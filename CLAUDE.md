@@ -104,9 +104,25 @@ the QML window.
   with the progress. QML reads it through `backend.state(url)` in bindings that also
   touch `backend.progressRevision`, which bumps on every change. Another window's
   commits are seen through a watch on the database file plus `PRAGMA data_version`.
+- **Article pages:** `Archive` (`src/archive.cpp`, owned by `Backend`) downloads each
+  writeup's own page in the window, one at a time, newest first, when the library
+  changes (only with `systemd` true and QSettings `saveTexts`, default on). Links are
+  untrusted (agent or feed): http(s) only; the host is resolved with `QHostInfo` and
+  every address must pass `Archive::isPublic` (no loopback, private, link-local, ULA,
+  CGNAT, multicast; IPv4-mapped judged as IPv4); redirects are followed by hand
+  (`ManualRedirectPolicy`, raw `Location`, max 5) and checked again; 4 MB cap, 45 s
+  inactivity timeout. Residual risk: the request resolves the name again (DNS
+  rebinding); acceptable for a GET with no cookies, don't add credentials to it.
+  `Archive::text` is regex HTML → text (prefers `<main>`/`<article>`, drops scripts,
+  nav, header/footer/aside and `<pre>` code). Text goes into `passages` (FTS5, ~1000
+  chars each) keyed by canonical URL, status into `pages` (`ok`, `skipped` for
+  non-HTML, `refused`, `failed`, retried after 6 h up to 3 times). Tests set
+  `allowPrivate` and serve pages from a `QTcpServer`. Claude is never involved.
 - **Search:** each word is a quoted FTS5 prefix (`"word"*`, so typed operators are
-  text) via `Database::match`, or part of one of the user's tags; every word must
-  match; results are ordered by summed BM25 (title 10, summary 4, rest 1).
+  text) via `Database::match`, or part of one of the user's tags, or in the saved page
+  (`Database::matchPages`, half weight); every word must match; results are ordered by
+  summed BM25 (title 10, summary 4, rest 1). `bm25()` can't be used inside an
+  aggregate, so per-page minima are taken in C++.
 - **Agent output fields:** category (fixed list in `Store`, grouped into topics; unknown
   → Other), level, 5–8 takeaways, 3–5 questions with answers, 3–6 practice ideas. The
   app is for learning, not attacking: the prompt forbids code/commands/payloads/PoCs,

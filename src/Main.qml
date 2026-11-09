@@ -689,6 +689,20 @@ ApplicationWindow {
                         font.pixelSize: 12
                     }
 
+                    Switch {
+                        text: qsTr("Save article texts for search")
+                        checked: backend.saveTexts
+                        onToggled: backend.saveTexts = checked
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        wrapMode: Text.Wrap
+                        text: qsTr("The window downloads each writeup's page once, from the site that published it, and keeps the text on this machine, so search covers whole articles. Code blocks are left out.")
+                        color: Style.faint
+                        font.family: Style.sans
+                        font.pixelSize: 12
+                    }
+
                     Rectangle { Layout.fillWidth: true; Layout.topMargin: 6; height: 1; color: Style.line }
                     Text { text: qsTr("Directions"); color: Style.ink; font.family: Style.sans; font.pixelSize: 17; font.weight: Font.DemiBold }
                     Text {

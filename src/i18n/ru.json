@@ -154,5 +154,7 @@
   "I knew it": "Знал",
   "I didn't": "Не знал",
   "answers known of %1": "ответов знал из %1",
-  "Your progress can't be saved: %1": "Прогресс не сохраняется: %1"
+  "Your progress can't be saved: %1": "Прогресс не сохраняется: %1",
+  "Save article texts for search": "Сохранять тексты статей для поиска",
+  "The window downloads each writeup's page once, from the site that published it, and keeps the text on this machine, so search covers whole articles. Code blocks are left out.": "Окно один раз скачивает страницу каждой статьи с сайта, где она опубликована, и хранит текст на этом компьютере, чтобы поиск охватывал статьи целиком. Блоки кода не сохраняются."
 }

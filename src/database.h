@@ -4,12 +4,14 @@
 #include <QJsonObject>
 #include <QSqlDatabase>
 #include <QString>
+#include <QStringList>
 
 class Store;
 
 // The local SQLite file, <data>/library/library.db. It keeps what the user did
-// (progress and self-check answers), which nothing can rebuild, and a
-// full-text index of the saved days, which reindexing can. It sits in a
+// (progress and self-check answers), which nothing can rebuild, a full-text
+// index of the saved days, which reindexing can, and the text of the
+// writeups' own pages, which the Archive downloads. It sits in a
 // subdirectory so its journal doesn't wake the window's watcher of the data
 // directory. Only the window and `export` open it; fetches and syncs never do.
 class Database {
@@ -19,7 +21,7 @@ public:
     Database(const Database &) = delete;
     Database &operator=(const Database &) = delete;
 
-    static constexpr int version = 1;
+    static constexpr int version = 2;
 
     QString path() const { return m_path; }
     // Empty when the file opened and is at the current version.
@@ -41,6 +43,17 @@ public:
     // Writeups with a word starting with this one, as "<date>\t<url>" → BM25
     // score (lower is better).
     QHash<QString, double> match(const QString &word) const;
+
+    // True while a page has no text saved yet and isn't given up on: a
+    // failed download is tried again after six hours, three times in all.
+    bool wantsPage(const QString &url) const;
+    // status: "ok" with passages, or "failed", "skipped", "refused" with error.
+    bool savePage(const QString &url, const QString &status, const QStringList &passages, const QString &error);
+    QStringList passages(const QString &url) const;
+    // "ok", "failed", "skipped", "refused", or empty when never tried.
+    QString pageStatus(const QString &url) const;
+    // Pages with a word starting with this one, canonical URL → best BM25.
+    QHash<QString, double> matchPages(const QString &word) const;
 
 private:
     QSqlDatabase connection() const;

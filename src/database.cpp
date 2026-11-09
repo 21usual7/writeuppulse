@@ -74,6 +74,13 @@ bool Database::migrate(const QString &directory) {
             ok = ok && run(sql);
         ok = ok && importProgress(directory + "/progress.json");
     }
+    if (ok && current < 2)
+        for (const char *sql : {
+                 "CREATE TABLE pages (url TEXT PRIMARY KEY, status TEXT NOT NULL, words INTEGER NOT NULL DEFAULT 0,"
+                 " error TEXT, attempts INTEGER NOT NULL DEFAULT 0, at TEXT NOT NULL)",
+                 "CREATE VIRTUAL TABLE passages USING fts5 (url UNINDEXED, n UNINDEXED, text,"
+                 " tokenize = 'unicode61 remove_diacritics 2')"})
+            ok = ok && run(sql);
     ok = ok && (current == version || run(QString("PRAGMA user_version = %1").arg(version))) && run("COMMIT");
     if (!ok)
         QSqlQuery(connection()).exec("ROLLBACK");
@@ -247,5 +254,80 @@ QHash<QString, double> Database::match(const QString &word) const {
     if (query.exec())
         while (query.next())
             hits.insert(query.value(0).toString() + "\t" + query.value(1).toString(), query.value(2).toDouble());
+    return hits;
+}
+
+bool Database::wantsPage(const QString &url) const {
+    QSqlQuery query(connection());
+    query.prepare("SELECT status, attempts, at FROM pages WHERE url = ?");
+    query.addBindValue(url);
+    if (!query.exec() || !query.next())
+        return true;
+    return query.value(0).toString() == "failed" && query.value(1).toInt() < 3
+           && QDateTime::fromString(query.value(2).toString(), Qt::ISODate).secsTo(QDateTime::currentDateTime()) > 6 * 3600;
+}
+
+bool Database::savePage(const QString &url, const QString &status, const QStringList &passages, const QString &error) {
+    QSqlDatabase db = connection();
+    QSqlQuery query(db);
+    bool ok = db.transaction();
+    query.prepare("SELECT attempts FROM pages WHERE url = ?");
+    query.addBindValue(url);
+    const int attempts = status == "failed" && query.exec() && query.next() ? query.value(0).toInt() + 1 : status == "failed";
+    query.prepare("DELETE FROM passages WHERE url = ?");
+    query.addBindValue(url);
+    ok = ok && query.exec();
+    int words = 0;
+    for (int i = 0; i < passages.size(); ++i) {
+        words += passages.at(i).split(' ', Qt::SkipEmptyParts).size();
+        query.prepare("INSERT INTO passages (url, n, text) VALUES (?, ?, ?)");
+        query.addBindValue(url);
+        query.addBindValue(i);
+        query.addBindValue(passages.at(i));
+        ok = ok && query.exec();
+    }
+    query.prepare("INSERT OR REPLACE INTO pages (url, status, words, error, attempts, at) VALUES (?, ?, ?, ?, ?, ?)");
+    for (const QVariant &value : {QVariant(url), QVariant(status), QVariant(words), QVariant(error), QVariant(attempts),
+                                  QVariant(QDateTime::currentDateTime().toString(Qt::ISODate))})
+        query.addBindValue(value);
+    ok = ok && query.exec();
+    if (ok && db.commit())
+        return true;
+    db.rollback();
+    return false;
+}
+
+QStringList Database::passages(const QString &url) const {
+    QStringList list;
+    QSqlQuery query(connection());
+    query.prepare("SELECT text FROM passages WHERE url = ? ORDER BY n");
+    query.addBindValue(url);
+    if (query.exec())
+        while (query.next())
+            list << query.value(0).toString();
+    return list;
+}
+
+QString Database::pageStatus(const QString &url) const {
+    QSqlQuery query(connection());
+    query.prepare("SELECT status FROM pages WHERE url = ?");
+    query.addBindValue(url);
+    return query.exec() && query.next() ? query.value(0).toString() : QString();
+}
+
+QHash<QString, double> Database::matchPages(const QString &word) const {
+    QHash<QString, double> hits;
+    QSqlQuery query(connection());
+    // bm25() can't be used inside an aggregate, so the best passage per page
+    // is picked here.
+    query.prepare("SELECT url, bm25(passages) FROM passages WHERE passages MATCH ?");
+    query.addBindValue("\"" + QString(word).replace('"', "\"\"") + "\"*");
+    if (query.exec())
+        while (query.next()) {
+            const QString url = query.value(0).toString();
+            const double score = query.value(1).toDouble();
+            if (!hits.contains(url) || score < hits.value(url))
+                hits.insert(url, score);
+        }
     return hits;
 }

@@ -9,6 +9,7 @@
 #include <QSignalSpy>
 #include <QStandardPaths>
 
+#include "archive.h"
 #include "backend.h"
 #include "database.h"
 #include "fetcher.h"
@@ -395,6 +396,121 @@ private slots:
         Backend first(dir.path(), false), second(dir.path(), false);
         first.setFavorite(first.items().first().toMap(), true);
         QTRY_COMPARE(second.favoriteCount(), 1);
+    }
+
+    void archiveAsksOnlyPublicAddresses()
+    {
+        for (const char *address : {"127.0.0.1", "10.1.2.3", "172.16.0.1", "192.168.1.1", "169.254.1.1", "100.64.0.1",
+                                    "0.0.0.0", "224.0.0.1", "::1", "fe80::1", "fd00::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1"})
+            QVERIFY2(!Archive::isPublic(QHostAddress(address)), address);
+        for (const char *address : {"93.184.215.14", "1.1.1.1", "2606:4700:4700::1111", "::ffff:1.1.1.1"})
+            QVERIFY2(Archive::isPublic(QHostAddress(address)), address);
+    }
+
+    void archiveKeepsTheReadableText()
+    {
+        const QByteArray html =
+            "<html><head><meta charset=\"utf-8\"><title>T</title><style>body{}</style>"
+            "<script>alert('x')</script></head><body><nav>Home | About</nav>"
+            "<aside>Popular posts</aside><article><h1>Heap grooming</h1>"
+            "<p>Freed chunks &amp; bins&nbsp;matter &#8212; a lot.</p><!-- hidden -->"
+            "<pre>int main() { return 0; }</pre><p>Привет, <b>мир</b> &#x41;</p></article>"
+            "<footer>(c) site</footer></body></html>";
+        const QString text = Archive::text(html);
+        QCOMPARE(text, QString("Heap grooming\nFreed chunks & bins matter — a lot.\nПривет, мир A"));
+
+        QString long_;
+        for (int i = 0; i < 30; ++i)
+            long_ += QString("Paragraph %1 ").arg(i).repeated(10) + "\n";
+        const QStringList passages = Archive::passages(long_);
+        QVERIFY(passages.size() > 1);
+        for (const auto &passage : passages)
+            QVERIFY(passage.size() <= 1200);
+        QCOMPARE(passages.join('\n').split('\n').size(), 30);
+    }
+
+    void archiveSavesPagesAndGivesUpOnTheRest()
+    {
+        // A stand-in web server: a redirect, a page, a PDF, and a page too big to keep.
+        QTcpServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        int connections = 0;
+        connect(&server, &QTcpServer::newConnection, this, [&] {
+            ++connections;
+            QTcpSocket *socket = server.nextPendingConnection();
+            connect(socket, &QTcpSocket::readyRead, socket, [socket] {
+                const QByteArray request = socket->readAll();
+                const QByteArray path = request.split(' ').value(1);
+                QByteArray head = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n", body;
+                if (path == "/old")
+                    head = "HTTP/1.1 301 Moved\r\nLocation: /page\r\n";
+                else if (path == "/page")
+                    body = "<html><body><main><p>Zebra stripes explain the allocator.</p></main></body></html>";
+                else if (path == "/paper.pdf")
+                    head = "HTTP/1.1 200 OK\r\nContent-Type: application/pdf\r\n", body = "%PDF-1.7";
+                else if (path == "/big")
+                    body = QByteArray(20000, 'x');
+                else
+                    head = "HTTP/1.1 404 Not Found\r\n";
+                socket->write(head + "Content-Length: " + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n" + body);
+                socket->disconnectFromHost();
+            });
+        });
+        const QString base = QString("http://127.0.0.1:%1").arg(server.serverPort());
+
+        QTemporaryDir dir;
+        Database database(dir.path());
+        Archive archive(database);
+        archive.allowPrivate = true;
+        // Pages are kept by canonical URL, which makes this one https.
+        auto status = [&](const QString &path) { return database.pageStatus(Store::canonicalUrl(base + path)); };
+        archive.limit = 8000;
+        QSignalSpy saved(&archive, &Archive::saved);
+        archive.enqueue({base + "/old", base + "/paper.pdf", base + "/big", base + "/gone", "ftp://example.com/x"});
+        QTRY_COMPARE(saved.count(), 5);
+
+        QCOMPARE(status("/old"), QString("ok"));
+        QCOMPARE(database.passages(Store::canonicalUrl(base + "/old")), QStringList({"Zebra stripes explain the allocator."}));
+        QCOMPARE(status("/paper.pdf"), QString("skipped"));
+        QCOMPARE(status("/big"), QString("failed"));
+        QCOMPARE(status("/gone"), QString("failed"));
+        QCOMPARE(database.pageStatus("ftp://example.com/x"), QString("refused"));
+        QVERIFY(database.matchPages("zebr").contains(Store::canonicalUrl(base + "/old")));
+
+        // Nothing is asked twice: saved pages are done, failures wait six hours.
+        const int asked = connections;
+        archive.enqueue({base + "/old", base + "/big"});
+        QTest::qWait(200);
+        QCOMPARE(connections, asked);
+
+        // This machine is never asked outside tests.
+        Archive strict(database);
+        QSignalSpy refused(&strict, &Archive::saved);
+        strict.enqueue({base + "/page"});
+        QTRY_COMPARE(refused.count(), 1);
+        QCOMPARE(status("/page"), QString("refused"));
+        QCOMPARE(connections, asked);
+    }
+
+    void searchCoversSavedPages()
+    {
+        QTemporaryDir dir;
+        Store store(dir.path());
+        QString error;
+        auto item = [](const QString &title, const QString &summary) {
+            return QJsonObject{{"title", title}, {"url", "https://example.com/" + title}, {"summary", summary}};
+        };
+        QVERIFY(store.saveDigest({{"date", "2026-11-09"}, {"items", QJsonArray{
+            item("a", "Nothing here."), item("b", "About the zebra allocator.")}}}, &error));
+        {
+            Database database(dir.path());
+            QVERIFY(database.savePage("https://example.com/a", "ok", {"A long text that mentions a zebra once."}, {}));
+        }
+        Backend backend(dir.path(), false);
+        backend.setQuery("zebra");
+        QCOMPARE(backend.items().size(), 2);
+        // A summary hit comes before a hit only in the page's text.
+        QCOMPARE(backend.items().first().toMap().value("title").toString(), QString("b"));
     }
 
     void backendExportsThroughThePicker()

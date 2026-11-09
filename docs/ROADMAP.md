@@ -156,6 +156,10 @@ Modules, one class per role like the current code:
   recorded (focus mode and the Check yourself tab, counted in Statistics and the
   export); `Database` (the module called `Library` below) with migrations,
   `progress.json` import, and FTS5 search ranked by BM25.
+- 2026-11-09, stage 3: `Archive` saves each writeup's page text locally
+  (public hosts only, redirects checked, no code blocks), cut into FTS5
+  passages; search covers it. 4 of 5 real pages saved on the first try; the
+  fifth is a slow site, retried later.
 
 ## 7–9. Roadmap
 

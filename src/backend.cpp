@@ -18,7 +18,7 @@
 static QByteArray stamp(const QString &path);
 
 Backend::Backend(const QString &directory, bool systemd, QObject *parent)
-    : QObject(parent), m_store(directory), m_database(m_store.directory()), m_progress(m_database), m_systemd(systemd) {
+    : QObject(parent), m_store(directory), m_database(m_store.directory()), m_progress(m_database), m_archive(m_database), m_systemd(systemd) {
     QDir().mkpath(m_store.directory());
     if (!m_database.error().isEmpty())
         setProblem(tr("Your progress can't be saved: %1").arg(m_database.error()));
@@ -29,6 +29,12 @@ Backend::Backend(const QString &directory, bool systemd, QObject *parent)
     m_hideRead = settings.value("hideRead", false).toBool();
     m_searchCategories = settings.value("categories").toStringList();
     m_preferredCategories = settings.value("preferred").toStringList();
+    m_saveTexts = settings.value("saveTexts", true).toBool();
+    // A newly saved page can change what a search finds.
+    connect(&m_archive, &Archive::saved, this, [this] {
+        if (!m_query.trimmed().isEmpty())
+            rebuild();
+    });
     m_noticeTimer.setSingleShot(true);
     m_noticeTimer.setInterval(6000);
     connect(&m_noticeTimer, &QTimer::timeout, this, [this] { setNotice({}); });
@@ -123,6 +129,28 @@ void Backend::setPreferredCategories(const QStringList &categories) {
         emit preferencesChanged();
         rebuild();
     }
+}
+
+void Backend::setSaveTexts(bool save) {
+    if (save == m_saveTexts)
+        return;
+    m_saveTexts = save;
+    QSettings("writeuppulse", "writeuppulse").setValue("saveTexts", save);
+    emit preferencesChanged();
+    if (save)
+        archive();
+    else
+        m_archive.clear();
+}
+
+// Newest first, so today's writeups are searchable before older ones.
+void Backend::archive() {
+    if (!m_systemd || !m_saveTexts)
+        return;
+    QStringList urls;
+    for (const auto &value : m_library)
+        urls << value.toMap().value("url").toString();
+    m_archive.enqueue(urls);
 }
 
 void Backend::setNotice(const QString &notice) {
@@ -242,9 +270,11 @@ void Backend::rebuild() {
     // index) or be part of one of the user's tags; the best matches come
     // first. A search hit that a filter hides counts as hidden; a miss doesn't.
     const QStringList words = m_query.toLower().split(' ', Qt::SkipEmptyParts);
-    QList<QHash<QString, double>> hits;
-    for (const auto &word : words)
+    QList<QHash<QString, double>> hits, pageHits;
+    for (const auto &word : words) {
         hits << m_database.match(word);
+        pageHits << m_database.matchPages(word);
+    }
     QHash<QString, double> scores;
     QVariantList items;
     int hidden = 0;
@@ -254,12 +284,16 @@ void Backend::rebuild() {
         const QStringList userTags = state.value("tags").toVariant().toStringList();
         if (!words.isEmpty()) {
             const QString key = item.value("date").toString() + "\t" + item.value("url").toString();
+            const QString page = Store::canonicalUrl(item.value("url").toString());
             const QString tagText = userTags.join(' ').toLower();
             double score = 0;
             bool all = true;
             for (int i = 0; all && i < words.size(); ++i) {
                 if (hits.at(i).contains(key))
                     score += hits.at(i).value(key);
+                // The page's own text counts for less than the summary.
+                else if (pageHits.at(i).contains(page))
+                    score += pageHits.at(i).value(page) / 2;
                 else
                     all = tagText.contains(words.at(i));
             }
@@ -397,6 +431,7 @@ void Backend::reload() {
         QString error;
         if (!m_database.index(m_store, &error))
             setProblem(error);
+        archive();
         rebuildNeeded = true;
         // The statistics read the categories of the days.
         emit progressChanged();

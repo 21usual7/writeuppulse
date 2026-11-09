@@ -84,7 +84,11 @@ slips through.
 
 Mark writeups as read (M), done in a lab (B), or favorite (F), and tag them.
 Filter the list by topic, level, or unread; search covers every saved day, matches
-the beginnings of words, and puts title matches first.
+the beginnings of words, and puts title matches first. With "Save article texts for
+search" on (Settings, on by default), the window downloads each writeup's page once
+from the site that published it and keeps its text, without code blocks, on your
+machine, so search also covers whole articles. Only public web addresses are
+fetched, and nothing is sent to Claude.
 Settings (P) holds the language, the daily timer, and which directions the agent
 searches, with stars for the ones it should pick more often. Export (E) saves the
 day, or the week ending on it, as Markdown through the desktop's save dialog, with

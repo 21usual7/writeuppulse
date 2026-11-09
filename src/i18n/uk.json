@@ -154,5 +154,7 @@
   "I knew it": "Знав",
   "I didn't": "Не знав",
   "answers known of %1": "відповідей знав із %1",
-  "Your progress can't be saved: %1": "Прогрес не зберігається: %1"
+  "Your progress can't be saved: %1": "Прогрес не зберігається: %1",
+  "Save article texts for search": "Зберігати тексти статей для пошуку",
+  "The window downloads each writeup's page once, from the site that published it, and keeps the text on this machine, so search covers whole articles. Code blocks are left out.": "Вікно один раз завантажує сторінку кожної статті із сайту, де її опубліковано, і зберігає текст на цьому комп'ютері, щоб пошук охоплював статті повністю. Блоки коду не зберігаються."
 }

@@ -6,6 +6,7 @@
 #include <QTimer>
 #include <QVariantList>
 
+#include "archive.h"
 #include "database.h"
 #include "filepicker.h"
 #include "progress.h"
@@ -48,6 +49,7 @@ class Backend : public QObject {
     Q_PROPERTY(QStringList searchCategories READ searchCategories WRITE setSearchCategories NOTIFY preferencesChanged)
     Q_PROPERTY(QStringList preferredCategories READ preferredCategories WRITE setPreferredCategories NOTIFY preferencesChanged)
     Q_PROPERTY(QString notice READ notice NOTIFY noticeChanged)
+    Q_PROPERTY(bool saveTexts READ saveTexts WRITE setSaveTexts NOTIFY preferencesChanged)
 
 public:
     explicit Backend(const QString &directory = {}, bool systemd = true, QObject *parent = nullptr);
@@ -82,6 +84,10 @@ public:
     QStringList preferredCategories() const { return m_preferredCategories; }
     void setPreferredCategories(const QStringList &categories);
     QString notice() const { return m_notice; }
+    // Whether the window downloads each writeup's page for search; on by
+    // default, and only in a real session, never in tests.
+    bool saveTexts() const { return m_saveTexts; }
+    void setSaveTexts(bool save);
 
     // The picker answers asynchronously; the export is written when it does.
     void setFilePicker(FilePicker *picker);
@@ -145,10 +151,13 @@ private:
     void progressSaved(bool ok);
     void saveExport(const QUrl &url);
     void setNotice(const QString &notice);
+    void archive();
 
     Store m_store;
     Database m_database;
     Progress m_progress;
+    Archive m_archive;
+    bool m_saveTexts = true;
     int m_progressRevision = 0;
     int m_dataVersion = -1;
     // Canonical URL → the category its day has now, for the statistics.

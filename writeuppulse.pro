@@ -8,6 +8,7 @@ VERSION = 0.3.0
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 HEADERS += \
+    src/archive.h \
     src/backend.h \
     src/cli.h \
     src/database.h \
@@ -22,6 +23,7 @@ HEADERS += \
 
 SOURCES += \
     src/main.cpp \
+    src/archive.cpp \
     src/backend.cpp \
     src/cli.cpp \
     src/database.cpp \
