@@ -14,7 +14,6 @@
 #include "filepicker.h"
 #include "progress.h"
 #include "store.h"
-#include "theme.h"
 #include "translator.h"
 
 // Answers the save dialog at once with a fixed file.
@@ -356,46 +355,6 @@ private slots:
         backend.olderDay();
         QCOMPARE(backend.date(), QString("2026-11-08"));
         QCOMPARE(backend.items().first().toMap().value("url").toString(), QString("https://example.com/old"));
-    }
-
-    void themeFallsBack()
-    {
-        QTemporaryDir dir;
-        Theme theme(dir.path());
-        QCOMPARE(theme.accent(), QString("#FFD60A"));
-        QCOMPARE(theme.accentForeground(), QString("black"));
-    }
-
-    void themeReadsAccent()
-    {
-        QTemporaryDir dir;
-        QDir(dir.path()).mkpath("theme");
-        QFile colors(dir.path() + "/theme/colors.toml");
-        QVERIFY(colors.open(QIODevice::WriteOnly));
-        colors.write("accent = \"#112233\"\n");
-        colors.close();
-
-        Theme theme(dir.path());
-        QCOMPARE(theme.accent(), QString("#112233"));
-        QCOMPARE(theme.accentForeground(), QString("white"));
-    }
-
-    void themeFollowsHyprlandRounding()
-    {
-        QTemporaryDir dir;
-        const QString response = dir.filePath("response.json"), command = dir.filePath("hyprctl");
-        auto write = [](const QString &path, const QByteArray &data) {
-            QFile file(path);
-            return file.open(QIODevice::WriteOnly) && file.write(data) == data.size();
-        };
-        QVERIFY(write(command, "#!/bin/sh\ncat '" + response.toUtf8() + "'\n"));
-        QVERIFY(QFile::setPermissions(command, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
-        QVERIFY(write(response, "{\"int\":0}"));
-
-        Theme theme(dir.path(), nullptr, command);
-        QCOMPARE(theme.radius(), 0);
-        QVERIFY(write(response, "{\"int\":6}"));
-        QTRY_COMPARE(theme.radius(), 6);
     }
 
     void translatorFallsBackToEnglish()

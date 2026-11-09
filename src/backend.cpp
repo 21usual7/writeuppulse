@@ -22,7 +22,6 @@ Backend::Backend(const QString &directory, bool systemd, QObject *parent)
     m_agentMissing = Fetcher::findClaude().isEmpty();
     m_language = Fetcher::language();
     const QSettings settings("writeuppulse", "writeuppulse");
-    m_deepMode = settings.value("deepMode", false).toBool();
     m_hideRead = settings.value("hideRead", false).toBool();
     m_searchCategories = settings.value("categories").toStringList();
     m_preferredCategories = settings.value("preferred").toStringList();
@@ -185,14 +184,6 @@ void Backend::setHideRead(bool hide) {
         m_hideRead = hide;
         QSettings("writeuppulse", "writeuppulse").setValue("hideRead", hide);
         filtersChanged();
-    }
-}
-
-void Backend::setDeepMode(bool deep) {
-    if (deep != m_deepMode) {
-        m_deepMode = deep;
-        QSettings("writeuppulse", "writeuppulse").setValue("deepMode", deep);
-        emit filterChanged();
     }
 }
 

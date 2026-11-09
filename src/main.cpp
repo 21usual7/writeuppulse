@@ -12,7 +12,6 @@
 #include "backend.h"
 #include "cli.h"
 #include "portalfilepicker.h"
-#include "theme.h"
 #include "translator.h"
 
 int main(int argc, char *argv[]) {
@@ -36,7 +35,6 @@ int main(int argc, char *argv[]) {
     Translator translator;
     app.installTranslator(&translator);
 
-    Theme theme;
     Backend backend;
     PortalFilePicker picker;
     backend.setFilePicker(&picker);
@@ -48,7 +46,6 @@ int main(int argc, char *argv[]) {
     QObject::connect(&backend, &Backend::languageChanged, &translator,
                      [&] { translator.setOverride(backend.language()); });
     engine.rootContext()->setContextProperty("translator", &translator);
-    engine.rootContext()->setContextProperty("theme", &theme);
     engine.rootContext()->setContextProperty("backend", &backend);
     engine.load(QUrl("qrc:/Main.qml"));
     if (engine.rootObjects().isEmpty())

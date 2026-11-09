@@ -1,8 +1,15 @@
 <RCC>
     <qresource prefix="/">
         <file alias="Main.qml">Main.qml</file>
-        <file alias="WriteupCard.qml">WriteupCard.qml</file>
-        <file alias="FilterChip.qml">FilterChip.qml</file>
+        <file alias="qmldir">qmldir</file>
+        <file alias="Style.qml">Style.qml</file>
+        <file alias="Pill.qml">Pill.qml</file>
+        <file alias="ActionButton.qml">ActionButton.qml</file>
+        <file alias="WriteupRow.qml">WriteupRow.qml</file>
+        <file alias="ReaderPane.qml">ReaderPane.qml</file>
+        <file alias="QuestionCard.qml">QuestionCard.qml</file>
+        <file alias="PracticeStep.qml">PracticeStep.qml</file>
+        <file alias="FocusView.qml">FocusView.qml</file>
         <file alias="StatsView.qml">StatsView.qml</file>
         <file alias="skill/SKILL.md">skill/SKILL.md</file>
         <file alias="i18n/en.json">i18n/en.json</file>

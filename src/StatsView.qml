@@ -1,78 +1,85 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Controls.Material
 import QtQuick.Layouts
 
 // The streak, the counts, and which directions the user reads, as bars.
 Flickable {
     id: stats
 
-    readonly property color dim: "#9a9aa2"
     readonly property var byCategory: {
         const counts = backend.stats.byCategory || {}
         return Object.keys(counts).map(k => ({ name: k, count: counts[k] })).sort((a, b) => b.count - a.count)
     }
     readonly property int most: byCategory.length ? byCategory[0].count : 1
 
-    contentHeight: column.implicitHeight
+    contentHeight: column.implicitHeight + 80
     clip: true
     boundsBehavior: Flickable.StopAtBounds
     ScrollBar.vertical: ScrollBar {}
 
     ColumnLayout {
         id: column
-        width: Math.min(stats.width - 12, 760)
-        spacing: 20
+        x: 56; y: 40
+        width: Math.min(stats.width - 112, 760)
+        spacing: 22
 
-        Label {
+        Text {
             text: qsTr("Statistics")
-            font.pixelSize: 20
-            font.bold: true
+            color: Style.ink
+            font.family: Style.sans
+            font.pixelSize: 28
+            font.weight: Font.DemiBold
         }
 
         GridLayout {
             Layout.fillWidth: true
-            columns: stats.width > 620 ? 4 : 2
+            columns: column.width > 560 ? 4 : 2
             columnSpacing: 12
             rowSpacing: 12
             Repeater {
                 model: [
-                    [backend.streak, qsTr("days in a row")],
-                    [backend.stats.read || 0, qsTr("writeups read")],
-                    [backend.stats.lab || 0, qsTr("done in a lab")],
-                    [backend.stats.favorites || 0, qsTr("in favorites")]
+                    [backend.streak, qsTr("days in a row"), Style.accent],
+                    [backend.stats.read || 0, qsTr("writeups read"), Style.ink],
+                    [backend.stats.lab || 0, qsTr("done in a lab"), Style.done],
+                    [backend.stats.favorites || 0, qsTr("in favorites"), Style.ink]
                 ]
                 Rectangle {
                     required property var modelData
                     Layout.fillWidth: true
-                    implicitHeight: 92
-                    radius: theme.radius
-                    color: "#17171a"
+                    implicitHeight: 104
+                    radius: 14
+                    color: Style.pane
                     Column {
                         anchors.centerIn: parent
-                        spacing: 4
-                        Label {
+                        spacing: 6
+                        Text {
                             anchors.horizontalCenter: parent.horizontalCenter
                             text: modelData[0].toLocaleString(Qt.locale(), 'f', 0)
-                            color: theme.accent
-                            font.pixelSize: 30
-                            font.bold: true
+                            color: modelData[2]
+                            font.family: Style.sans
+                            font.pixelSize: 34
+                            font.weight: Font.DemiBold
                         }
-                        Label {
+                        Text {
                             anchors.horizontalCenter: parent.horizontalCenter
                             text: modelData[1]
-                            color: stats.dim
+                            color: Style.muted
+                            font.family: Style.sans
+                            font.pixelSize: 13
                         }
                     }
                 }
             }
         }
 
-        Label {
+        Text {
+            Layout.topMargin: 10
             visible: stats.byCategory.length > 0
             text: qsTr("Read by direction")
-            font.pixelSize: 16
-            font.bold: true
+            color: Style.ink
+            font.family: Style.sans
+            font.pixelSize: 17
+            font.weight: Font.DemiBold
         }
 
         Repeater {
@@ -80,37 +87,46 @@ Flickable {
             RowLayout {
                 required property var modelData
                 Layout.fillWidth: true
-                spacing: 12
-                Label {
+                spacing: 14
+                Text {
                     Layout.preferredWidth: 170
                     text: modelData.name
                     elide: Text.ElideRight
+                    color: Style.ink
+                    font.family: Style.sans
+                    font.pixelSize: 14
                 }
-                Item {
+                Rectangle {
                     Layout.fillWidth: true
-                    implicitHeight: 14
+                    implicitHeight: 10
+                    radius: 5
+                    color: Style.raised
                     Rectangle {
-                        width: Math.max(4, parent.width * modelData.count / stats.most)
+                        width: Math.max(10, parent.width * modelData.count / stats.most)
                         height: parent.height
-                        radius: Math.min(4, theme.radius)
-                        color: theme.accent
+                        radius: 5
+                        color: Style.topicColor(backend.topicOf(modelData.name))
                     }
                 }
-                Label {
+                Text {
                     Layout.preferredWidth: 36
                     horizontalAlignment: Text.AlignRight
                     text: modelData.count.toLocaleString(Qt.locale(), 'f', 0)
-                    color: stats.dim
+                    color: Style.muted
+                    font.family: Style.sans
+                    font.pixelSize: 13
                 }
             }
         }
 
-        Label {
+        Text {
             Layout.fillWidth: true
             visible: (backend.stats.read || 0) === 0
             wrapMode: Text.Wrap
             text: qsTr("Mark writeups as read with M to see your progress here.")
-            color: stats.dim
+            color: Style.muted
+            font.family: Style.sans
+            font.pixelSize: 14
         }
     }
 }

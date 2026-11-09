@@ -24,7 +24,6 @@ class Backend : public QObject {
     Q_PROPERTY(QString levelFilter READ levelFilter WRITE setLevelFilter NOTIFY filterChanged)
     Q_PROPERTY(QString tagFilter READ tagFilter WRITE setTagFilter NOTIFY filterChanged)
     Q_PROPERTY(bool hideRead READ hideRead WRITE setHideRead NOTIFY filterChanged)
-    Q_PROPERTY(bool deepMode READ deepMode WRITE setDeepMode NOTIFY filterChanged)
     Q_PROPERTY(QStringList shownCategories READ shownCategories NOTIFY digestChanged)
     Q_PROPERTY(int hiddenCount READ hiddenCount NOTIFY digestChanged)
     Q_PROPERTY(QVariantList items READ items NOTIFY digestChanged)
@@ -67,8 +66,6 @@ public:
     void setTagFilter(const QString &tag);
     bool hideRead() const { return m_hideRead; }
     void setHideRead(bool hide);
-    bool deepMode() const { return m_deepMode; }
-    void setDeepMode(bool deep);
     QStringList shownCategories() const { return m_shownCategories; }
     int hiddenCount() const { return m_hiddenCount; }
     int favoriteCount() const { return m_progress.favorites().size(); }
@@ -156,7 +153,6 @@ private:
     QString m_query, m_levelFilter, m_tagFilter;
     QStringList m_categoryFilter, m_shownCategories;
     bool m_hideRead = false;
-    bool m_deepMode = false;
     int m_hiddenCount = 0;
     QStringList m_searchCategories, m_preferredCategories;
     FilePicker *m_picker = nullptr;

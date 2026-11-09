@@ -66,9 +66,13 @@ One binary, two modes (`src/main.cpp`): any first argument other than `open` goe
   (`Fetcher::language()`); unset → Omarchy's language if offered, else English.
   Catalogs are `src/i18n/<code>.json` keyed by the English `qsTr()` text; add new
   strings to both `ru.json` and `uk.json`.
-- `theme.{h,cpp}` and `translator.{h,cpp}` come from the omarchy-app templates (live
-  accent/rounding from Omarchy, live language). Keep agent-supplied text in QML as
-  `textFormat: Text.PlainText`.
+- **Look:** the app has its own palette on purpose (the user chose it over following the
+  Omarchy theme): colours, fonts, and radius live in the `Style` QML singleton
+  (`src/Style.qml`, registered by `src/qmldir`). Layout is a reader — icon rail, list
+  (`WriteupRow`), open writeup in tabs (`ReaderPane`) — plus `FocusView`, a step-by-step
+  overlay. Controls are mostly hand-drawn (`Pill`, `ActionButton`); Material only
+  styles fields, menus, and popups. `translator.{h,cpp}` comes from the omarchy-app
+  templates. Keep agent-supplied text in QML as `textFormat: Text.PlainText`.
 
 ## Gotchas
 
@@ -77,6 +81,8 @@ One binary, two modes (`src/main.cpp`): any first argument other than `open` goe
   Build JSON fixtures with `QJsonObject` instead. After such a failure, `rm -rf build/tests`.
 - Tests call `QStandardPaths::setTestModeEnabled(true)` in `initTestCase` so `QSettings`
   doesn't touch the real `~/.config`; keep it there.
+- Never use `focus` as a QML id: every Item has a `focus` property, which wins, so
+  `focus.x` silently reads `undefined`.
 - Offscreen rendering (`QT_QPA_PLATFORM=offscreen`) does not draw Material button and
   popup backgrounds. For screenshots that must look real, run the QML harness with
   `QT_QPA_PLATFORM=wayland` and `grabWindow()`.
