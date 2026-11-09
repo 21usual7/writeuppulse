@@ -3,6 +3,9 @@ QT += core gui qml quick quickcontrols2 dbus network
 CONFIG += c++17 release
 TARGET = writeuppulse
 TEMPLATE = app
+# Keep in step with pkgver in pkgbuild/PKGBUILD.
+VERSION = 0.2.0
+DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 HEADERS += \
     src/backend.h \
