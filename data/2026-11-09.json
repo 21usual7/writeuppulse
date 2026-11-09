@@ -1,0 +1,139 @@
+{
+    "date": "2026-11-09",
+    "generatedAt": "2026-11-09T18:13:43",
+    "items": [
+        {
+            "category": "Other",
+            "level": "",
+            "popularity": "Hacker News · 535 points, 283 comments",
+            "practice": [
+            ],
+            "questions": [
+            ],
+            "source": "shubs.io (Shubham Shah)",
+            "summary": "Shubham Shah and Sam Curry found a chain of flaws in a major automaker's connected-car platform. The chain let them send remote commands, such as unlocking doors, to any car in Australia given only its number plate. The automaker is not named. They tested only cars they owned or had permission to access, in July 2026. Curry's separate writeup extends the impact to the US, Canada and Europe.\n\nThe chain: an exposed \"TEST HARNESS\" admin tool leaked internal APIs and hardcoded keys. A vendor JavaScript bundle contained ForgeRock OpenIDM admin credentials that were meant for staging but also worked in production. A path-normalization trick got past the WAF protecting the admin API, and a custom mobile-app endpoint returned password and PIN hashes and personal data. In the Australian environment the MFA step could be skipped through a password-based OAuth grant, which yielded a valid app token for the remote command API. The author says an AI model helped find the WAF bypass after manual attempts failed.\n\nThe post gives no disclosure timeline and does not confirm that everything was fixed. It only says the automaker added WAF rules to the admin APIs.",
+            "tags": [
+                "security",
+                "web",
+                "automotive"
+            ],
+            "takeaways": [
+                "Secrets in client-side JavaScript bundles, including vendor bundles, are a recurring source of full compromise.",
+                "Staging credentials often still work in production, so test for that.",
+                "A WAF is not a substitute for authentication. Path normalization differences between the WAF and the backend can bypass it.",
+                "MFA can be undermined by alternate OAuth grant types that skip the second step.",
+                "Per-region differences in hardening mean one environment can be much weaker than another."
+            ],
+            "title": "Unlocking any car from X brand in most of the world",
+            "topic": "Other",
+            "url": "https://shubs.io/unlocking-any-car-from-x-brand-in-most-of-the-world/",
+            "why": "A full real-world exploit chain, from a number plate to remote car commands, where each step is a different common web security mistake."
+        },
+        {
+            "category": "Other",
+            "level": "",
+            "popularity": "Hacker News · 104 points, 20 comments",
+            "practice": [
+            ],
+            "questions": [
+            ],
+            "source": "benmandrew.com (Ben M. Andrew)",
+            "summary": "The article starts from strace output, which shows that 1,000 malloc(16) calls cause only two brk syscalls. It then measures cost: an empty syscall takes about 575 ns and sbrk(16) about 610 ns, while malloc(16) takes about 27 ns. It maps the process address space and explains chunk headers (an 8-byte size field, 16-byte alignment, flag bits) and demand paging, where RAM is attached only on first write.\n\nThe author then builds four allocators in turn: a bump allocator, a free list with splitting and coalescing, one that trims the heap top, and one that uses mmap for blocks of 128 KiB or more. They run a workload of 4,000 live blocks for 500,000 steps. The toy allocators take 5 to 12 µs per step against 0.079 µs for glibc, because they walk a linear free list. The reason glibc is fast is its bins (size-segregated free lists) and its thread-local tcache.\n\nTuning experiments show the trade-offs. Setting tcache_count=0 lets RSS drop to 0.25 MiB after all blocks are freed, but costs speed. Fixing mmap_threshold at 128 KiB makes the run about 10.7x slower, because glibc normally raises the threshold adaptively.",
+            "tags": [
+                "systems",
+                "C",
+                "performance"
+            ],
+            "takeaways": [
+                "malloc batches kernel requests in userspace. malloc(16) is about 22x cheaper than sbrk(16).",
+                "Only the top of the heap can be returned to the kernel, so a live chunk above free space pins the break and causes fragmentation.",
+                "glibc's speed comes mainly from data structures (bins and tcache), not from any single trick.",
+                "Large allocations use mmap and can be returned immediately, but each new mapping page-faults on every page it writes.",
+                "glibc retaining about 19 MiB after all frees is a deliberate design choice, not a leak."
+            ],
+            "title": "What is malloc doing, anyway?",
+            "topic": "Other",
+            "url": "https://benmandrew.com/articles/what-is-malloc-doing-anyway",
+            "why": "It builds four toy allocators step by step and benchmarks each against glibc, which shows why malloc is fast and where fragmentation comes from."
+        },
+        {
+            "category": "Other",
+            "level": "",
+            "popularity": "Hacker News · 685 points, 86 comments",
+            "practice": [
+            ],
+            "questions": [
+            ],
+            "source": "declarative-dragging.github.io (Horowitz, Blinn, Heer; UIST 2026)",
+            "summary": "The paper proposes that making a diagram draggable should require only a declaration of which future model states dragging an element can lead to. The engine works out the geometry, feedback and animation. When a drag starts, it speculatively renders each candidate state into a view tree and extracts the dragged element's position in each one. Those positions become drop zones, and the engine synthesizes an animated, responsive drag between them.\n\nSimple model-driven behaviors can be combined, and modifiers add floating, snapping and transitions. The implementation is Dragology, a library for SVG interfaces on the web, available on GitHub and npm. Demos include algebra trees, Bézier curves, braids and card piles. Downstream uses are the Hazel programming environment, where it makes refactorings tangible, and a math game called Supernool.\n\nThe page reports no quantitative evaluation such as user studies or benchmarks. The evidence is the award, the demos and the two applications.",
+            "tags": [
+                "HCI",
+                "UI",
+                "research"
+            ],
+            "takeaways": [
+                "Specify the possible next states and let the system derive the drag interaction, instead of coding it by hand.",
+                "Speculatively rendering candidate states yields drop zones and animation without extra geometry code.",
+                "Behaviors are composable, with modifiers for snapping, floating and transitions.",
+                "The library, a video and an explorable supplement are public, so it can be tried today.",
+                "No user study or benchmark is reported, so the productivity claims rest on demos."
+            ],
+            "title": "Declarative Dragging",
+            "topic": "Other",
+            "url": "https://declarative-dragging.github.io/",
+            "why": "A best-paper idea that cuts drag-and-drop interactions down to declaring which states an element can become, which could change how UI code is written."
+        },
+        {
+            "category": "Other",
+            "level": "",
+            "popularity": "Hacker News · 68 points, 36 comments",
+            "practice": [
+            ],
+            "questions": [
+            ],
+            "source": "psalm.dev",
+            "summary": "Psalm 7 supports 64-bit PHP 8.2 to 8.6 and turns security analysis on by default. Taint analysis now runs in the same pass as type checking and dead-code detection, which the page claims is up to 10x faster. Taints are stored as bitmasks and resolved over compact per-function summaries, and results are deterministic across runs and thread counts.\n\nNew taint kinds cover NoSQL, LLM prompt and URL injection, with new sources such as php://input and uploaded file names. Taint now flows through closures, generators, traits and by-reference parameters. Capability-based purity (io, time) replaces @psalm-pure, and dead-code detection is graph-based, so unreachable cycles are flagged. PHP 8.5 and 8.6 pipe operators and partial application are typed.\n\nUpgrade with composer require --dev vimeo/psalm:^7.0 -W. Taint analysis can be turned off with runTaintAnalysis=\"false\". The speedup figures come from the project itself and I did not verify them.",
+            "tags": [
+                "PHP",
+                "static-analysis",
+                "security"
+            ],
+            "takeaways": [
+                "Taint analysis is on by default, so existing projects may see new findings and longer runs after upgrading.",
+                "Capability-based purity (io, time) replaces binary purity annotations.",
+                "LLM prompt injection is now a taint category for static analysis.",
+                "Dead-code detection by reachability from entry points catches unused cycles."
+            ],
+            "title": "Psalm 7 release: PHP security and static analysis",
+            "topic": "Other",
+            "url": "https://psalm.dev/articles/psalm-7",
+            "why": "It is a release note, but it shows the engineering behind a faster taint analysis and a capability-based purity model."
+        },
+        {
+            "category": "Other",
+            "level": "",
+            "popularity": "Hacker News · 13 points, 1 comment (page dated 2026-11-06 on HN)",
+            "practice": [
+            ],
+            "questions": [
+            ],
+            "source": "brendangregg.com (Brendan Gregg)",
+            "summary": "Gregg contrasts passive benchmarking, where results are collected and never examined, with active benchmarking, where you analyze the system with other tools while the benchmark runs. The aim is to confirm the benchmark tests what you intend and to identify the limiting factor. He says he usually finds passive results wrong or misleading.\n\nThe steps are: run long and steady; watch all components with tools such as vmstat, iostat, mpstat, perf, eBPF and strace; review the benchmark's source and compiler options; report the limiting factor with the result; and apply statistics only after the benchmark is validated. A worked Bonnie++ example covers SmartOS and Linux.\n\nCommon problems include noisy neighbors, throttling, a limiting network, single-threaded benchmark software, mismatched versions and unrealistic workloads. This is a long-standing reference page rather than a new writeup, and it has low HN engagement, so it is the weakest pick here.",
+            "tags": [
+                "performance",
+                "benchmarking",
+                "methodology"
+            ],
+            "takeaways": [
+                "Explain why the result is X and not 2X, with evidence from tools such as pidstat -t 1.",
+                "Validate what is being measured before comparing numbers.",
+                "Statistics cannot rescue bad data, and high variance should prompt a search for the cause.",
+                "Spending more effort up front can prevent costly decisions based on bad results."
+            ],
+            "title": "Active Benchmarking",
+            "topic": "Other",
+            "url": "https://www.brendangregg.com/activebenchmarking.html",
+            "why": "A short methodology page on checking what a benchmark actually measures, useful before trusting any performance number."
+        }
+    ]
+}
