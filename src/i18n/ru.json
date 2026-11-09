@@ -41,10 +41,45 @@
     "many": "%n дней подряд",
     "other": "%n дня подряд"
   },
-  "%n writeups read": {
-    "one": "Прочитан %n разбор",
-    "few": "Прочитано %n разбора",
-    "many": "Прочитано %n разборов",
-    "other": "Прочитано %n разбора"
-  }
+  "%1 of %2 done": "выполнено %1 из %2",
+  "%n hidden by filters": {
+    "one": "%n скрыт фильтрами",
+    "few": "%n скрыто фильтрами",
+    "many": "%n скрыто фильтрами",
+    "other": "%n скрыто фильтрами"
+  },
+  "%n results": {
+    "one": "%n результат",
+    "few": "%n результата",
+    "many": "%n результатов",
+    "other": "%n результата"
+  },
+  "Add a tag": "Добавить тег",
+  "All directions": "Все направления",
+  "All levels": "Все уровни",
+  "All tags": "Все теги",
+  "Check yourself": "Проверь себя",
+  "Days": "Дни",
+  "Deep": "Глубоко",
+  "Every writeup here is hidden by the filters.": "Все разборы здесь скрыты фильтрами.",
+  "Favorites": "Избранное",
+  "Hide answer": "Скрыть ответ",
+  "Hide or show read writeups": "Скрыть или показать прочитанные",
+  "Hide read": "Скрыть прочитанные",
+  "Mark writeups as read with M to see your progress here.": "Отмечайте разборы прочитанными клавишей M, и здесь появится прогресс.",
+  "No favorites yet. Press F on a writeup to keep it here.": "В избранном пока пусто. Нажмите F на разборе, чтобы сохранить его здесь.",
+  "Nothing found.": "Ничего не найдено.",
+  "Quick": "Быстро",
+  "Read by direction": "Прочитано по направлениям",
+  "Search all writeups": "Поиск по всем разборам",
+  "Show all": "Показать все",
+  "Show answer": "Показать ответ",
+  "Statistics": "Статистика",
+  "Switch between quick and deep view": "Переключить быстрый и глубокий режим",
+  "This day was fetched before learning mode, so it has no questions or practice.": "Этот день загружен до режима обучения, поэтому в нём нет вопросов и практики.",
+  "Try it yourself": "Попробуй сам",
+  "days in a row": "серия дней",
+  "done in a lab": "отработано в лабе",
+  "in favorites": "в избранном",
+  "writeups read": "прочитано"
 }

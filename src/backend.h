@@ -9,13 +9,23 @@
 #include "progress.h"
 #include "store.h"
 
-// What the window shows: the saved days, the selected day's writeups, and
+// What the window shows: the saved days, the writeups of the current view
+// (a day, the favorites, or a search across every day) after the filters, and
 // the state of the last and current fetch. Fetches run outside the window,
 // through the systemd user service, so closing the window never stops one.
 class Backend : public QObject {
     Q_OBJECT
     Q_PROPERTY(QStringList dates READ dates NOTIFY datesChanged)
-    Q_PROPERTY(QString date READ date WRITE setDate NOTIFY digestChanged)
+    Q_PROPERTY(QString date READ date WRITE setDate NOTIFY dateChanged)
+    Q_PROPERTY(QString view READ view WRITE setView NOTIFY filterChanged)
+    Q_PROPERTY(QString query READ query WRITE setQuery NOTIFY filterChanged)
+    Q_PROPERTY(QStringList categoryFilter READ categoryFilter WRITE setCategoryFilter NOTIFY filterChanged)
+    Q_PROPERTY(QString levelFilter READ levelFilter WRITE setLevelFilter NOTIFY filterChanged)
+    Q_PROPERTY(QString tagFilter READ tagFilter WRITE setTagFilter NOTIFY filterChanged)
+    Q_PROPERTY(bool hideRead READ hideRead WRITE setHideRead NOTIFY filterChanged)
+    Q_PROPERTY(bool deepMode READ deepMode WRITE setDeepMode NOTIFY filterChanged)
+    Q_PROPERTY(QStringList shownCategories READ shownCategories NOTIFY digestChanged)
+    Q_PROPERTY(int hiddenCount READ hiddenCount NOTIFY digestChanged)
     Q_PROPERTY(QVariantList items READ items NOTIFY digestChanged)
     Q_PROPERTY(bool running READ running NOTIFY statusChanged)
     Q_PROPERTY(QDateTime lastRun READ lastRun NOTIFY statusChanged)
@@ -30,6 +40,8 @@ class Backend : public QObject {
     Q_PROPERTY(int streak READ streak NOTIFY progressChanged)
     Q_PROPERTY(QVariantMap stats READ stats NOTIFY progressChanged)
     Q_PROPERTY(QStringList tags READ tags NOTIFY progressChanged)
+    Q_PROPERTY(int favoriteCount READ favoriteCount NOTIFY progressChanged)
+    Q_PROPERTY(QStringList levels READ levels CONSTANT)
 
 public:
     explicit Backend(const QString &directory = {}, bool systemd = true, QObject *parent = nullptr);
@@ -38,6 +50,25 @@ public:
     QString date() const { return m_date; }
     void setDate(const QString &date);
     QVariantList items() const { return m_items; }
+    QString view() const { return m_view; }
+    void setView(const QString &view);
+    QString query() const { return m_query; }
+    void setQuery(const QString &query);
+    QStringList categoryFilter() const { return m_categoryFilter; }
+    void setCategoryFilter(const QStringList &categories);
+    QString levelFilter() const { return m_levelFilter; }
+    void setLevelFilter(const QString &level);
+    QString tagFilter() const { return m_tagFilter; }
+    void setTagFilter(const QString &tag);
+    bool hideRead() const { return m_hideRead; }
+    void setHideRead(bool hide);
+    bool deepMode() const { return m_deepMode; }
+    void setDeepMode(bool deep);
+    QStringList shownCategories() const { return m_shownCategories; }
+    int hiddenCount() const { return m_hiddenCount; }
+    int favoriteCount() const { return m_progress.favorites().size(); }
+    QStringList levels() const { return Store::levels(); }
+    Q_INVOKABLE QString topicOf(const QString &category) const { return Store::topicOf(category); }
     bool running() const { return m_lockHeld || m_starting.isActive(); }
     QDateTime lastRun() const { return m_lastRun; }
     bool lastOk() const { return m_lastOk; }
@@ -70,6 +101,8 @@ public:
 signals:
     void datesChanged();
     void digestChanged();
+    void dateChanged();
+    void filterChanged();
     void statusChanged();
     void timerChanged();
     void problemChanged();
@@ -78,6 +111,8 @@ signals:
 
 private:
     void reload();
+    void rebuild();
+    void filtersChanged();
     void step(int delta);
     void setProblem(const QString &problem);
     bool systemctl(const QStringList &arguments, QString *output = nullptr);
@@ -93,8 +128,14 @@ private:
     QTimer m_debounce, m_starting;
     QStringList m_dates;
     QString m_date;
-    QVariantList m_items;
-    QByteArray m_digestStamp, m_statusStamp;
+    QVariantList m_library, m_items;
+    QByteArray m_libraryStamp, m_statusStamp;
+    QString m_view = "day";
+    QString m_query, m_levelFilter, m_tagFilter;
+    QStringList m_categoryFilter, m_shownCategories;
+    bool m_hideRead = false;
+    bool m_deepMode = false;
+    int m_hiddenCount = 0;
     bool m_lockHeld = false;
     QDateTime m_lastRun;
     bool m_lastOk = true;

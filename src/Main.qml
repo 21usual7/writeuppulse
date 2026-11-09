@@ -5,10 +5,10 @@ import QtQuick.Layouts
 
 ApplicationWindow {
     id: win
-    width: 1080
-    height: 760
-    minimumWidth: 720
-    minimumHeight: 480
+    width: 1180
+    height: 820
+    minimumWidth: 760
+    minimumHeight: 520
     visible: true
     title: "WriteupPulse"
     color: "#0e0e10"
@@ -22,32 +22,47 @@ ApplicationWindow {
     property bool helpVisible: false
     property int current: 0
     property var expanded: ({})
+    // Single-key shortcuts stay quiet while the user types in a field.
+    readonly property bool typing: activeFocusItem !== null && activeFocusItem.cursorPosition !== undefined
+    readonly property bool searching: backend.query.trim().length > 0
 
     Connections {
         target: backend
-        function onDigestChanged() { win.current = 0; win.expanded = ({}) }
+        function onDigestChanged() { win.current = Math.min(win.current, Math.max(0, backend.items.length - 1)); if (!backend.items.length) win.expanded = ({}) }
+        function onDateChanged() { win.current = 0; win.expanded = ({}) }
     }
 
+    function valid(i) { return i >= 0 && i < backend.items.length }
     function toggle(i) {
-        if (i < 0 || i >= backend.items.length) return
+        if (!valid(i) || backend.deepMode) return
         const next = Object.assign({}, expanded)
-        next[i] = !next[i]
+        next[backend.items[i].url] = !next[backend.items[i].url]
         expanded = next
     }
-    function openArticle(i) {
-        if (i >= 0 && i < backend.items.length) Qt.openUrlExternally(backend.items[i].url)
-    }
+    function openArticle(i) { if (valid(i)) Qt.openUrlExternally(backend.items[i].url) }
     function progressOf(i) {
         backend.progressRevision
-        return i >= 0 && i < backend.items.length ? backend.state(backend.items[i].url) : ({})
+        return valid(i) ? backend.state(backend.items[i].url) : ({})
     }
-    function toggleRead(i) { if (i >= 0 && i < backend.items.length) backend.setRead(backend.items[i], progressOf(i).read === undefined) }
-    function toggleLab(i) { if (i >= 0 && i < backend.items.length) backend.setLab(backend.items[i], progressOf(i).lab === undefined) }
-    function toggleStar(i) { if (i >= 0 && i < backend.items.length) backend.setFavorite(backend.items[i], progressOf(i).favorite !== true) }
+    function toggleRead(i) { if (valid(i)) backend.setRead(backend.items[i], progressOf(i).read === undefined) }
+    function toggleLab(i) { if (valid(i)) backend.setLab(backend.items[i], progressOf(i).lab === undefined) }
+    function toggleStar(i) { if (valid(i)) backend.setFavorite(backend.items[i], progressOf(i).favorite !== true) }
     function move(delta) {
         if (!backend.items.length) return
         current = Math.max(0, Math.min(backend.items.length - 1, current + delta))
         cards.positionViewAtIndex(current, ListView.Contain)
+    }
+    function toggleCategory(category) {
+        const list = backend.categoryFilter.slice()
+        const at = list.indexOf(category)
+        if (at >= 0) list.splice(at, 1); else list.push(category)
+        backend.categoryFilter = list
+    }
+    function clearFilters() {
+        backend.categoryFilter = []
+        backend.levelFilter = ""
+        backend.hideRead = false
+        backend.tagFilter = ""
     }
 
     // Today, Yesterday, or the date in the user's language.
@@ -71,19 +86,47 @@ ApplicationWindow {
                               : qsTr("Last sync failed %1: %2").arg(when).arg(backend.lastMessage)
     }
 
-    Shortcut { sequence: "?"; context: Qt.ApplicationShortcut; onActivated: win.helpVisible = !win.helpVisible }
-    Shortcut { sequence: "Esc"; context: Qt.ApplicationShortcut; enabled: win.helpVisible; onActivated: win.helpVisible = false }
-    Shortcut { sequence: "Q"; context: Qt.ApplicationShortcut; onActivated: Qt.quit() }
-    Shortcut { sequences: ["Space", "Return"]; context: Qt.ApplicationShortcut; onActivated: win.toggle(win.current) }
-    Shortcut { sequence: "R"; context: Qt.ApplicationShortcut; onActivated: backend.refresh() }
-    Shortcut { sequence: "O"; context: Qt.ApplicationShortcut; onActivated: win.openArticle(win.current) }
-    Shortcut { sequence: "M"; context: Qt.ApplicationShortcut; onActivated: win.toggleRead(win.current) }
-    Shortcut { sequence: "B"; context: Qt.ApplicationShortcut; onActivated: win.toggleLab(win.current) }
-    Shortcut { sequence: "F"; context: Qt.ApplicationShortcut; onActivated: win.toggleStar(win.current) }
-    Shortcut { sequences: ["Down", "J"]; context: Qt.ApplicationShortcut; onActivated: win.move(1) }
-    Shortcut { sequences: ["Up", "K"]; context: Qt.ApplicationShortcut; onActivated: win.move(-1) }
-    Shortcut { sequences: ["Left", "H"]; context: Qt.ApplicationShortcut; onActivated: backend.olderDay() }
-    Shortcut { sequences: ["Right", "L"]; context: Qt.ApplicationShortcut; onActivated: backend.newerDay() }
+    function heading() {
+        translator.language
+        if (win.searching) return qsTr("%n results", "", backend.items.length)
+        if (backend.view === "favorites") return qsTr("Favorites")
+        return backend.date ? win.dayLabel(backend.date) : ""
+    }
+
+    function emptyText() {
+        if (backend.running && !backend.dates.length) return qsTr("The agent is reading today's writeups…")
+        if (!backend.dates.length) return qsTr("No writeups yet. Press R to fetch today's.")
+        if (backend.hiddenCount > 0) return qsTr("Every writeup here is hidden by the filters.")
+        if (win.searching) return qsTr("Nothing found.")
+        if (backend.view === "favorites") return qsTr("No favorites yet. Press F on a writeup to keep it here.")
+        return ""
+    }
+
+    Shortcut { sequence: "?"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.helpVisible = !win.helpVisible }
+    Shortcut {
+        sequence: "Esc"
+        context: Qt.ApplicationShortcut
+        onActivated: {
+            if (win.helpVisible) win.helpVisible = false
+            else if (win.typing) { search.text = ""; cards.forceActiveFocus() }
+        }
+    }
+    Shortcut { sequences: [StandardKey.Find]; context: Qt.ApplicationShortcut; onActivated: search.forceActiveFocus() }
+    Shortcut { sequence: "/"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: search.forceActiveFocus() }
+    Shortcut { sequence: "Q"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: Qt.quit() }
+    Shortcut { sequences: ["Space", "Return"]; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.toggle(win.current) }
+    Shortcut { sequence: "D"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: backend.deepMode = !backend.deepMode }
+    Shortcut { sequence: "R"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: backend.refresh() }
+    Shortcut { sequence: "O"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.openArticle(win.current) }
+    Shortcut { sequence: "M"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.toggleRead(win.current) }
+    Shortcut { sequence: "B"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.toggleLab(win.current) }
+    Shortcut { sequence: "F"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.toggleStar(win.current) }
+    Shortcut { sequence: "H"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: backend.hideRead = !backend.hideRead }
+    Shortcut { sequence: "S"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: backend.view = backend.view === "stats" ? "day" : "stats" }
+    Shortcut { sequences: ["Down", "J"]; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.move(1) }
+    Shortcut { sequences: ["Up", "K"]; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.move(-1) }
+    Shortcut { sequence: "Left"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: backend.olderDay() }
+    Shortcut { sequence: "Right"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: backend.newerDay() }
 
     // Right-to-left languages mirror the window; the Translator sets the
     // application's layout direction.
@@ -95,7 +138,7 @@ ApplicationWindow {
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 20
-            spacing: 16
+            spacing: 12
 
             RowLayout {
                 Layout.fillWidth: true
@@ -112,57 +155,58 @@ ApplicationWindow {
                         NumberAnimation { to: 1; duration: 700; easing.type: Easing.InOutQuad }
                     }
                 }
-                Label {
-                    text: "WriteupPulse"
-                    font.pixelSize: 22
-                    font.bold: true
-                }
-                Label {
-                    Layout.leftMargin: 8
-                    visible: backend.streak > 0
-                    text: qsTr("%n-day streak", "", backend.streak)
-                    color: theme.accent
-                    font.bold: true
-                    ToolTip.visible: streakHover.hovered
-                    ToolTip.text: qsTr("%n writeups read", "", backend.stats.read || 0)
-                    HoverHandler { id: streakHover }
-                }
-                Label {
+                ColumnLayout {
+                    spacing: 0
                     Layout.fillWidth: true
-                    Layout.leftMargin: 8
-                    text: win.statusText()
-                    color: backend.running || backend.lastOk ? win.dim : "#ff6b6b"
-                    elide: Text.ElideRight
-                    ToolTip.visible: !backend.lastOk && statusHover.hovered
-                    ToolTip.text: backend.lastMessage
-                    HoverHandler { id: statusHover }
+                    RowLayout {
+                        spacing: 12
+                        Label { text: "WriteupPulse"; font.pixelSize: 22; font.bold: true }
+                        Label {
+                            visible: backend.streak > 0
+                            text: qsTr("%n-day streak", "", backend.streak)
+                            color: theme.accent
+                            font.bold: true
+                        }
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        text: win.statusText()
+                        color: backend.running || backend.lastOk ? win.dim : "#ff6b6b"
+                        elide: Text.ElideRight
+                        font.pixelSize: 13
+                        ToolTip.visible: statusHover.hovered && text.length > 40
+                        ToolTip.text: text
+                        HoverHandler { id: statusHover }
+                    }
+                }
+                TextField {
+                    id: search
+                    Layout.preferredWidth: 240
+                    Layout.minimumWidth: 120
+                    Layout.fillWidth: true
+                    Layout.maximumWidth: 280
+                    placeholderText: qsTr("Search all writeups")
+                    Material.containerStyle: Material.Outlined
+                    text: backend.query
+                    onTextEdited: backend.query = text
                 }
                 ComboBox {
-                    id: languagePicker
                     readonly property var codes: ["en", "ru", "uk"]
                     // Each language in its own name, so it can be found from any of them.
                     model: ["English", "Русский", "Українська"]
                     currentIndex: Math.max(0, codes.indexOf(backend.language))
-                    implicitWidth: 150
+                    implicitWidth: 130
                     Material.roundedScale: theme.radius
                     onActivated: index => backend.language = codes[index]
                     ToolTip.visible: hovered && !popup.visible
                     ToolTip.delay: 600
                     ToolTip.text: qsTr("Language of the window and of new summaries, from the next fetch on")
                 }
-                Switch {
-                    text: qsTr("Daily at 08:00")
-                    visible: backend.timerAvailable
-                    checked: backend.timerEnabled
-                    onToggled: {
-                        backend.setTimerEnabled(checked)
-                        checked = Qt.binding(() => backend.timerEnabled)
-                    }
-                }
                 Button {
                     text: backend.running ? qsTr("Fetching…") : qsTr("Refresh now")
                     highlighted: true
                     enabled: !backend.running && !backend.agentMissing
+                    onClicked: backend.refresh()
                     // Material keeps highlighted text white, which a light
                     // accent like the default yellow washes out.
                     contentItem: Label {
@@ -172,7 +216,6 @@ ApplicationWindow {
                         verticalAlignment: Text.AlignVCenter
                         color: parent.enabled ? theme.accentForeground : win.dim
                     }
-                    onClicked: backend.refresh()
                 }
             }
 
@@ -199,82 +242,233 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 spacing: 16
 
+                // Favorites, statistics, and the days.
                 Rectangle {
-                    Layout.preferredWidth: 180
+                    Layout.preferredWidth: 190
                     Layout.fillHeight: true
                     radius: theme.radius
                     color: win.panel
 
-                    ListView {
-                        id: days
+                    ColumnLayout {
                         anchors.fill: parent
                         anchors.margins: 6
-                        clip: true
                         spacing: 2
-                        model: backend.dates
-                        delegate: ItemDelegate {
-                            required property string modelData
-                            width: ListView.view.width
-                            text: win.dayLabel(modelData)
-                            highlighted: modelData === backend.date
+
+                        ItemDelegate {
+                            Layout.fillWidth: true
+                            text: "★  " + qsTr("Favorites") + (backend.favoriteCount ? "  " + backend.favoriteCount.toLocaleString(Qt.locale(), 'f', 0) : "")
+                            highlighted: backend.view === "favorites" && !win.searching
                             Material.roundedScale: Math.min(4, theme.radius)
-                            onClicked: backend.date = modelData
+                            onClicked: { search.text = ""; backend.view = "favorites" }
                         }
-                    }
-                    Label {
-                        anchors.centerIn: parent
-                        width: parent.width - 24
-                        horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.Wrap
-                        visible: backend.dates.length === 0
-                        text: qsTr("No history yet")
-                        color: win.dim
+                        ItemDelegate {
+                            Layout.fillWidth: true
+                            text: "∑  " + qsTr("Statistics")
+                            highlighted: backend.view === "stats" && !win.searching
+                            Material.roundedScale: Math.min(4, theme.radius)
+                            onClicked: { search.text = ""; backend.view = "stats" }
+                        }
+                        Label {
+                            Layout.topMargin: 10
+                            Layout.leftMargin: 10
+                            Layout.bottomMargin: 2
+                            text: qsTr("Days")
+                            color: win.dim
+                            font.pixelSize: 12
+                        }
+                        ListView {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            clip: true
+                            spacing: 2
+                            model: backend.dates
+                            delegate: ItemDelegate {
+                                required property string modelData
+                                width: ListView.view.width
+                                text: win.dayLabel(modelData)
+                                highlighted: modelData === backend.date && backend.view === "day" && !win.searching
+                                Material.roundedScale: Math.min(4, theme.radius)
+                                onClicked: { search.text = ""; backend.date = modelData }
+                            }
+                            Label {
+                                anchors.centerIn: parent
+                                width: parent.width - 24
+                                horizontalAlignment: Text.AlignHCenter
+                                wrapMode: Text.Wrap
+                                visible: backend.dates.length === 0
+                                text: qsTr("No history yet")
+                                color: win.dim
+                            }
+                        }
+                        Switch {
+                            Layout.fillWidth: true
+                            visible: backend.timerAvailable
+                            text: qsTr("Daily at 08:00")
+                            font.pixelSize: 13
+                            checked: backend.timerEnabled
+                            onToggled: {
+                                backend.setTimerEnabled(checked)
+                                checked = Qt.binding(() => backend.timerEnabled)
+                            }
+                        }
                     }
                 }
 
-                ListView {
-                    id: cards
+                StatsView {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    clip: true
-                    spacing: 12
-                    model: backend.items
-                    boundsBehavior: Flickable.StopAtBounds
-                    ScrollBar.vertical: ScrollBar {}
-                    delegate: WriteupCard {
-                        required property var modelData
-                        required property int index
-                        width: ListView.view.width - 12
-                        item: modelData
-                        number: index + 1
-                        selected: index === win.current
-                        expanded: !!win.expanded[index]
-                        onClicked: win.current = index
-                        onToggled: win.toggle(index)
-                        onOpened: win.openArticle(index)
-                        progress: win.progressOf(index)
-                        onReadToggled: win.toggleRead(index)
-                        onLabToggled: win.toggleLab(index)
-                        onStarToggled: win.toggleStar(index)
+                    visible: backend.view === "stats" && !win.searching
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    visible: backend.view !== "stats" || win.searching
+                    spacing: 10
+
+                    // Heading, view mode, and filters; the controls wrap under the
+                    // heading when the window is narrow.
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: 12
+                        Label {
+                            height: 40
+                            verticalAlignment: Text.AlignVCenter
+                            text: win.heading()
+                            font.pixelSize: 20
+                            font.bold: true
+                        }
+                        Row {
+                            spacing: 4
+                            topPadding: 6
+                            FilterChip { text: qsTr("Quick"); on: !backend.deepMode; onClicked: backend.deepMode = false }
+                            FilterChip { text: qsTr("Deep"); on: backend.deepMode; onClicked: backend.deepMode = true }
+                        }
+                        ComboBox {
+                            width: 150
+                            height: 40
+                            model: [qsTr("All levels")].concat(backend.levels)
+                            currentIndex: backend.levelFilter ? backend.levels.indexOf(backend.levelFilter) + 1 : 0
+                            onActivated: index => backend.levelFilter = index > 0 ? backend.levels[index - 1] : ""
+                            Material.roundedScale: theme.radius
+                        }
+                        Switch {
+                            height: 40
+                            text: qsTr("Hide read")
+                            checked: backend.hideRead
+                            onToggled: { backend.hideRead = checked; checked = Qt.binding(() => backend.hideRead) }
+                        }
                     }
 
-                    Label {
-                        anchors.centerIn: parent
-                        width: Math.min(parent.width - 40, 420)
-                        horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.Wrap
-                        visible: backend.items.length === 0
-                        text: backend.running ? qsTr("The agent is reading today's writeups…")
-                                              : qsTr("No writeups yet. Press R to fetch today's.")
-                        color: win.dim
-                        font.pixelSize: 16
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: 6
+                        visible: backend.shownCategories.length > 1 || backend.categoryFilter.length > 0
+                        FilterChip {
+                            text: qsTr("All directions")
+                            on: backend.categoryFilter.length === 0
+                            onClicked: backend.categoryFilter = []
+                        }
+                        Repeater {
+                            model: backend.shownCategories
+                            FilterChip {
+                                required property string modelData
+                                text: modelData
+                                on: backend.categoryFilter.indexOf(modelData) >= 0
+                                onClicked: win.toggleCategory(modelData)
+                            }
+                        }
+                    }
+
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: 6
+                        visible: backend.view === "favorites" && !win.searching && backend.tags.length > 0
+                        FilterChip { text: qsTr("All tags"); on: !backend.tagFilter; onClicked: backend.tagFilter = "" }
+                        Repeater {
+                            model: backend.tags
+                            FilterChip {
+                                required property string modelData
+                                text: "#" + modelData
+                                on: backend.tagFilter === modelData
+                                onClicked: backend.tagFilter = modelData
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        visible: backend.hiddenCount > 0
+                        spacing: 8
+                        Label {
+                            text: qsTr("%n hidden by filters", "", backend.hiddenCount)
+                            color: win.dim
+                            font.pixelSize: 13
+                        }
+                        Button {
+                            flat: true
+                            text: qsTr("Show all")
+                            font.pixelSize: 13
+                            Material.foreground: theme.accent
+                            onClicked: win.clearFilters()
+                        }
+                    }
+
+                    ListView {
+                        id: cards
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        spacing: 14
+                        model: backend.items
+                        boundsBehavior: Flickable.StopAtBounds
+                        ScrollBar.vertical: ScrollBar {}
+                        // ListView pins delegates to x: 0, so each one is a
+                        // full-width row that centers a card of readable width.
+                        delegate: Item {
+                            id: row
+                            required property var modelData
+                            required property int index
+                            width: ListView.view.width - 12
+                            height: card.implicitHeight
+                            WriteupCard {
+                                id: card
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                width: Math.min(parent.width, 940)
+                                height: implicitHeight
+                                item: row.modelData
+                                number: row.index + 1
+                                selected: row.index === win.current
+                                expanded: backend.deepMode || !!win.expanded[row.modelData.url]
+                                showDate: win.searching || backend.view === "favorites"
+                                dayText: win.dayLabel(row.modelData.date)
+                                progress: win.progressOf(row.index)
+                                onClicked: win.current = row.index
+                                onToggled: win.toggle(row.index)
+                                onOpened: win.openArticle(row.index)
+                                onReadToggled: win.toggleRead(row.index)
+                                onLabToggled: win.toggleLab(row.index)
+                                onStarToggled: win.toggleStar(row.index)
+                                onPracticeToggled: (step, done) => backend.setPracticeDone(row.modelData.url, step, done)
+                                onTagsEdited: tags => backend.setTags(row.modelData.url, tags)
+                            }
+                        }
+
+                        Label {
+                            anchors.centerIn: parent
+                            width: Math.min(parent.width - 40, 420)
+                            horizontalAlignment: Text.AlignHCenter
+                            wrapMode: Text.Wrap
+                            visible: backend.items.length === 0
+                            text: win.emptyText()
+                            color: win.dim
+                            font.pixelSize: 16
+                        }
                     }
                 }
             }
         }
 
         Popup {
-            id: help
             anchors.centerIn: parent
             modal: true
             visible: win.helpVisible
@@ -290,12 +484,16 @@ ApplicationWindow {
                 Repeater {
                     model: [
                         ["Space", qsTr("Expand or collapse the writeup")],
+                        ["D", qsTr("Switch between quick and deep view")],
                         ["↑ ↓", qsTr("Previous or next writeup")],
                         ["← →", qsTr("Older or newer day")],
                         ["O", qsTr("Open the article in the browser")],
                         ["M", qsTr("Mark as read")],
                         ["B", qsTr("Mark as done in a lab")],
                         ["F", qsTr("Add to or remove from favorites")],
+                        ["H", qsTr("Hide or show read writeups")],
+                        ["Ctrl+F  /", qsTr("Search all writeups")],
+                        ["S", qsTr("Statistics")],
                         ["R", qsTr("Fetch today's writeups now")],
                         ["?", qsTr("Show or hide shortcuts")],
                         ["Q", qsTr("Quit")]

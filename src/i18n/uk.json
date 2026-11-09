@@ -41,10 +41,45 @@
     "many": "%n днів поспіль",
     "other": "%n дня поспіль"
   },
-  "%n writeups read": {
-    "one": "Прочитано %n розбір",
-    "few": "Прочитано %n розбори",
-    "many": "Прочитано %n розборів",
-    "other": "Прочитано %n розбору"
-  }
+  "%1 of %2 done": "виконано %1 з %2",
+  "%n hidden by filters": {
+    "one": "%n приховано фільтрами",
+    "few": "%n приховано фільтрами",
+    "many": "%n приховано фільтрами",
+    "other": "%n приховано фільтрами"
+  },
+  "%n results": {
+    "one": "%n результат",
+    "few": "%n результати",
+    "many": "%n результатів",
+    "other": "%n результату"
+  },
+  "Add a tag": "Додати тег",
+  "All directions": "Усі напрями",
+  "All levels": "Усі рівні",
+  "All tags": "Усі теги",
+  "Check yourself": "Перевір себе",
+  "Days": "Дні",
+  "Deep": "Глибоко",
+  "Every writeup here is hidden by the filters.": "Усі розбори тут приховані фільтрами.",
+  "Favorites": "Обране",
+  "Hide answer": "Сховати відповідь",
+  "Hide or show read writeups": "Сховати або показати прочитані",
+  "Hide read": "Сховати прочитані",
+  "Mark writeups as read with M to see your progress here.": "Позначайте розбори прочитаними клавішею M, і тут з'явиться прогрес.",
+  "No favorites yet. Press F on a writeup to keep it here.": "В обраному поки порожньо. Натисніть F на розборі, щоб зберегти його тут.",
+  "Nothing found.": "Нічого не знайдено.",
+  "Quick": "Швидко",
+  "Read by direction": "Прочитано за напрямами",
+  "Search all writeups": "Пошук по всіх розборах",
+  "Show all": "Показати всі",
+  "Show answer": "Показати відповідь",
+  "Statistics": "Статистика",
+  "Switch between quick and deep view": "Перемкнути швидкий і глибокий режим",
+  "This day was fetched before learning mode, so it has no questions or practice.": "Цей день завантажено до режиму навчання, тому в ньому немає питань і практики.",
+  "Try it yourself": "Спробуй сам",
+  "days in a row": "серія днів",
+  "done in a lab": "відпрацьовано в лабі",
+  "in favorites": "в обраному",
+  "writeups read": "прочитано"
 }

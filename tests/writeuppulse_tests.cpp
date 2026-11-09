@@ -166,6 +166,56 @@ private slots:
         QCOMPARE(backend.stats().value("read").toInt(), 1);
     }
 
+    void backendFiltersSearchesAndShowsFavorites()
+    {
+        QTemporaryDir dir;
+        Store store(dir.path());
+        QString error;
+        auto item = [](const QString &title, const QString &category, const QString &level) {
+            return QJsonObject{{"title", title}, {"url", "https://example.com/" + title}, {"summary", "About " + title},
+                               {"category", category}, {"level", level}};
+        };
+        QVERIFY(store.saveDigest({{"date", "2026-11-08"}, {"items", QJsonArray{item("heap", "Pwn", "Senior")}}}, &error));
+        QVERIFY(store.saveDigest({{"date", "2026-11-09"}, {"items", QJsonArray{
+            item("xss", "Web", "Junior"), item("rag", "LLM & Agents", "Middle"),
+            QJsonObject{{"title", "old"}, {"url", "https://example.com/old"}, {"summary", "No category"}}}}}, &error));
+
+        Backend backend(dir.path(), false);
+        QCOMPARE(backend.items().size(), 3);
+        QCOMPARE(backend.shownCategories(), QStringList({"Web", "LLM & Agents", "Other"}));
+
+        backend.setCategoryFilter({"Web", "Other"});
+        QCOMPARE(backend.items().size(), 2);
+        QCOMPARE(backend.hiddenCount(), 1);
+        backend.setCategoryFilter({});
+        backend.setLevelFilter("Middle");
+        QCOMPARE(backend.items().first().toMap().value("title").toString(), QString("rag"));
+        backend.setLevelFilter({});
+
+        backend.setRead(backend.items().first().toMap(), true);
+        backend.setHideRead(true);
+        QCOMPARE(backend.items().size(), 2);
+        backend.setHideRead(false);
+
+        // Search spans every day, and each hit carries its date.
+        backend.setQuery("HEAP");
+        QCOMPARE(backend.items().size(), 1);
+        QCOMPARE(backend.hiddenCount(), 0);
+        QCOMPARE(backend.items().first().toMap().value("date").toString(), QString("2026-11-08"));
+        backend.setQuery({});
+
+        backend.setFavorite(backend.items().at(1).toMap(), true);
+        backend.setTags("https://example.com/rag", {"study"});
+        backend.setView("favorites");
+        QCOMPARE(backend.items().size(), 1);
+        QCOMPARE(backend.favoriteCount(), 1);
+        backend.setTagFilter("other");
+        QCOMPARE(backend.items().size(), 0);
+        backend.setDate("2026-11-08");
+        QCOMPARE(backend.view(), QString("day"));
+        QCOMPARE(backend.items().size(), 1);
+    }
+
     void storeSavesJsonAndMarkdown()
     {
         QTemporaryDir dir;

@@ -31,6 +31,22 @@ daily timer. WriteupPulse then shows up in the app launcher (`Super + Space`).
   window closes. A fetch takes a few minutes. Logs: `journalctl --user -u writeuppulse`.
 - Digests are saved as `~/.local/share/writeuppulse/<date>.json` and `<date>.md`.
 
+## Learning
+
+Each writeup comes with its direction (Web, Pwn, Reverse, Crypto, Cloud Security,
+Red Team, Blue Team, Malware, OSINT, LLM & Agents, ML Engineering, Systems &
+Performance, Backend & Databases, DevOps & Infra, Postmortems, Other) and a level
+(Junior, Middle, Senior). The deep view adds 5–8 takeaways, self-check questions
+with hidden answers, and a "Try it yourself" checklist of practice ideas for a lab
+you control. WriteupPulse is for understanding, not attacking: the agent is told
+never to write code, commands, payloads, or exploits, and the app cuts out any
+code block that slips through.
+
+Mark writeups as read (M), done in a lab (B), or favorite (F), and tag favorites.
+Filters narrow a day by direction, level, and read state; search covers every
+saved day. Your progress lives in `~/.local/share/writeuppulse/progress.json`,
+and Statistics shows the reading streak, counts, and directions you read most.
+
 The language picker at the top switches the window between English, Russian,
 and Ukrainian, and the agent writes new summaries in the same language; days
 already saved stay in the language they were written in. Until a language is
@@ -54,10 +70,17 @@ Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`
 
 | Key | Action |
 | --- | --- |
-| Space / Enter | Expand or collapse the writeup |
+| Space / Enter | Expand or collapse the writeup (quick view) |
+| D | Switch between quick and deep view |
 | ↑ ↓ (K J) | Previous or next writeup |
-| ← → (H L) | Older or newer day |
+| ← → | Older or newer day |
 | O | Open the article in the browser |
+| M | Mark as read |
+| B | Mark as done in a lab |
+| F | Add to or remove from favorites |
+| H | Hide or show read writeups |
+| Ctrl+F or / | Search all saved writeups |
+| S | Statistics |
 | R | Fetch today's writeups now |
 | ? | Show or hide shortcuts |
 | Q | Quit |

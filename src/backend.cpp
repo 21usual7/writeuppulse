@@ -8,6 +8,7 @@
 #include <QJsonDocument>
 #include <QLockFile>
 #include <QProcess>
+#include <QSettings>
 #include <QStandardPaths>
 
 #include "fetcher.h"
@@ -19,6 +20,9 @@ Backend::Backend(const QString &directory, bool systemd, QObject *parent)
     QDir().mkpath(m_store.directory());
     m_agentMissing = Fetcher::findClaude().isEmpty();
     m_language = Fetcher::language();
+    const QSettings settings("writeuppulse", "writeuppulse");
+    m_deepMode = settings.value("deepMode", false).toBool();
+    m_hideRead = settings.value("hideRead", false).toBool();
 
     // A fetch writes its files and lock into the data directory, so watching
     // that one directory follows timer runs and manual ones alike.
@@ -53,6 +57,120 @@ void Backend::progressSaved(bool ok) {
     m_progressStamp = stamp(m_store.directory() + "/progress.json");
     ++m_progressRevision;
     emit progressChanged();
+    // Hiding read writeups and the favorites view both depend on progress.
+    rebuild();
+}
+
+void Backend::filtersChanged() {
+    emit filterChanged();
+    rebuild();
+}
+
+void Backend::setView(const QString &view) {
+    if (view == m_view)
+        return;
+    m_view = view;
+    m_query.clear();
+    m_tagFilter.clear();
+    filtersChanged();
+}
+
+void Backend::setQuery(const QString &query) {
+    if (query != m_query) {
+        m_query = query;
+        filtersChanged();
+    }
+}
+
+void Backend::setCategoryFilter(const QStringList &categories) {
+    if (categories != m_categoryFilter) {
+        m_categoryFilter = categories;
+        filtersChanged();
+    }
+}
+
+void Backend::setLevelFilter(const QString &level) {
+    if (level != m_levelFilter) {
+        m_levelFilter = level;
+        filtersChanged();
+    }
+}
+
+void Backend::setTagFilter(const QString &tag) {
+    if (tag != m_tagFilter) {
+        m_tagFilter = tag;
+        filtersChanged();
+    }
+}
+
+void Backend::setHideRead(bool hide) {
+    if (hide != m_hideRead) {
+        m_hideRead = hide;
+        QSettings("writeuppulse", "writeuppulse").setValue("hideRead", hide);
+        filtersChanged();
+    }
+}
+
+void Backend::setDeepMode(bool deep) {
+    if (deep != m_deepMode) {
+        m_deepMode = deep;
+        QSettings("writeuppulse", "writeuppulse").setValue("deepMode", deep);
+        emit filterChanged();
+    }
+}
+
+// The writeups the window shows: the source the view picks (a day, the
+// favorites, or every day when searching), narrowed by the filters. Each
+// item carries its date, and old digests get the fields they lack.
+void Backend::rebuild() {
+    const QStringList favorites = m_progress.favorites();
+    const bool searching = !m_query.trimmed().isEmpty();
+    QVariantList source;
+    for (const auto &value : m_library) {
+        const QVariantMap item = value.toMap();
+        if (searching || (m_view == "favorites" ? favorites.contains(item.value("url").toString())
+                                                : m_view == "day" && item.value("date") == m_date))
+            source << item;
+    }
+
+    QStringList shown;
+    for (const auto &category : Store::categories())
+        for (const auto &value : source)
+            if (value.toMap().value("category") == category && !shown.contains(category))
+                shown << category;
+
+    // A search hit that a filter hides counts as hidden; a miss doesn't.
+    const QStringList words = m_query.toLower().split(' ', Qt::SkipEmptyParts);
+    QVariantList items;
+    int hidden = 0;
+    for (const auto &value : source) {
+        const QVariantMap item = value.toMap();
+        const QJsonObject state = m_progress.entry(item.value("url").toString());
+        const QStringList userTags = state.value("tags").toVariant().toStringList();
+        if (!words.isEmpty()) {
+            const QString haystack = QStringList{item.value("title").toString(), item.value("summary").toString(),
+                item.value("why").toString(), item.value("source").toString(), item.value("category").toString(),
+                item.value("takeaways").toStringList().join(' '), item.value("tags").toStringList().join(' '),
+                userTags.join(' ')}.join(' ').toLower();
+            if (!std::all_of(words.begin(), words.end(), [&](const QString &word) { return haystack.contains(word); }))
+                continue;
+        }
+        if ((!m_categoryFilter.isEmpty() && !m_categoryFilter.contains(item.value("category").toString()))
+            || (!m_levelFilter.isEmpty() && item.value("level") != m_levelFilter)
+            || (m_hideRead && state.contains("read"))
+            || (!m_tagFilter.isEmpty() && !userTags.contains(m_tagFilter, Qt::CaseInsensitive))) {
+            ++hidden;
+            continue;
+        }
+        items << item;
+    }
+
+    m_hiddenCount = hidden;
+    if (items != m_items || shown != m_shownCategories) {
+        m_items = items;
+        m_shownCategories = shown;
+        emit digestChanged();
+    }
 }
 
 void Backend::setRead(const QVariantMap &item, bool read) {
@@ -76,11 +194,14 @@ void Backend::setPracticeDone(const QString &url, int index, bool done) {
 }
 
 void Backend::setDate(const QString &date) {
-    if (date == m_date || !m_dates.contains(date))
+    if (!m_dates.contains(date) || (date == m_date && m_view == "day" && m_query.isEmpty()))
         return;
     m_date = date;
-    m_digestStamp.clear();
-    reload();
+    emit dateChanged();
+    m_view = "day";
+    m_query.clear();
+    m_tagFilter.clear();
+    filtersChanged();
 }
 
 void Backend::step(int delta) {
@@ -115,15 +236,28 @@ void Backend::reload() {
         emit datesChanged();
         if (follow || !m_dates.contains(m_date)) {
             m_date = m_dates.value(0);
-            m_digestStamp.clear();
+            emit dateChanged();
         }
     }
 
-    const QByteArray digestStamp = m_date.toUtf8() + "@" + stamp(m_store.directory() + "/" + m_date + ".json");
-    if (digestStamp != m_digestStamp) {
-        m_digestStamp = digestStamp;
-        m_items = m_date.isEmpty() ? QVariantList() : m_store.digest(m_date).value("items").toArray().toVariantList();
-        emit digestChanged();
+    // Every day is loaded at once: search and favorites span them all, and a
+    // year of digests is still only a few megabytes.
+    QByteArray libraryStamp;
+    for (const auto &date : m_dates)
+        libraryStamp += date.toUtf8() + "@" + stamp(m_store.directory() + "/" + date + ".json") + ";";
+    bool rebuildNeeded = false;
+    if (libraryStamp != m_libraryStamp) {
+        m_libraryStamp = libraryStamp;
+        m_library.clear();
+        for (const auto &date : m_dates)
+            for (const auto &value : m_store.digest(date).value("items").toArray()) {
+                QVariantMap item = value.toObject().toVariantMap();
+                item.insert("date", date);
+                if (!Store::categories().contains(item.value("category").toString()))
+                    item.insert("category", "Other");
+                m_library << item;
+            }
+        rebuildNeeded = true;
     }
 
     // Another window may have marked something; pick it up.
@@ -133,7 +267,10 @@ void Backend::reload() {
         m_progress.load();
         ++m_progressRevision;
         emit progressChanged();
+        rebuildNeeded = true;
     }
+    if (rebuildNeeded)
+        rebuild();
 
     // QLockFile removes a lock left by a dead process, but only when it tries
     // to take it; reading the owner's pid doesn't touch the directory, which

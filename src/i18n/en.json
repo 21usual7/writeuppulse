@@ -3,8 +3,12 @@
     "one": "%n-day streak",
     "other": "%n-day streak"
   },
-  "%n writeups read": {
-    "one": "%n writeup read",
-    "other": "%n writeups read"
+  "%n results": {
+    "one": "%n result",
+    "other": "%n results"
+  },
+  "%n hidden by filters": {
+    "one": "%n hidden by filters",
+    "other": "%n hidden by filters"
   }
 }
