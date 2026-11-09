@@ -12,6 +12,7 @@
 #include "backend.h"
 #include "cli.h"
 #include "portalfilepicker.h"
+#include "tutor.h"
 #include "translator.h"
 
 int main(int argc, char *argv[]) {
@@ -38,6 +39,7 @@ int main(int argc, char *argv[]) {
     Backend backend;
     PortalFilePicker picker;
     backend.setFilePicker(&picker);
+    Tutor tutor;
 
     QQmlApplicationEngine engine;
     QObject::connect(&translator, &Translator::changed, &engine, &QQmlEngine::retranslate);
@@ -47,6 +49,7 @@ int main(int argc, char *argv[]) {
                      [&] { translator.setOverride(backend.language()); });
     engine.rootContext()->setContextProperty("translator", &translator);
     engine.rootContext()->setContextProperty("backend", &backend);
+    engine.rootContext()->setContextProperty("tutor", &tutor);
     engine.load(QUrl("qrc:/Main.qml"));
     if (engine.rootObjects().isEmpty())
         return 1;

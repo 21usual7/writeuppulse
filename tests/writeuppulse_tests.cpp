@@ -16,6 +16,10 @@
 #include "store.h"
 #include "syncer.h"
 #include "translator.h"
+#include "tutor.h"
+
+#include <QTcpServer>
+#include <QTcpSocket>
 
 // Answers the save dialog at once with a fixed file.
 class FakePicker : public FilePicker {
@@ -382,6 +386,74 @@ private slots:
         Syncer::setSource("claude");
         QCOMPARE(Syncer::source(), QString("claude"));
         QSettings("writeuppulse", "writeuppulse").clear();
+    }
+
+    void tutorStreamsALocalAnswer()
+    {
+        // A stand-in for Ollama: lists one model and streams an answer in pieces.
+        QTcpServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        QByteArray lastRequest;
+        connect(&server, &QTcpServer::newConnection, this, [&] {
+            QTcpSocket *socket = server.nextPendingConnection();
+            connect(socket, &QTcpSocket::readyRead, socket, [&, socket] {
+                lastRequest += socket->readAll();
+                const qsizetype head = lastRequest.indexOf("\r\n\r\n");
+                if (head < 0)
+                    return;
+                const QByteArray length = lastRequest.mid(lastRequest.toLower().indexOf("content-length:") + 15).split('\r').value(0).trimmed();
+                if (lastRequest.startsWith("POST") && lastRequest.size() - head - 4 < length.toInt())
+                    return;
+                QByteArray body;
+                if (lastRequest.startsWith("GET"))
+                    body = QJsonDocument(QJsonObject{{"models", QJsonArray{QJsonObject{{"name", "tiny:latest"}}}}}).toJson(QJsonDocument::Compact);
+                else
+                    for (const char *piece : {"<think>hm</think>A buffer ", "overflow writes past ", "the end.```x```"})
+                        body += QJsonDocument(QJsonObject{{"message", QJsonObject{{"content", piece}}}}).toJson(QJsonDocument::Compact) + "\n";
+                socket->write("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\n\r\n" + body);
+                socket->disconnectFromHost();
+            });
+        });
+
+        QSettings("writeuppulse", "writeuppulse").setValue("tutorModel", "tiny");
+        Tutor tutor(QUrl(QString("http://127.0.0.1:%1").arg(server.serverPort())));
+        QTRY_COMPARE(tutor.status(), QString("ready"));
+
+        tutor.open(QVariantMap{{"url", "https://example.com/a"}, {"title", "Overflow"}, {"summary", "About buffers."},
+                               {"practice", QStringList{"Watch a crash in a VM", "Read the patch"}}}, 1);
+        QVERIFY(tutor.systemPrompt().contains("About buffers."));
+        QVERIFY(tutor.systemPrompt().contains("practice idea 2: \"Read the patch\""));
+        QVERIFY(tutor.systemPrompt().contains("never write code"));
+
+        lastRequest.clear();
+        tutor.ask("What is it?");
+        QVERIFY(tutor.busy());
+        QTRY_VERIFY(!tutor.busy());
+        QVERIFY2(tutor.error().isEmpty(), qPrintable(tutor.error()));
+        const QVariantList messages = tutor.messages();
+        QCOMPARE(messages.size(), 2);
+        QCOMPARE(messages[1].toMap()["text"].toString(), QString("A buffer overflow writes past the end."));
+        QVERIFY(lastRequest.contains("\"model\":\"tiny\""));
+
+        // Each practice idea and the whole writeup keep their own conversation.
+        tutor.open(QVariantMap{{"url", "https://example.com/a"}, {"title", "Overflow"}}, -1);
+        QCOMPARE(tutor.messages().size(), 0);
+        QSettings("writeuppulse", "writeuppulse").clear();
+    }
+
+    void tutorReportsAMissingOllama()
+    {
+        QTcpServer closed;
+        QVERIFY(closed.listen(QHostAddress::LocalHost));
+        const quint16 port = closed.serverPort();
+        closed.close();
+        Tutor tutor(QUrl(QString("http://127.0.0.1:%1").arg(port)));
+        QTRY_COMPARE(tutor.status(), QString("missing"));
+        tutor.open(QVariantMap{{"url", "https://example.com/a"}, {"title", "T"}});
+        tutor.ask("Hello?");
+        QTRY_VERIFY(!tutor.busy());
+        QVERIFY(!tutor.error().isEmpty());
+        QCOMPARE(tutor.messages().size(), 0);
     }
 
     void fetcherSavesTheAgentsAnswer()

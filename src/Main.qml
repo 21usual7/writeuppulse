@@ -176,6 +176,7 @@ ApplicationWindow {
     Shortcut { sequence: "2"; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: reader.tab = 1 }
     Shortcut { sequence: "3"; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: reader.tab = 2 }
     Shortcut { sequence: "4"; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: reader.tab = 3 }
+    Shortcut { sequence: "5"; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: reader.tab = 4 }
     Shortcut { sequences: ["Down", "J"]; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: win.move(1) }
     Shortcut { sequences: ["Up", "K"]; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: win.move(-1) }
     Shortcut { sequence: "Left"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.focusVisible ? focusView.previousStep() : backend.olderDay() }
@@ -653,6 +654,38 @@ ApplicationWindow {
                         font.pixelSize: 12
                     }
 
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 14
+                        Text { text: qsTr("Tutor model"); color: Style.muted; font.family: Style.sans; font.pixelSize: 14 }
+                        TextField {
+                            Layout.preferredWidth: 200
+                            text: tutor.model
+                            color: Style.ink
+                            font.family: Style.sans
+                            font.pixelSize: 13
+                            onEditingFinished: tutor.model = text
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                            text: tutor.status === "ready" ? qsTr("Ready")
+                                : tutor.status === "noModel" ? qsTr("Not downloaded: ollama pull %1").arg(tutor.model)
+                                : qsTr("Ollama is not running")
+                            color: tutor.status === "ready" ? Style.done : Style.faint
+                            font.family: Style.sans
+                            font.pixelSize: 12
+                        }
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        wrapMode: Text.Wrap
+                        text: qsTr("The Ask tab and practice reviews use this local Ollama model; nothing leaves your machine.")
+                        color: Style.faint
+                        font.family: Style.sans
+                        font.pixelSize: 12
+                    }
+
                     Rectangle { Layout.fillWidth: true; Layout.topMargin: 6; height: 1; color: Style.line }
                     Text { text: qsTr("Directions"); color: Style.ink; font.family: Style.sans; font.pixelSize: 17; font.weight: Font.DemiBold }
                     Text {
@@ -737,7 +770,7 @@ ApplicationWindow {
                     model: [
                         ["↑ ↓", qsTr("Previous or next writeup")],
                         ["← →", qsTr("Older or newer day")],
-                        ["1 – 4", qsTr("Summary, takeaways, questions, practice")],
+                        ["1 – 5", qsTr("Summary, takeaways, questions, practice, ask")],
                         ["Enter", qsTr("Study the writeup step by step")],
                         ["O", qsTr("Open the article in the browser")],
                         ["M", qsTr("Mark as read")],

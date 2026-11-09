@@ -101,6 +101,15 @@ the QML window.
   Tests use a `file://` feed. The maintainer's machine has `source=claude` and a local
   unit that runs `fetch` plus a drop-in (`writeuppulse.service.d/publish.conf`) that runs
   `bin/publish` after it.
+- **Tutor:** `Tutor` (`src/tutor.cpp`, QML context property `tutor`) talks to a local
+  Ollama (`WRITEUPPULSE_OLLAMA`, default `http://127.0.0.1:11434`; model in QSettings
+  `tutorModel`, default `qwen3:8b`). `status` comes from `/api/tags`; `ask` streams
+  `/api/chat` (NDJSON, `think: false`) with a system prompt holding the writeup and the
+  no-code rule, plus a practice idea when one is open. Conversations are in memory, keyed
+  by URL + practice index (−1 = whole writeup), capped at 20 messages. `clean()` cuts
+  `<think>` and fenced code. UI: the Ask tab (`TutorChat.qml`, key 5) and "Discuss" on
+  `PracticeStep`. Tests use a `QTcpServer` stand-in for Ollama. Claude still does all
+  searching and summarizing; the tutor never writes to disk.
 - **Look:** the app has its own palette on purpose (the user chose it over following the
   Omarchy theme): colours, fonts, and radius live in the `Style` QML singleton
   (`src/Style.qml`, registered by `src/qmldir`). Layout is a reader — icon rail, list
@@ -116,6 +125,8 @@ the QML window.
   Build JSON fixtures with `QJsonObject` instead. After such a failure, `rm -rf build/tests`.
 - Tests call `QStandardPaths::setTestModeEnabled(true)` in `initTestCase` so `QSettings`
   doesn't touch the real `~/.config`; keep it there.
+- `QJsonArray::last()` returns a copy, and chained `json["a"]["b"]` on refs can quietly
+  read nothing: use `toObject().value(...)` and `QJsonArray::replace`.
 - Never use `focus` as a QML id: every Item has a `focus` property, which wins, so
   `focus.x` silently reads `undefined`.
 - There is no screenshot harness in the repo: write a small Qt program that loads

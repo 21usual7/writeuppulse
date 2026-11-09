@@ -5,5 +5,5 @@ TEMPLATE = app
 
 INCLUDEPATH += ../src
 
-HEADERS += ../src/backend.h ../src/filepicker.h ../src/fetcher.h ../src/progress.h ../src/store.h ../src/syncer.h ../src/translator.h
-SOURCES += writeuppulse_tests.cpp ../src/backend.cpp ../src/fetcher.cpp ../src/progress.cpp ../src/store.cpp ../src/syncer.cpp ../src/translator.cpp
+HEADERS += ../src/backend.h ../src/filepicker.h ../src/fetcher.h ../src/progress.h ../src/store.h ../src/syncer.h ../src/translator.h ../src/tutor.h
+SOURCES += writeuppulse_tests.cpp ../src/backend.cpp ../src/fetcher.cpp ../src/progress.cpp ../src/store.cpp ../src/syncer.cpp ../src/translator.cpp ../src/tutor.cpp

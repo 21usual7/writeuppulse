@@ -4,7 +4,8 @@ import QtQuick.Controls.Material
 import QtQuick.Layouts
 
 // The open writeup: its header and actions, then the summary, takeaways,
-// self-check questions, and practice as tabs. Agent text is plain text.
+// self-check questions, practice, and the local tutor as tabs. Agent text is
+// plain text.
 Flickable {
     id: pane
 
@@ -26,7 +27,19 @@ Flickable {
     signal practiceToggled(int index, bool done)
     signal tagsEdited(var tags)
 
-    onItemChanged: { tab = 0; contentY = 0 }
+    onItemChanged: {
+        tab = 0
+        contentY = 0
+        if (item) tutor.open(item, -1)
+    }
+
+    // Keeps the newest answer in view while it streams in.
+    Connections {
+        target: tutor
+        function onMessagesChanged() {
+            if (pane.tab === 4) pane.contentY = Math.max(0, pane.contentHeight - pane.height)
+        }
+    }
 
     contentHeight: page.implicitHeight + 80
     clip: true
@@ -158,7 +171,8 @@ Flickable {
                     qsTr("Summary"),
                     qsTr("Takeaways") + "  " + pane.count(pane.takeaways.length),
                     qsTr("Check yourself") + "  " + pane.count(pane.questions.length),
-                    qsTr("Practice") + "  " + qsTr("%1/%2").arg(pane.count(pane.done.length)).arg(pane.count(pane.practice.length))
+                    qsTr("Practice") + "  " + qsTr("%1/%2").arg(pane.count(pane.done.length)).arg(pane.count(pane.practice.length)),
+                    qsTr("Ask")
                 ]
                 Column {
                     required property string modelData
@@ -261,15 +275,25 @@ Flickable {
                     Layout.fillWidth: true
                     text: modelData
                     checked: pane.done.indexOf(index) >= 0
+                    discussable: true
                     onToggled: pane.practiceToggled(index, !checked)
+                    onDiscuss: { tutor.open(pane.item, index); pane.tab = 4 }
                 }
             }
+        }
+
+        // Ask
+        TutorChat {
+            Layout.fillWidth: true
+            Layout.topMargin: 18
+            visible: pane.tab === 4
+            item: pane.item
         }
 
         Text {
             Layout.fillWidth: true
             Layout.topMargin: 22
-            visible: pane.tab > 0 && !pane.learning
+            visible: pane.tab > 0 && pane.tab < 4 && !pane.learning
             wrapMode: Text.Wrap
             text: qsTr("This day was fetched before learning mode, so it has no questions or practice.")
             color: Style.muted

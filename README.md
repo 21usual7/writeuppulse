@@ -64,6 +64,14 @@ Postmortems, Other) and level (Junior, Middle, Senior). The open one is on the
 right, in four tabs: the summary, 5–8 takeaways, self-check questions with hidden
 answers, and a "Try it yourself" checklist of practice ideas for a lab you control.
 
+**Ask** (5) is a chat with a local tutor about the open writeup, and **Discuss**
+next to a practice idea asks it to review what you did in your lab and suggest the
+next step. The tutor runs on your machine with [Ollama](https://ollama.com)
+(`sudo pacman -S ollama`, `systemctl enable --now ollama`, `ollama pull qwen3:8b`;
+pick another model in Settings), knows the writeup's summary, takeaways, questions,
+and practice ideas, and follows the same rule: explanations in words, no code or
+commands. Conversations last until the window closes.
+
 **Study step by step** (Enter) opens focus mode: one writeup at a time, through
 read → remember → check yourself → practice, with the day's progress on top.
 
@@ -107,7 +115,7 @@ Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`
 | --- | --- |
 | ↑ ↓ (K J) | Previous or next writeup |
 | ← → | Older or newer day; in focus mode, previous or next step |
-| 1 – 4 | Summary, takeaways, questions, practice |
+| 1 – 5 | Summary, takeaways, questions, practice, ask the tutor |
 | Enter | Study the writeup step by step |
 | Space | In focus mode, reveal the next answer or go on |
 | O | Open the article in the browser |

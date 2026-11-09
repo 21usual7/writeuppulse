@@ -16,6 +16,7 @@ HEADERS += \
     src/progress.h \
     src/store.h \
     src/syncer.h \
+    src/tutor.h \
     src/translator.h
 
 SOURCES += \
@@ -27,6 +28,7 @@ SOURCES += \
     src/progress.cpp \
     src/store.cpp \
     src/syncer.cpp \
+    src/tutor.cpp \
     src/translator.cpp
 
 RESOURCES += src/resources.qrc
