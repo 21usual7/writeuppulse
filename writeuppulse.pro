@@ -4,7 +4,7 @@ CONFIG += c++17 release
 TARGET = writeuppulse
 TEMPLATE = app
 # Keep in step with pkgver in pkgbuild/PKGBUILD.
-VERSION = 0.2.0
+VERSION = 0.3.0
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 
 HEADERS += \
