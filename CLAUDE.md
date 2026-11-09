@@ -27,7 +27,7 @@ switching to `bin/install`, remove those copies first or they shadow the package
 
 One binary, two modes (`src/main.cpp`): any first argument other than `open` goes to
 `runCli` (`src/cli.cpp`, headless `QCoreApplication`: `fetch`, `list`, `show`,
-`skill install`, all with `--json`); otherwise the QML window.
+`export`, `skill install`, all with `--json`); otherwise the QML window.
 
 - **Fetch path:** `Fetcher` (`src/fetcher.cpp`) runs `claude -p <prompt>` with only
   `WebSearch,WebFetch` tools, `--strict-mcp-config`, `--output-format json` and a
@@ -55,7 +55,7 @@ One binary, two modes (`src/main.cpp`): any first argument other than `open` goe
   app is for learning, not attacking: the prompt forbids code/commands/payloads/PoCs,
   the schema has no code field, and `normalize` strips fenced code blocks. Old digests
   lack these fields and must still render.
-- **Preferences and export:** the Directions popup writes `categories` (empty = all)
+- **Preferences and export:** the Settings popup (P) writes `categories` (empty = all)
   and `preferred` to `QSettings`; `Fetcher::prompt` reads them, and `Backend::rebuild`
   puts preferred directions first in a day. Export goes through `FilePicker`
   (abstract; tests inject a fake) → `PortalFilePicker`, adapted from Omacut, which
@@ -83,11 +83,14 @@ One binary, two modes (`src/main.cpp`): any first argument other than `open` goe
   doesn't touch the real `~/.config`; keep it there.
 - Never use `focus` as a QML id: every Item has a `focus` property, which wins, so
   `focus.x` silently reads `undefined`.
-- Offscreen rendering (`QT_QPA_PLATFORM=offscreen`) does not draw Material button and
-  popup backgrounds. For screenshots that must look real, run the QML harness with
-  `QT_QPA_PLATFORM=wayland` and `grabWindow()`.
-- The QML harness must run with its own `XDG_CONFIG_HOME`: pressing keys like D or H
-  in it otherwise writes into the user's real `~/.config/writeuppulse`.
+- There is no screenshot harness in the repo: write a small Qt program that loads
+  `qrc:/Main.qml` with a `Backend` on `WRITEUPPULSE_DATA` (made-up digests), sends
+  keys, and saves `grabWindow()`. Set `QT_FORCE_STDERR_LOGGING=1` to see QML warnings.
+- Offscreen rendering (`QT_QPA_PLATFORM=offscreen`) is fine for the hand-drawn UI but
+  does not draw Material control backgrounds (menus, switches); use
+  `QT_QPA_PLATFORM=wayland` when those must look real.
+- The harness must run with its own `XDG_CONFIG_HOME`: keys like U or the language
+  pills otherwise write into the user's real `~/.config/writeuppulse`.
 - A real `writeuppulse fetch` spends the user's Claude usage and takes minutes; don't
   run it just to test — use the fake `claude` script pattern in the tests.
 
@@ -96,4 +99,5 @@ One binary, two modes (`src/main.cpp`): any first argument other than `open` goe
 - Commit messages in **English**, short and imperative ("Pick the language of …").
 - Branch `master`, remote `git@github.com:21usual7/writeuppulse.git` (public). Push only
   when asked: `GIT_SSH_COMMAND="ssh -i ~/keys/git_key -o IdentitiesOnly=yes" git push`.
-- README screenshot (`docs/screenshot.png`) uses made-up data and the default accent.
+- README screenshots (`docs/screenshot.png`, `docs/focus.png`) use made-up data, the
+  English UI, and the app's own palette; retake them when the UI changes.
