@@ -14,6 +14,30 @@ what is done) is `docs/ROADMAP.md`; mark stages done there. **The Claude budget 
 grow** (the user's decision): keep `Fetcher`'s prompt and schema the size they are, and
 build new features locally — SQLite, the local Ollama model, the article pages themselves.
 
+## Status (2026-11-09)
+
+Roadmap stages done, each with tests (35 passing) and docs:
+
+- **0 (bugs):** start limits in `[Unit]` (packaged and local unit), statistics take
+  the category from the day, progress keyed by `Store::canonicalUrl`.
+- **1 (self-check):** "I knew it" / "I didn't" on revealed answers (focus mode and the
+  Check yourself tab), kept as `events`, counted in Statistics and the export.
+- **2 (data foundation):** `Database` (SQLite, migrations, version 2), `progress.json`
+  imported, FTS5 search with BM25.
+- **3 (article texts):** `Archive` saves each writeup's page as passages; search
+  covers them; Settings switch "Save article texts for search".
+
+On this machine the window runs the new binary: the database is at version 2 and all
+5 saved writeups have their page text (`pages` status `ok`). Nothing is pushed; the
+last release is still 0.3.0, so cutting 0.4.0 would need the user's go-ahead.
+
+**Next: stage 4**, concept and relation extraction with the local Ollama (not Claude):
+an `LlmClient` taken out of `Tutor` (chat, structured output with `format`, so the
+JSON is validated before saving), an `Extractor` queue that runs only while the tutor
+is `ready` (Ollama is off on battery here), reading `Database::passages` or the summary
+when a page has none, and storing concepts and edges with provenance (passage, model
+name) in a version 3 migration. Then stage 5, the graph view. See `docs/ROADMAP.md`.
+
 ## Commands
 
 ```sh
