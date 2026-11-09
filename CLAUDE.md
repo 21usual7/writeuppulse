@@ -165,7 +165,8 @@ the QML window.
 - Branch `master`, remote `git@github.com:21usual7/writeuppulse.git` (public). Push only
   when asked: `GIT_SSH_COMMAND="ssh -i ~/keys/git_key -o IdentitiesOnly=yes" git push`.
 - Releases: bump `pkgver` in `pkgbuild/PKGBUILD` and `VERSION` in `writeuppulse.pro`
-  (it becomes `APP_VERSION` for `setApplicationVersion`), `cd pkgbuild && makepkg -f` (not
+  (it becomes `APP_VERSION` for `setApplicationVersion`; make doesn't track DEFINES, so
+  `rm build/main.o` first or the binary keeps the old version), `cd pkgbuild && makepkg -f` (not
   `bin/install`, which also installs), commit, push, then
   `gh release create vX.Y.Z pkgbuild/writeuppulse-X.Y.Z-1-x86_64.pkg.tar.zst --target master`
   (only the main package, not `-debug`). The README's install steps link to the latest
