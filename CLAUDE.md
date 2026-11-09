@@ -3,8 +3,11 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 WriteupPulse is an Omarchy desktop app (C++17 + Qt 6 Quick, qmake, no CMake) built
-following the `omarchy-app` skill. Every morning it runs Claude Code headless to find
-5 popular technical writeups, summarize them, and save them; the window shows them.
+following the `omarchy-app` skill. Every morning Claude Code (headless, on the
+maintainer's machine) finds 5 popular technical writeups and summarizes them; they are
+published to a static site, and every other install downloads them from there. In the
+window, an optional local Ollama model tutors the reader. Three roles, kept apart: Claude
+searches and summarizes, the site distributes, Ollama only teaches.
 
 ## Commands
 
@@ -15,6 +18,8 @@ QT_QPA_PLATFORM=offscreen build/tests/writeuppulse_tests fetcherReportsAgentErro
 build/writeuppulse             # open the window (same as `writeuppulse open`)
 WRITEUPPULSE_DATA=/tmp/x build/writeuppulse   # run against a scratch data dir
 bin/install                    # makepkg -fsi + enable the user timer (needs sudo)
+WRITEUPPULSE_DATA=/tmp/x build/writeuppulse sync   # download from the live site (safe)
+bin/publish                    # push the saved days to the site (pages branch only)
 ```
 
 On this machine the app is currently installed **without** the package, for the user
@@ -32,8 +37,8 @@ binary. `ExecStartPost=-` ignores a failed publish; `timeout 5m` and ssh's
 `BatchMode`/`ConnectTimeout` keep a hung one inside the unit's 40-min `TimeoutStartSec`
 (the fetch takes up to 30), because a unit timeout means `Restart=on-failure` reruns the
 agent. `bin/publish` pushes whenever `pages` is ahead of `origin/pages`, so a push that
-failed one day goes out the next, and it stops with an error if `pages` diverged. Site: <https://21usual7.github.io/writeuppulse/>,
-served by GitHub Pages from the `pages` branch (only `bin/publish` writes it, from the
+failed one day goes out the next, and it stops with an error if `pages` diverged.
+Site: <https://21usual7.github.io/writeuppulse/>, served by GitHub Pages from the `pages` branch (only `bin/publish` writes it, from the
 worktree in `~/.cache/writeuppulse/pages`). Changes to `site/` reach the site only once
 committed on `master` and published.
 
@@ -62,9 +67,9 @@ the QML window.
   (`fetch.lock`) prevents concurrent runs. URLs from the last 7 days go into the prompt
   to avoid repeats. `findClaude()` also searches mise/`~/.local/bin` paths because the
   systemd unit runs with a bare PATH.
-- **Window ↔ fetch decoupling:** the GUI never runs the agent itself. "Refresh now"
-  does `systemctl --user start --no-block writeuppulse.service` (falls back to a
-  detached `writeuppulse fetch`). `Backend` watches the data directory with
+- **Window ↔ fetch decoupling:** the GUI never runs the agent or a sync itself. "Refresh
+  now" does `systemctl --user start --no-block writeuppulse.service` (falls back to a
+  detached `writeuppulse update`). `Backend` watches the data directory with
   `QFileSystemWatcher`; "running" = the lock file's pid is alive (read via
   `getLockInfo`, never `tryLock`, which would touch the directory and re-trigger the
   watcher), plus a short `m_starting` grace timer.
@@ -107,16 +112,15 @@ the QML window.
   file names, runs `normalize`, and saves through `Store` under the same lock and
   `status.json` as a fetch. In feed mode the window syncs on open and hourly if the last
   run is over 30 min old (only with `systemd` true, so tests never start anything).
-  Tests use a `file://` feed. The maintainer's machine has `source=claude` and a local
-  unit that runs `fetch` plus a drop-in (`writeuppulse.service.d/publish.conf`) that runs
-  `bin/publish` after it.
+  Tests use a `file://` feed. The packaged unit runs `update`; this machine's runs
+  `fetch` (see the publisher setup above).
 - **Tutor:** `Tutor` (`src/tutor.cpp`, QML context property `tutor`) talks to a local
   Ollama (`WRITEUPPULSE_OLLAMA`, default `http://127.0.0.1:11434`; model in QSettings
-  `tutorModel`, default `qwen3:8b`). `status` comes from `/api/tags`; `ask` streams
-  `/api/chat` (NDJSON, `think: false`); when Ollama is unreachable and `onAcPower()` (reads
-  `/sys/class/power_supply`) is false, `status` is `battery` (this machine stops Ollama off
-  AC, see below) with a system prompt holding the writeup and the
-  no-code rule, plus a practice idea when one is open. Conversations are in memory, keyed
+  `tutorModel`, default `qwen3:8b`). `status` comes from `/api/tags`: `ready`, `noModel`,
+  `missing`, or `battery` when Ollama is unreachable and `onAcPower()` (reads
+  `/sys/class/power_supply`) is false (this machine stops Ollama off AC, see above).
+  `ask` streams `/api/chat` (NDJSON, `think: false`) with a system prompt holding the
+  writeup and the no-code rule, plus a practice idea when one is open. Conversations are in memory, keyed
   by URL + practice index (−1 = whole writeup), capped at 20 messages. `clean()` cuts
   `<think>` and fenced code. UI: the Ask tab (`TutorChat.qml`, key 5) and "Discuss" on
   `PracticeStep`. Tests use a `QTcpServer` stand-in for Ollama. Claude still does all
@@ -140,9 +144,14 @@ the QML window.
   read nothing: use `toObject().value(...)` and `QJsonArray::replace`.
 - Never use `focus` as a QML id: every Item has a `focus` property, which wins, so
   `focus.x` silently reads `undefined`.
-- There is no screenshot harness in the repo: write a small Qt program that loads
-  `qrc:/Main.qml` with a `Backend` on `WRITEUPPULSE_DATA` (made-up digests), sends
-  keys, and saves `grabWindow()`. Set `QT_FORCE_STDERR_LOGGING=1` to see QML warnings.
+- There is no screenshot harness in the repo: write a small Qt program (in the scratchpad,
+  its .pro listing the `src/*.cpp` it needs and `src/resources.qrc`) that sets the
+  `translator`, `backend`, and `tutor` context properties, loads `qrc:/Main.qml`, sends
+  keys, and saves `grabWindow()`. Construct `Backend({}, false)` so it never syncs on open
+  (R still starts a detached `update`). Point `WRITEUPPULSE_DATA` at made-up digests and
+  `WRITEUPPULSE_OLLAMA` at a fake (a few lines of Python `http.server`: `/api/tags` plus an
+  NDJSON `/api/chat`), or at the real Ollama for a real answer (qwen3:8b, CPU: ~20 s
+  warm). Set `QT_FORCE_STDERR_LOGGING=1` to see QML warnings and `qInfo` output.
 - Offscreen rendering (`QT_QPA_PLATFORM=offscreen`) is fine for the hand-drawn UI but
   does not draw Material control backgrounds (menus, switches); use
   `QT_QPA_PLATFORM=wayland` when those must look real.
