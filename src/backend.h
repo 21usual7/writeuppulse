@@ -24,6 +24,7 @@ class Backend : public QObject {
     Q_PROPERTY(bool timerAvailable READ timerAvailable NOTIFY timerChanged)
     Q_PROPERTY(bool timerEnabled READ timerEnabled NOTIFY timerChanged)
     Q_PROPERTY(QString problem READ problem NOTIFY problemChanged)
+    Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
 
 public:
     explicit Backend(const QString &directory = {}, bool systemd = true, QObject *parent = nullptr);
@@ -40,6 +41,8 @@ public:
     bool timerAvailable() const { return m_timerAvailable; }
     bool timerEnabled() const { return m_timerEnabled; }
     QString problem() const { return m_problem; }
+    QString language() const { return m_language; }
+    void setLanguage(const QString &language);
 
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void setTimerEnabled(bool enabled);
@@ -52,6 +55,7 @@ signals:
     void statusChanged();
     void timerChanged();
     void problemChanged();
+    void languageChanged();
 
 private:
     void reload();
@@ -76,4 +80,5 @@ private:
     bool m_timerAvailable = false;
     bool m_timerEnabled = false;
     QString m_problem;
+    QString m_language;
 };

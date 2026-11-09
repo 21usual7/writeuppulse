@@ -5,7 +5,9 @@
 
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QSettings>
 #include <QSignalSpy>
+#include <QStandardPaths>
 
 #include "backend.h"
 #include "fetcher.h"
@@ -17,6 +19,28 @@ class WriteupPulseTests : public QObject {
     Q_OBJECT
 
 private slots:
+    void initTestCase()
+    {
+        // Keeps QSettings out of the real ~/.config.
+        QStandardPaths::setTestModeEnabled(true);
+        QSettings("writeuppulse", "writeuppulse").clear();
+    }
+
+    void languagePickedInTheAppWins()
+    {
+        QTemporaryDir dir;
+        write(dir.path() + "/language", "uk\n");
+        QCOMPARE(Fetcher::language(dir.path() + "/language"), QString("uk"));
+        write(dir.path() + "/language", "da\n");
+        QCOMPARE(Fetcher::language(dir.path() + "/language"), QString("en"));
+
+        Fetcher::setLanguage("ru");
+        QCOMPARE(Fetcher::language(dir.path() + "/language"), QString("ru"));
+        Fetcher fetcher(Store(dir.path()), "/bin/true");
+        QVERIFY(fetcher.prompt("2026-11-09").contains("takeaways in Russian"));
+        QSettings("writeuppulse", "writeuppulse").clear();
+    }
+
     void normalizeKeepsOnlyCompleteWebItems()
     {
         auto item = [](const QString &title, const QString &url, const QString &summary) {

@@ -22,6 +22,8 @@ public:
                         QObject *parent = nullptr);
 
     QString language() const { return m_language; }
+    // A language picked in the app wins over Omarchy's; empty follows Omarchy.
+    void setOverride(const QString &language);
     bool isEmpty() const override { return m_strings.isEmpty(); }
     QString translate(const char *context, const char *sourceText, const char *disambiguation = nullptr,
                       int n = -1) const override;
@@ -37,6 +39,7 @@ private:
     void reload();
 
     QString m_languageFile;
+    QString m_override;
     QString m_catalogDirectory;
     QString m_language;
     QHash<QString, QJsonValue> m_strings;

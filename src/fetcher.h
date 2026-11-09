@@ -18,6 +18,8 @@ public:
     bool run(QString *error, int *count = nullptr);
 
     static QString findClaude();
+    static QString language(const QString &omarchyLanguageFile = {});
+    static void setLanguage(const QString &language);
     static QByteArray schema();
 
     int timeoutMs = 30 * 60 * 1000;

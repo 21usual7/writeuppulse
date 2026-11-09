@@ -40,6 +40,10 @@ int main(int argc, char *argv[]) {
 
     QQmlApplicationEngine engine;
     QObject::connect(&translator, &Translator::changed, &engine, &QQmlEngine::retranslate);
+    // The language picked in the window wins over Omarchy's, live.
+    translator.setOverride(backend.language());
+    QObject::connect(&backend, &Backend::languageChanged, &translator,
+                     [&] { translator.setOverride(backend.language()); });
     engine.rootContext()->setContextProperty("translator", &translator);
     engine.rootContext()->setContextProperty("theme", &theme);
     engine.rootContext()->setContextProperty("backend", &backend);

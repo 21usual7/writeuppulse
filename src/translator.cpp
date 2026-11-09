@@ -92,6 +92,11 @@ QString Translator::translate(const char *, const char *sourceText, const char *
     return {};
 }
 
+void Translator::setOverride(const QString &language) {
+    m_override = language;
+    reload();
+}
+
 void Translator::reload() {
     const auto paths = m_watcher.files() + m_watcher.directories();
     if (!paths.isEmpty())
@@ -106,7 +111,7 @@ void Translator::reload() {
         m_watcher.addPath(m_languageFile);
 
     // Catalogs are compiled in, so only a different language needs a reload.
-    const QString language = readLanguage(m_languageFile);
+    const QString language = m_override.isEmpty() ? readLanguage(m_languageFile) : m_override;
     if (language == m_language)
         return;
 

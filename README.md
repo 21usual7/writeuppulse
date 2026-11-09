@@ -31,7 +31,12 @@ daily timer. WriteupPulse then shows up in the app launcher (`Super + Space`).
   window closes. A fetch takes a few minutes. Logs: `journalctl --user -u writeuppulse`.
 - Digests are saved as `~/.local/share/writeuppulse/<date>.json` and `<date>.md`.
 
-Settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`),
+The language picker at the top switches the window between English, Russian,
+and Ukrainian, and the agent writes new summaries in the same language; days
+already saved stay in the language they were written in. Until a language is
+picked, WriteupPulse follows Omarchy's when it is one of the three.
+
+Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`),
 `WRITEUPPULSE_CLAUDE` (path to `claude` if it isn't found), and
 `WRITEUPPULSE_DATA` (the data directory).
 

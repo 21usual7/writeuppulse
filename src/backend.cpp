@@ -16,6 +16,7 @@ Backend::Backend(const QString &directory, bool systemd, QObject *parent)
     : QObject(parent), m_store(directory), m_systemd(systemd) {
     QDir().mkpath(m_store.directory());
     m_agentMissing = Fetcher::findClaude().isEmpty();
+    m_language = Fetcher::language();
 
     // A fetch writes its files and lock into the data directory, so watching
     // that one directory follows timer runs and manual ones alike.
@@ -34,6 +35,14 @@ Backend::Backend(const QString &directory, bool systemd, QObject *parent)
     if (m_systemd)
         readTimer();
     reload();
+}
+
+void Backend::setLanguage(const QString &language) {
+    if (language == m_language)
+        return;
+    Fetcher::setLanguage(language);
+    m_language = language;
+    emit languageChanged();
 }
 
 void Backend::setDate(const QString &date) {

@@ -24,5 +24,6 @@
   "Show or hide shortcuts": "Показати або сховати клавіші",
   "Quit": "Вийти",
   "Could not start a fetch.": "Не вдалося запустити завантаження.",
-  "Could not change the daily timer: %1": "Не вдалося змінити щоденний таймер: %1"
+  "Could not change the daily timer: %1": "Не вдалося змінити щоденний таймер: %1",
+  "Language of the window and of new summaries, from the next fetch on": "Мова вікна й нових самарі, починаючи з наступного завантаження"
 }

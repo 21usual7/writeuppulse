@@ -117,6 +117,19 @@ ApplicationWindow {
                     ToolTip.text: backend.lastMessage
                     HoverHandler { id: statusHover }
                 }
+                ComboBox {
+                    id: languagePicker
+                    readonly property var codes: ["en", "ru", "uk"]
+                    // Each language in its own name, so it can be found from any of them.
+                    model: ["English", "Русский", "Українська"]
+                    currentIndex: Math.max(0, codes.indexOf(backend.language))
+                    implicitWidth: 150
+                    Material.roundedScale: theme.radius
+                    onActivated: index => backend.language = codes[index]
+                    ToolTip.visible: hovered && !popup.visible
+                    ToolTip.delay: 600
+                    ToolTip.text: qsTr("Language of the window and of new summaries, from the next fetch on")
+                }
                 Switch {
                     text: qsTr("Daily at 08:00")
                     visible: backend.timerAvailable
