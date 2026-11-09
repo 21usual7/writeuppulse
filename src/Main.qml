@@ -37,6 +37,13 @@ ApplicationWindow {
     function openArticle(i) {
         if (i >= 0 && i < backend.items.length) Qt.openUrlExternally(backend.items[i].url)
     }
+    function progressOf(i) {
+        backend.progressRevision
+        return i >= 0 && i < backend.items.length ? backend.state(backend.items[i].url) : ({})
+    }
+    function toggleRead(i) { if (i >= 0 && i < backend.items.length) backend.setRead(backend.items[i], progressOf(i).read === undefined) }
+    function toggleLab(i) { if (i >= 0 && i < backend.items.length) backend.setLab(backend.items[i], progressOf(i).lab === undefined) }
+    function toggleStar(i) { if (i >= 0 && i < backend.items.length) backend.setFavorite(backend.items[i], progressOf(i).favorite !== true) }
     function move(delta) {
         if (!backend.items.length) return
         current = Math.max(0, Math.min(backend.items.length - 1, current + delta))
@@ -70,6 +77,9 @@ ApplicationWindow {
     Shortcut { sequences: ["Space", "Return"]; context: Qt.ApplicationShortcut; onActivated: win.toggle(win.current) }
     Shortcut { sequence: "R"; context: Qt.ApplicationShortcut; onActivated: backend.refresh() }
     Shortcut { sequence: "O"; context: Qt.ApplicationShortcut; onActivated: win.openArticle(win.current) }
+    Shortcut { sequence: "M"; context: Qt.ApplicationShortcut; onActivated: win.toggleRead(win.current) }
+    Shortcut { sequence: "B"; context: Qt.ApplicationShortcut; onActivated: win.toggleLab(win.current) }
+    Shortcut { sequence: "F"; context: Qt.ApplicationShortcut; onActivated: win.toggleStar(win.current) }
     Shortcut { sequences: ["Down", "J"]; context: Qt.ApplicationShortcut; onActivated: win.move(1) }
     Shortcut { sequences: ["Up", "K"]; context: Qt.ApplicationShortcut; onActivated: win.move(-1) }
     Shortcut { sequences: ["Left", "H"]; context: Qt.ApplicationShortcut; onActivated: backend.olderDay() }
@@ -106,6 +116,16 @@ ApplicationWindow {
                     text: "WriteupPulse"
                     font.pixelSize: 22
                     font.bold: true
+                }
+                Label {
+                    Layout.leftMargin: 8
+                    visible: backend.streak > 0
+                    text: qsTr("%n-day streak", "", backend.streak)
+                    color: theme.accent
+                    font.bold: true
+                    ToolTip.visible: streakHover.hovered
+                    ToolTip.text: qsTr("%n writeups read", "", backend.stats.read || 0)
+                    HoverHandler { id: streakHover }
                 }
                 Label {
                     Layout.fillWidth: true
@@ -232,6 +252,10 @@ ApplicationWindow {
                         onClicked: win.current = index
                         onToggled: win.toggle(index)
                         onOpened: win.openArticle(index)
+                        progress: win.progressOf(index)
+                        onReadToggled: win.toggleRead(index)
+                        onLabToggled: win.toggleLab(index)
+                        onStarToggled: win.toggleStar(index)
                     }
 
                     Label {
@@ -269,6 +293,9 @@ ApplicationWindow {
                         ["↑ ↓", qsTr("Previous or next writeup")],
                         ["← →", qsTr("Older or newer day")],
                         ["O", qsTr("Open the article in the browser")],
+                        ["M", qsTr("Mark as read")],
+                        ["B", qsTr("Mark as done in a lab")],
+                        ["F", qsTr("Add to or remove from favorites")],
                         ["R", qsTr("Fetch today's writeups now")],
                         ["?", qsTr("Show or hide shortcuts")],
                         ["Q", qsTr("Quit")]

@@ -25,5 +25,26 @@
   "Quit": "Вийти",
   "Could not start a fetch.": "Не вдалося запустити завантаження.",
   "Could not change the daily timer: %1": "Не вдалося змінити щоденний таймер: %1",
-  "Language of the window and of new summaries, from the next fetch on": "Мова вікна й нових самарі, починаючи з наступного завантаження"
+  "Language of the window and of new summaries, from the next fetch on": "Мова вікна й нових самарі, починаючи з наступного завантаження",
+  "Read": "Прочитано",
+  "Mark read": "Позначити прочитаним",
+  "Done in lab": "Відпрацював у лабі",
+  "Remove from favorites": "Прибрати з обраного",
+  "Add to favorites": "До обраного",
+  "Mark as read": "Позначити прочитаним",
+  "Mark as done in a lab": "Позначити як відпрацьоване в лабі",
+  "Add to or remove from favorites": "Додати до обраного або прибрати",
+  "Could not save your progress to %1.": "Не вдалося зберегти прогрес у %1.",
+  "%n-day streak": {
+    "one": "%n день поспіль",
+    "few": "%n дні поспіль",
+    "many": "%n днів поспіль",
+    "other": "%n дня поспіль"
+  },
+  "%n writeups read": {
+    "one": "Прочитано %n розбір",
+    "few": "Прочитано %n розбори",
+    "many": "Прочитано %n розборів",
+    "other": "Прочитано %n розбору"
+  }
 }

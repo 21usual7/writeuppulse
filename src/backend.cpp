@@ -12,8 +12,10 @@
 
 #include "fetcher.h"
 
+static QByteArray stamp(const QString &path);
+
 Backend::Backend(const QString &directory, bool systemd, QObject *parent)
-    : QObject(parent), m_store(directory), m_systemd(systemd) {
+    : QObject(parent), m_store(directory), m_progress(m_store.directory()), m_systemd(systemd) {
     QDir().mkpath(m_store.directory());
     m_agentMissing = Fetcher::findClaude().isEmpty();
     m_language = Fetcher::language();
@@ -43,6 +45,34 @@ void Backend::setLanguage(const QString &language) {
     Fetcher::setLanguage(language);
     m_language = language;
     emit languageChanged();
+}
+
+void Backend::progressSaved(bool ok) {
+    if (!ok)
+        setProblem(tr("Could not save your progress to %1.").arg(m_store.directory()));
+    m_progressStamp = stamp(m_store.directory() + "/progress.json");
+    ++m_progressRevision;
+    emit progressChanged();
+}
+
+void Backend::setRead(const QVariantMap &item, bool read) {
+    progressSaved(m_progress.setRead(item.value("url").toString(), item.value("category").toString(), read));
+}
+
+void Backend::setLab(const QVariantMap &item, bool lab) {
+    progressSaved(m_progress.setLab(item.value("url").toString(), item.value("category").toString(), lab));
+}
+
+void Backend::setFavorite(const QVariantMap &item, bool favorite) {
+    progressSaved(m_progress.setFavorite(item.value("url").toString(), item.value("category").toString(), favorite));
+}
+
+void Backend::setTags(const QString &url, const QStringList &tags) {
+    progressSaved(m_progress.setTags(url, tags));
+}
+
+void Backend::setPracticeDone(const QString &url, int index, bool done) {
+    progressSaved(m_progress.setPracticeDone(url, index, done));
 }
 
 void Backend::setDate(const QString &date) {
@@ -94,6 +124,15 @@ void Backend::reload() {
         m_digestStamp = digestStamp;
         m_items = m_date.isEmpty() ? QVariantList() : m_store.digest(m_date).value("items").toArray().toVariantList();
         emit digestChanged();
+    }
+
+    // Another window may have marked something; pick it up.
+    const QByteArray progressStamp = stamp(m_store.directory() + "/progress.json");
+    if (progressStamp != m_progressStamp) {
+        m_progressStamp = progressStamp;
+        m_progress.load();
+        ++m_progressRevision;
+        emit progressChanged();
     }
 
     // QLockFile removes a lock left by a dead process, but only when it tries

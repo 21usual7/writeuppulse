@@ -11,6 +11,7 @@
 
 #include "backend.h"
 #include "fetcher.h"
+#include "progress.h"
 #include "store.h"
 #include "theme.h"
 #include "translator.h"
@@ -110,6 +111,59 @@ private slots:
         QVERIFY(prompt.contains("especially wants: Web."));
         QVERIFY(prompt.contains("Never write code"));
         settings.clear();
+    }
+
+    void progressCountsStreaksAndStats()
+    {
+        QTemporaryDir dir;
+        const QDate today(2026, 11, 9);
+        {
+            Progress progress(dir.path());
+            QVERIFY(progress.setRead("https://a", "Web", true, today.addDays(-2)));
+            QVERIFY(progress.setRead("https://b", "Pwn", true, today.addDays(-1)));
+            QVERIFY(progress.setRead("https://c", "Web", true, today.addDays(-1)));
+            QVERIFY(progress.setLab("https://b", "Pwn", true, today));
+            QVERIFY(progress.setFavorite("https://d", "Crypto", true));
+            QVERIFY(progress.setTags("https://d", {"study", " Study ", "", "later"}));
+            QVERIFY(progress.setPracticeDone("https://a", 2, true));
+        }
+
+        // A fresh load sees everything written, and today not yet read keeps
+        // yesterday's streak alive.
+        Progress progress(dir.path());
+        QCOMPARE(progress.streak(today), 2);
+        QCOMPARE(progress.streak(today.addDays(1)), 0);
+        progress.setRead("https://d", "Crypto", true, today);
+        QCOMPARE(progress.streak(today), 3);
+
+        const QJsonObject stats = progress.stats();
+        QCOMPARE(stats.value("read").toInt(), 4);
+        QCOMPARE(stats.value("lab").toInt(), 1);
+        QCOMPARE(stats.value("favorites").toInt(), 1);
+        QCOMPARE(stats.value("byCategory").toObject().value("Web").toInt(), 2);
+        QCOMPARE(progress.tags(), QStringList({"later", "study"}));
+        QCOMPARE(progress.favorites(), QStringList({"https://d"}));
+        QCOMPARE(progress.entry("https://a").value("done").toArray().first().toInt(), 2);
+
+        // Undoing everything drops the entry instead of keeping it empty.
+        progress.setRead("https://a", {}, false);
+        progress.setPracticeDone("https://a", 2, false);
+        QVERIFY(progress.entry("https://a").isEmpty());
+    }
+
+    void backendMarksProgress()
+    {
+        QTemporaryDir dir;
+        Store store(dir.path());
+        QString error;
+        QVERIFY(store.saveDigest(sampleDigest("2026-11-09", "https://example.com/x"), &error));
+        Backend backend(dir.path(), false);
+        QSignalSpy changed(&backend, &Backend::progressChanged);
+        backend.setRead(backend.items().first().toMap(), true);
+        QCOMPARE(changed.count(), 1);
+        QVERIFY(backend.state("https://example.com/x").contains("read"));
+        QCOMPARE(backend.streak(), 1);
+        QCOMPARE(backend.stats().value("read").toInt(), 1);
     }
 
     void storeSavesJsonAndMarkdown()

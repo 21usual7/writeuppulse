@@ -3,6 +3,7 @@
         <file alias="Main.qml">Main.qml</file>
         <file alias="WriteupCard.qml">WriteupCard.qml</file>
         <file alias="skill/SKILL.md">skill/SKILL.md</file>
+        <file alias="i18n/en.json">i18n/en.json</file>
         <file alias="i18n/ru.json">i18n/ru.json</file>
         <file alias="i18n/uk.json">i18n/uk.json</file>
     </qresource>

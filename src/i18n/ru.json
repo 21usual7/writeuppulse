@@ -25,5 +25,26 @@
   "Quit": "Выйти",
   "Could not start a fetch.": "Не удалось запустить загрузку.",
   "Could not change the daily timer: %1": "Не удалось изменить ежедневный таймер: %1",
-  "Language of the window and of new summaries, from the next fetch on": "Язык окна и новых саммари, начиная со следующей загрузки"
+  "Language of the window and of new summaries, from the next fetch on": "Язык окна и новых саммари, начиная со следующей загрузки",
+  "Read": "Прочитано",
+  "Mark read": "Отметить прочитанным",
+  "Done in lab": "Отработал в лабе",
+  "Remove from favorites": "Убрать из избранного",
+  "Add to favorites": "В избранное",
+  "Mark as read": "Отметить прочитанным",
+  "Mark as done in a lab": "Отметить как отработанное в лабе",
+  "Add to or remove from favorites": "Добавить в избранное или убрать",
+  "Could not save your progress to %1.": "Не удалось сохранить прогресс в %1.",
+  "%n-day streak": {
+    "one": "%n день подряд",
+    "few": "%n дня подряд",
+    "many": "%n дней подряд",
+    "other": "%n дня подряд"
+  },
+  "%n writeups read": {
+    "one": "Прочитан %n разбор",
+    "few": "Прочитано %n разбора",
+    "many": "Прочитано %n разборов",
+    "other": "Прочитано %n разбора"
+  }
 }

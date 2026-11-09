@@ -8,6 +8,7 @@ HEADERS += \
     src/backend.h \
     src/cli.h \
     src/fetcher.h \
+    src/progress.h \
     src/store.h \
     src/theme.h \
     src/translator.h
@@ -17,6 +18,7 @@ SOURCES += \
     src/backend.cpp \
     src/cli.cpp \
     src/fetcher.cpp \
+    src/progress.cpp \
     src/store.cpp \
     src/theme.cpp \
     src/translator.cpp

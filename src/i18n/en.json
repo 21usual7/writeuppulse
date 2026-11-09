@@ -1,0 +1,10 @@
+{
+  "%n-day streak": {
+    "one": "%n-day streak",
+    "other": "%n-day streak"
+  },
+  "%n writeups read": {
+    "one": "%n writeup read",
+    "other": "%n writeups read"
+  }
+}

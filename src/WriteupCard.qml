@@ -12,10 +12,17 @@ Rectangle {
     required property int number
     property bool selected: false
     property bool expanded: false
+    property var progress: ({})
+    readonly property bool isRead: progress.read !== undefined
+    readonly property bool inLab: progress.lab !== undefined
+    readonly property bool starred: progress.favorite === true
 
     signal clicked()
     signal toggled()
     signal opened()
+    signal readToggled()
+    signal labToggled()
+    signal starToggled()
 
     readonly property color dim: "#9a9aa2"
 
@@ -49,6 +56,7 @@ Rectangle {
             Label {
                 Layout.fillWidth: true
                 text: card.item.title
+                opacity: card.isRead ? 0.6 : 1
                 textFormat: Text.PlainText
                 wrapMode: Text.Wrap
                 font.pixelSize: 17
@@ -114,7 +122,9 @@ Rectangle {
             }
         }
 
-        RowLayout {
+        // Wraps instead of pushing past the card in longer languages.
+        Flow {
+            Layout.fillWidth: true
             spacing: 4
             Button {
                 flat: true
@@ -128,6 +138,30 @@ Rectangle {
                 Material.roundedScale: theme.radius
                 Material.foreground: theme.accent
                 onClicked: { card.clicked(); card.opened() }
+            }
+            Button {
+                flat: true
+                text: card.isRead ? "✓ " + qsTr("Read") : qsTr("Mark read")
+                Material.roundedScale: theme.radius
+                Material.foreground: card.isRead ? theme.accent : "#e6e6e6"
+                onClicked: { card.clicked(); card.readToggled() }
+            }
+            Button {
+                flat: true
+                text: card.inLab ? "✓ " + qsTr("Done in lab") : qsTr("Done in lab")
+                Material.roundedScale: theme.radius
+                Material.foreground: card.inLab ? theme.accent : "#e6e6e6"
+                onClicked: { card.clicked(); card.labToggled() }
+            }
+            Button {
+                flat: true
+                text: card.starred ? "★" : "☆"
+                font.pixelSize: 18
+                Material.roundedScale: theme.radius
+                Material.foreground: card.starred ? theme.accent : "#e6e6e6"
+                ToolTip.visible: hovered
+                ToolTip.text: card.starred ? qsTr("Remove from favorites") : qsTr("Add to favorites")
+                onClicked: { card.clicked(); card.starToggled() }
             }
         }
     }

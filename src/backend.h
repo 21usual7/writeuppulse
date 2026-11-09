@@ -6,6 +6,7 @@
 #include <QTimer>
 #include <QVariantList>
 
+#include "progress.h"
 #include "store.h"
 
 // What the window shows: the saved days, the selected day's writeups, and
@@ -25,6 +26,10 @@ class Backend : public QObject {
     Q_PROPERTY(bool timerEnabled READ timerEnabled NOTIFY timerChanged)
     Q_PROPERTY(QString problem READ problem NOTIFY problemChanged)
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
+    Q_PROPERTY(int progressRevision READ progressRevision NOTIFY progressChanged)
+    Q_PROPERTY(int streak READ streak NOTIFY progressChanged)
+    Q_PROPERTY(QVariantMap stats READ stats NOTIFY progressChanged)
+    Q_PROPERTY(QStringList tags READ tags NOTIFY progressChanged)
 
 public:
     explicit Backend(const QString &directory = {}, bool systemd = true, QObject *parent = nullptr);
@@ -43,6 +48,19 @@ public:
     QString problem() const { return m_problem; }
     QString language() const { return m_language; }
     void setLanguage(const QString &language);
+    int progressRevision() const { return m_progressRevision; }
+    int streak() const { return m_progress.streak(); }
+    QVariantMap stats() const { return m_progress.stats().toVariantMap(); }
+    QStringList tags() const { return m_progress.tags(); }
+
+    // QML reads a writeup's state through state(url) in bindings that also
+    // read progressRevision, so they re-evaluate after every change.
+    Q_INVOKABLE QVariantMap state(const QString &url) const { return m_progress.entry(url).toVariantMap(); }
+    Q_INVOKABLE void setRead(const QVariantMap &item, bool read);
+    Q_INVOKABLE void setLab(const QVariantMap &item, bool lab);
+    Q_INVOKABLE void setFavorite(const QVariantMap &item, bool favorite);
+    Q_INVOKABLE void setTags(const QString &url, const QStringList &tags);
+    Q_INVOKABLE void setPracticeDone(const QString &url, int index, bool done);
 
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void setTimerEnabled(bool enabled);
@@ -56,6 +74,7 @@ signals:
     void timerChanged();
     void problemChanged();
     void languageChanged();
+    void progressChanged();
 
 private:
     void reload();
@@ -63,8 +82,12 @@ private:
     void setProblem(const QString &problem);
     bool systemctl(const QStringList &arguments, QString *output = nullptr);
     void readTimer();
+    void progressSaved(bool ok);
 
     Store m_store;
+    Progress m_progress;
+    int m_progressRevision = 0;
+    QByteArray m_progressStamp;
     bool m_systemd;
     QFileSystemWatcher m_watcher;
     QTimer m_debounce, m_starting;

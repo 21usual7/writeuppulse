@@ -5,5 +5,5 @@ TEMPLATE = app
 
 INCLUDEPATH += ../src
 
-HEADERS += ../src/backend.h ../src/fetcher.h ../src/store.h ../src/theme.h ../src/translator.h
-SOURCES += writeuppulse_tests.cpp ../src/backend.cpp ../src/fetcher.cpp ../src/store.cpp ../src/theme.cpp ../src/translator.cpp
+HEADERS += ../src/backend.h ../src/fetcher.h ../src/progress.h ../src/store.h ../src/theme.h ../src/translator.h
+SOURCES += writeuppulse_tests.cpp ../src/backend.cpp ../src/fetcher.cpp ../src/progress.cpp ../src/store.cpp ../src/theme.cpp ../src/translator.cpp
