@@ -39,9 +39,12 @@ committed on `master` and published.
 
 Ollama (package `ollama` + `ollama-vulkan` for the Radeon 680M) runs only on AC power, as
 the user asked: `/etc/systemd/system/ollama.service.d/ac-power.conf` sets
-`ConditionACPower=true`, and `/etc/udev/rules.d/99-ollama-ac-power.rules` stops it on
-unplug and starts it on plug-in (only while the service is enabled). Don't run models on
-battery for tests.
+`ConditionACPower=true`, and `/etc/udev/rules.d/99-ollama-ac-power.rules` runs
+`/usr/local/bin/ollama-ac-power` through `systemd-run --on-active=3
+--timer-property=AccuracySec=1s` on each `Mains` change: it checks `systemd-ac-power`
+and stops or starts Ollama (only while the service is enabled), logging its decision
+to the journal. The 1 s accuracy matters: by default a transient timer may fire up to a
+minute late and then read the wrong state. Don't run models on battery for tests.
 
 ## Architecture
 
