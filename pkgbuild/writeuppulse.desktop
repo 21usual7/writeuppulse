@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=WriteupPulse
+Name[ru]=WriteupPulse
+Name[uk]=WriteupPulse
+Comment=Daily digest of popular technical writeups, summarized by Claude
+Comment[ru]=Ежедневная подборка популярных технических разборов с саммари от Claude
+Comment[uk]=Щоденна добірка популярних технічних розборів із самарі від Claude
+Exec=writeuppulse
+Icon=writeuppulse
+Terminal=false
+Categories=Utility;Network;News;
+StartupWMClass=writeuppulse

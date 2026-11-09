@@ -1,0 +1,11 @@
+[Unit]
+Description=Fetch the WriteupPulse digest every morning
+
+[Timer]
+OnCalendar=*-*-* 08:00:00
+RandomizedDelaySec=5min
+# Catches up on the next boot or resume when the machine was off at 08:00.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

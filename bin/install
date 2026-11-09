@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+"$ROOT/bin/build"
+cd "$ROOT/pkgbuild"
+makepkg -fsi "$@"
+
+# A package can't enable a user's timer, so do it here for the user who
+# installs it; the window's switch turns it off and on again.
+systemctl --user daemon-reload
+systemctl --user enable --now writeuppulse.timer
