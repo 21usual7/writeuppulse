@@ -20,6 +20,13 @@ public:
     bool saveStatus(const QJsonObject &status) const;
     QStringList recentUrls(int days) const;
 
+    // The fixed directions the agent sorts writeups into, grouped by topic,
+    // so filters and preferences never meet a category they don't know.
+    static QStringList topics();
+    static QStringList categories(const QString &topic = {});
+    static QString topicOf(const QString &category);
+    static QStringList levels();
+
     static QJsonObject normalize(const QJsonObject &output, const QString &date, QString *error);
     static QString markdown(const QJsonObject &digest);
 

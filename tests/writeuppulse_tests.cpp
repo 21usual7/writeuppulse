@@ -37,7 +37,7 @@ private slots:
         Fetcher::setLanguage("ru");
         QCOMPARE(Fetcher::language(dir.path() + "/language"), QString("ru"));
         Fetcher fetcher(Store(dir.path()), "/bin/true");
-        QVERIFY(fetcher.prompt("2026-11-09").contains("takeaways in Russian"));
+        QVERIFY(fetcher.prompt("2026-11-09").contains("every other text field in Russian"));
         QSettings("writeuppulse", "writeuppulse").clear();
     }
 
@@ -61,6 +61,55 @@ private slots:
 
         QVERIFY(Store::normalize(QJsonObject{{"items", QJsonArray{}}}, "2026-11-09", &error).isEmpty());
         QVERIFY(!error.isEmpty());
+    }
+
+    void normalizeKeepsLearningFieldsAndDropsCode()
+    {
+        const QJsonObject raw{
+            {"title", "T"}, {"url", "https://example.com/t"}, {"summary", "Idea.\n```\nrm -rf /\n```\nMore."},
+            {"category", "Pwn"}, {"level", "Wizard"},
+            {"takeaways", QJsonArray{"one", "```bash\nexploit\n```"}},
+            {"questions", QJsonArray{QJsonObject{{"question", "Why?"}, {"answer", "Because."}},
+                                     QJsonObject{{"question", "No answer"}}}},
+            {"practice", QJsonArray{"Set up a lab"}},
+        };
+        QString error;
+        QJsonObject item = Store::normalize(QJsonObject{{"items", QJsonArray{raw}}}, "2026-11-09", &error)
+                               .value("items").toArray().first().toObject();
+        QVERIFY(!item.value("summary").toString().contains("rm -rf"));
+        QCOMPARE(item.value("category").toString(), QString("Pwn"));
+        QCOMPARE(item.value("level").toString(), QString());
+        QCOMPARE(item.value("takeaways").toArray().size(), 1);
+        QCOMPARE(item.value("questions").toArray().size(), 1);
+        QCOMPARE(item.value("practice").toArray().first().toString(), QString("Set up a lab"));
+
+        QJsonObject unknown = raw;
+        unknown.insert("category", "Gardening");
+        item = Store::normalize(QJsonObject{{"items", QJsonArray{unknown}}}, "2026-11-09", &error)
+                   .value("items").toArray().first().toObject();
+        QCOMPARE(item.value("category").toString(), QString("Other"));
+        QCOMPARE(Store::topicOf("Pwn"), QString("Security"));
+        QCOMPARE(Store::topicOf("LLM & Agents"), QString("AI / ML"));
+    }
+
+    void schemaAndPromptCarryTheDirections()
+    {
+        const QJsonObject schema = QJsonDocument::fromJson(Fetcher::schema()).object();
+        const QJsonObject item = schema["properties"]["items"]["items"]["properties"].toObject();
+        QCOMPARE(item["category"]["enum"].toArray().size(), Store::categories().size());
+        QCOMPARE(item["takeaways"]["minItems"].toInt(), 5);
+        QVERIFY(item.contains("questions") && item.contains("practice"));
+
+        QTemporaryDir dir;
+        QSettings settings("writeuppulse", "writeuppulse");
+        settings.setValue("categories", QStringList{"Web", "Pwn", "Nonsense"});
+        settings.setValue("preferred", QStringList{"Web"});
+        settings.sync();
+        const QString prompt = Fetcher(Store(dir.path()), "/bin/true").prompt("2026-11-09");
+        QVERIFY(prompt.contains("in these directions: Web, Pwn."));
+        QVERIFY(prompt.contains("especially wants: Web."));
+        QVERIFY(prompt.contains("Never write code"));
+        settings.clear();
     }
 
     void storeSavesJsonAndMarkdown()
