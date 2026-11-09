@@ -231,3 +231,57 @@ QString Store::exportMarkdown(const QString &date, bool week, const Progress *pr
         parts << markdown(digest(day), progress);
     return parts.join("\n---\n\n");
 }
+
+// The site gets each day re-checked like fresh agent output, so the cost and
+// anything else private stay home, and the topic comes along for the colours.
+// The index covers every day already in the directory, so publishing from a
+// machine with fewer saved days never drops older ones from the site.
+bool Store::publish(const QString &directory, QString *error) const {
+    if (!QDir().mkpath(directory)) {
+        if (error)
+            *error = QString("Could not create %1.").arg(directory);
+        return false;
+    }
+    for (const auto &date : dates()) {
+        const QJsonObject saved = digest(date);
+        QJsonObject day = normalize(saved, date, nullptr);
+        if (day.isEmpty())
+            continue;
+        QJsonArray items;
+        for (const auto &value : day.value("items").toArray()) {
+            QJsonObject item = value.toObject();
+            item.insert("topic", topicOf(item.value("category").toString()));
+            items.append(item);
+        }
+        day.insert("items", items);
+        day.insert("generatedAt", saved.value("generatedAt"));
+        if (!writeAtomically(directory + "/" + date + ".json", QJsonDocument(day).toJson(QJsonDocument::Indented))) {
+            if (error)
+                *error = QString("Could not write to %1.").arg(directory);
+            return false;
+        }
+    }
+    const Store site(directory);
+    QJsonArray days;
+    for (const auto &date : site.dates()) {
+        QJsonArray items;
+        for (const auto &value : site.digest(date).value("items").toArray()) {
+            const QJsonObject item = value.toObject();
+            items.append(QJsonObject{
+                {"title", item.value("title")},
+                {"source", item.value("source")},
+                {"category", item.value("category")},
+                {"topic", topicOf(item.value("category").toString())},
+                {"level", item.value("level")},
+                {"tags", item.value("tags")},
+            });
+        }
+        days.append(QJsonObject{{"date", date}, {"items", items}});
+    }
+    if (!writeAtomically(directory + "/index.json", QJsonDocument(QJsonObject{{"days", days}}).toJson(QJsonDocument::Compact))) {
+        if (error)
+            *error = QString("Could not write to %1.").arg(directory);
+        return false;
+    }
+    return true;
+}

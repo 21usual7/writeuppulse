@@ -305,6 +305,36 @@ private slots:
         QVERIFY(text.contains("- First lesson"));
     }
 
+    void publishLeavesPrivateFieldsHome()
+    {
+        QTemporaryDir data, site;
+        const Store store(data.path());
+        QJsonObject day = Store::normalize(QJsonObject{{"items", QJsonArray{QJsonObject{
+            {"title", "New"}, {"url", "https://example.com/a"}, {"summary", "S"}, {"category", "Web"}}}}},
+            "2026-11-09", nullptr);
+        day.insert("costUsd", 0.5);
+        QVERIFY(store.saveDigest(day, nullptr));
+        write(data.path() + "/progress.json", "{}");
+        QVERIFY(Store(site.path()).saveDigest(QJsonObject{{"date", "2026-11-01"}, {"items", QJsonArray{QJsonObject{
+            {"title", "Old"}, {"url", "https://example.com/o"}, {"summary", "S"}}}}}, nullptr));
+
+        QString error;
+        QVERIFY(store.publish(site.path(), &error));
+        const Store published(site.path());
+        QCOMPARE(published.dates(), (QStringList{"2026-11-09", "2026-11-01"}));
+        const QJsonObject newest = published.digest("2026-11-09");
+        QVERIFY(!newest.contains("costUsd"));
+        QCOMPARE(newest["items"][0]["topic"].toString(), QString("Security"));
+        QVERIFY(!QFile::exists(site.path() + "/progress.json"));
+
+        QFile index(site.path() + "/index.json");
+        QVERIFY(index.open(QIODevice::ReadOnly));
+        const QJsonArray days = QJsonDocument::fromJson(index.readAll())["days"].toArray();
+        QCOMPARE(days.size(), 2);
+        QCOMPARE(days[0]["items"][0]["title"].toString(), QString("New"));
+        QCOMPARE(days[1]["items"][0]["topic"].toString(), QString("Other"));
+    }
+
     void fetcherSavesTheAgentsAnswer()
     {
         QTemporaryDir dir;

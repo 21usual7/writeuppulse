@@ -27,7 +27,7 @@ switching to `bin/install`, remove those copies first or they shadow the package
 
 One binary, two modes (`src/main.cpp`): any first argument other than `open` goes to
 `runCli` (`src/cli.cpp`, headless `QCoreApplication`: `fetch`, `list`, `show`,
-`export`, `skill install`, all with `--json`); otherwise the QML window.
+`export`, `publish`, `skill install`, all with `--json`); otherwise the QML window.
 
 - **Fetch path:** `Fetcher` (`src/fetcher.cpp`) runs `claude -p <prompt>` with only
   `WebSearch,WebFetch` tools, `--strict-mcp-config`, `--output-format json` and a
@@ -66,6 +66,16 @@ One binary, two modes (`src/main.cpp`): any first argument other than `open` goe
   (`Fetcher::language()`); unset → Omarchy's language if offered, else English.
   Catalogs are `src/i18n/<code>.json` keyed by the English `qsTr()` text; add new
   strings to both `ru.json` and `uk.json`.
+- **Public site:** `site/` is a static page (vanilla JS, no build) that reads
+  `data/index.json` and `data/<date>.json`. `Store::publish` writes those: every day
+  re-run through `normalize` (so `costUsd` and progress never leave the machine) plus
+  `topic`, and an index of every day already in the target, so it never drops days.
+  `bin/publish` keeps a worktree of the `pages` branch in `~/.cache/writeuppulse/pages`,
+  copies `site/` from committed `master`, runs `writeuppulse publish data`, commits, and
+  pushes only `pages` (GitHub Pages serves it), so unpushed `master` work stays local.
+  Agent text goes into the DOM only via text nodes; only http(s) URLs become links.
+  Preview: `writeuppulse publish site/data` (ignored by git), then
+  `python3 -m http.server -d site`.
 - **Look:** the app has its own palette on purpose (the user chose it over following the
   Omarchy theme): colours, fonts, and radius live in the `Style` QML singleton
   (`src/Style.qml`, registered by `src/qmldir`). Layout is a reader — icon rail, list

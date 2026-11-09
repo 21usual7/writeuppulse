@@ -25,6 +25,8 @@ static const char *usage = R"(Usage: writeuppulse [command]
                        Export a day, or the week ending on it, as Markdown
                        with your progress (latest day by default; stdout
                        unless --output)
+  publish DIR [--json] Write every day, without private fields, and an
+                       index to DIR for the public site
   skill install        Install the WriteupPulse skill for Claude Code
 )";
 
@@ -110,6 +112,21 @@ int runCli(int argc, char *argv[]) {
             print({{"ok", true}, {"path", QFileInfo(output).absoluteFilePath()}});
         else
             QTextStream(stdout) << "Saved " << output << Qt::endl;
+        return 0;
+    }
+
+    if (command == "publish") {
+        const QString directory = args.value(1);
+        if (directory.isEmpty())
+            return fail("publish needs a directory.");
+        QString error;
+        if (!store.publish(directory, &error))
+            return fail(error);
+        const qsizetype days = Store(directory).dates().size();
+        if (json)
+            print({{"ok", true}, {"path", QFileInfo(directory).absoluteFilePath()}, {"days", days}});
+        else
+            QTextStream(stdout) << QString("Published %1 days to %2").arg(days).arg(directory) << Qt::endl;
         return 0;
     }
 

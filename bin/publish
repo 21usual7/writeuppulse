@@ -1,0 +1,41 @@
+#!/bin/sh
+# Publishes the saved writeups: the site from master plus `writeuppulse publish`
+# data, committed on the `pages` branch that GitHub Pages serves. Only that
+# branch is pushed, so unpushed work on master stays local.
+set -eu
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+PAGES="${XDG_CACHE_HOME:-$HOME/.cache}/writeuppulse/pages"
+APP="$(command -v writeuppulse || echo "$HOME/.local/bin/writeuppulse")"
+
+cd "$ROOT"
+if [ ! -e "$PAGES/.git" ]; then
+    git worktree prune
+    if git show-ref -q --verify refs/heads/pages; then
+        git worktree add -q "$PAGES" pages
+    else
+        set +e
+        git ls-remote -q --exit-code --heads origin pages >/dev/null
+        found=$?
+        set -e
+        case $found in
+            0) git fetch -q origin pages:pages && git worktree add -q "$PAGES" pages ;;
+            2) git worktree add -q --orphan -b pages "$PAGES" ;;
+            *) echo "Could not reach origin." >&2; exit 1 ;;
+        esac
+    fi
+fi
+
+cd "$PAGES"
+git pull -q --ff-only origin pages 2>/dev/null || true
+find . -mindepth 1 -maxdepth 1 ! -name .git ! -name data -exec rm -rf {} +
+git -C "$ROOT" archive master site | tar -x --strip-components=1
+"$APP" publish data
+git add -A
+if git diff --cached --quiet; then
+    echo "Nothing new to publish."
+    exit 0
+fi
+git commit -q -m "Publish writeups up to $(date +%F)"
+git push -q origin pages
+echo "Published to https://21usual7.github.io/writeuppulse/"

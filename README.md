@@ -112,6 +112,7 @@ Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`
 | `writeuppulse list [--json]` | List the saved days |
 | `writeuppulse show [DATE] [--json]` | Print a day's digest |
 | `writeuppulse export [DATE] [--week] [--output FILE]` | Export a day or week as Markdown with your progress |
+| `writeuppulse publish DIR` | Write every day, without private fields, and an index to DIR for the public site |
 | `writeuppulse skill install` | Install a Claude Code skill for reading digests |
 
 ## Shortcuts
@@ -136,6 +137,13 @@ Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`
 | Esc | Back to the list |
 | ? | Show or hide shortcuts |
 | Q | Quit |
+
+## Public site
+
+The writeups are also published at
+[21usual7.github.io/writeuppulse](https://21usual7.github.io/writeuppulse/).
+`bin/publish` copies the site from `site/` and the saved days (without the run's
+cost and without your progress) to the `pages` branch and pushes it.
 
 ## Develop
 

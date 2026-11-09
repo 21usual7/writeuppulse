@@ -35,6 +35,8 @@ public:
     static QString markdown(const QJsonObject &digest, const Progress *progress = nullptr);
     // One day, or the seven days ending on it, oldest first.
     QString exportMarkdown(const QString &date, bool week, const Progress *progress = nullptr) const;
+    // Copies every day into the public site's data directory, plus an index.
+    bool publish(const QString &directory, QString *error) const;
 
 private:
     QString m_directory;
