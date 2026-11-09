@@ -9,6 +9,11 @@ published to a static site, and every other install downloads them from there. I
 window, an optional local Ollama model tutors the reader. Three roles, kept apart: Claude
 searches and summarizes, the site distributes, Ollama only teaches.
 
+The plan for growing it into a learning platform (audit, target architecture, stages,
+what is done) is `docs/ROADMAP.md`; mark stages done there. **The Claude budget must not
+grow** (the user's decision): keep `Fetcher`'s prompt and schema the size they are, and
+build new features locally — SQLite, the local Ollama model, the article pages themselves.
+
 ## Commands
 
 ```sh
@@ -20,6 +25,7 @@ WRITEUPPULSE_DATA=/tmp/x build/writeuppulse   # run against a scratch data dir
 bin/install                    # makepkg -fsi + enable the user timer (needs sudo)
 WRITEUPPULSE_DATA=/tmp/x build/writeuppulse sync   # download from the live site (safe)
 bin/publish                    # push the saved days to the site (pages branch only)
+sqlite3 ~/.local/share/writeuppulse/library/library.db   # inspect progress and the index
 ```
 
 On this machine the app is currently installed **without** the package, for the user
@@ -27,7 +33,10 @@ only: `~/.local/bin/writeuppulse`, `~/.local/share/applications/writeuppulse.des
 `~/.config/systemd/user/writeuppulse.{service,timer}` (ExecStart uses `%h/.local/bin`).
 After a change the user should see, copy `build/writeuppulse` to `~/.local/bin/` (to a
 temp name, then `mv`, since the window may be running). If switching to `bin/install`,
-remove those copies first or they shadow the package.
+remove those copies first or they shadow the package. A window started from the old
+binary keeps running it: after a change to storage, ask the user to reopen the window.
+Here `progress.json` was imported into the database on 2026-11-09 and is now only a
+stale backup; don't read it as the current progress.
 
 This machine is the publisher: its `~/.config/writeuppulse/writeuppulse.conf` has
 `source=claude`, its local unit runs `writeuppulse fetch`, and the drop-in
@@ -167,7 +176,8 @@ the QML window.
 - Never use `focus` as a QML id: every Item has a `focus` property, which wins, so
   `focus.x` silently reads `undefined`.
 - There is no screenshot harness in the repo: write a small Qt program (in the scratchpad,
-  its .pro listing the `src/*.cpp` it needs and `src/resources.qrc`) that sets the
+  its .pro with `QT += ... sql` listing the `src/*.cpp` it needs, `src/database.cpp`
+  among them, and `src/resources.qrc`) that sets the
   `translator`, `backend`, and `tutor` context properties, loads `qrc:/Main.qml`, sends
   keys, and saves `grabWindow()`. Construct `Backend({}, false)` so it never syncs on open
   (R still starts a detached `update`). Point `WRITEUPPULSE_DATA` at made-up digests and
