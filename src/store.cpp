@@ -10,6 +10,7 @@
 #include <QSaveFile>
 #include <QStandardPaths>
 #include <QUrl>
+#include <QUrlQuery>
 
 #include "progress.h"
 
@@ -110,6 +111,29 @@ QStringList Store::levels() {
     return {"Junior", "Middle", "Senior"};
 }
 
+QString Store::canonicalUrl(const QString &text) {
+    QUrl url(text.trimmed());
+    if (!url.isValid() || url.host().isEmpty())
+        return text.trimmed();
+    if (url.scheme() == "http")
+        url.setScheme("https");
+    if (url.port() == 80 || url.port() == 443)
+        url.setPort(-1);
+    if (url.host().startsWith("www."))
+        url.setHost(url.host().mid(4));
+    url.setFragment({});
+    QUrlQuery query(url);
+    for (const auto &[key, value] : query.queryItems())
+        if (key.startsWith("utm_") || key == "fbclid" || key == "gclid")
+            query.removeAllQueryItems(key);
+    url.setQuery(query.isEmpty() ? QString() : query.query(QUrl::FullyEncoded));
+    QString path = url.path(QUrl::FullyEncoded);
+    while (path.endsWith('/'))
+        path.chop(1);
+    url.setPath(path, QUrl::TolerantMode);
+    return url.toString(QUrl::FullyEncoded);
+}
+
 // The window shows agent text as plain text and the app teaches without
 // code, so a fenced block the agent slipped in anyway is cut out.
 static QString prose(const QJsonValue &value) {
@@ -204,9 +228,13 @@ QString Store::markdown(const QJsonObject &digest, const Progress *progress) {
         const QJsonArray questions = item.value("questions").toArray();
         if (!questions.isEmpty()) {
             md += "\n**Self-check**\n\n";
-            for (const auto &entry : questions)
-                md += QString("- %1\n  *%2*\n").arg(entry.toObject().value("question").toString(),
-                                                     entry.toObject().value("answer").toString());
+            const QJsonObject checks = state.value("checks").toObject();
+            for (const auto &entry : questions) {
+                const QString question = entry.toObject().value("question").toString();
+                const QString result = checks.value(question).toString();
+                md += QString("- %1%2\n  *%3*\n").arg(question, result == "knew" ? " ✓" : result == "missed" ? " ✗" : "",
+                                                       entry.toObject().value("answer").toString());
+            }
         }
         const QStringList practice = strings(item.value("practice"));
         const QJsonArray done = state.value("done").toArray();

@@ -73,7 +73,8 @@ and practice ideas, and follows the same rule: explanations in words, no code or
 commands. Conversations last until the window closes.
 
 **Study step by step** (Enter) opens focus mode: one writeup at a time, through
-read → remember → check yourself → practice, with the day's progress on top.
+read → remember → check yourself → practice, with the day's progress on top. After
+revealing an answer, say whether you knew it; Statistics counts the answers you knew.
 
 ![Focus mode, checking yourself](docs/focus.png)
 
@@ -82,13 +83,15 @@ code, commands, payloads, or exploits, and the app cuts out any code block that
 slips through.
 
 Mark writeups as read (M), done in a lab (B), or favorite (F), and tag them.
-Filter the list by topic, level, or unread; search covers every saved day.
+Filter the list by topic, level, or unread; search covers every saved day, matches
+the beginnings of words, and puts title matches first.
 Settings (P) holds the language, the daily timer, and which directions the agent
 searches, with stars for the ones it should pick more often. Export (E) saves the
 day, or the week ending on it, as Markdown through the desktop's save dialog, with
-your read marks, tags, and checked practice items. Progress lives in
-`~/.local/share/writeuppulse/progress.json`; Statistics shows the streak and what
-you read most.
+your read marks, tags, checked practice items, and self-check answers. Progress
+lives in a local SQLite file, `~/.local/share/writeuppulse/library/library.db`
+(a `progress.json` from earlier versions is imported once and left as a backup);
+Statistics shows the streak and what you read most.
 
 Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`),
 `WRITEUPPULSE_CLAUDE` (path to `claude` if it isn't found),

@@ -1,44 +1,45 @@
 #include "progress.h"
 
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
 #include <QJsonArray>
-#include <QJsonDocument>
-#include <QSaveFile>
 #include <QSet>
 
-Progress::Progress(const QString &directory) : m_path(directory + "/progress.json") {
+#include "database.h"
+#include "store.h"
+
+Progress::Progress(Database &database) : m_database(database) {
     load();
 }
 
 void Progress::load() {
-    QFile file(m_path);
-    m_items = file.open(QIODevice::ReadOnly)
-        ? QJsonDocument::fromJson(file.readAll()).object().value("items").toObject() : QJsonObject();
+    m_items = m_database.entries();
 }
 
-// Every change is written at once, atomically, so nothing the user marked is
-// lost when the window closes.
+QJsonObject Progress::entry(const QString &url) const {
+    return m_items.value(Store::canonicalUrl(url)).toObject();
+}
+
+// Every change is written at once, so nothing the user marked is lost when
+// the window closes.
 bool Progress::update(const QString &url, const QString &category, const std::function<void(QJsonObject &)> &change) {
-    if (url.isEmpty())
+    const QString key = Store::canonicalUrl(url);
+    if (key.isEmpty())
         return false;
-    QJsonObject entry = m_items.value(url).toObject();
+    QJsonObject entry = m_items.value(key).toObject();
     if (!category.isEmpty())
         entry.insert("category", category);
     change(entry);
     // An entry with nothing left in it is dropped rather than kept empty.
     const bool empty = !entry.contains("read") && !entry.contains("lab") && !entry.value("favorite").toBool()
-                       && entry.value("tags").toArray().isEmpty() && entry.value("done").toArray().isEmpty();
+                       && entry.value("tags").toArray().isEmpty() && entry.value("done").toArray().isEmpty()
+                       && entry.value("checks").toObject().isEmpty();
     if (empty)
-        m_items.remove(url);
+        m_items.remove(key);
     else
-        m_items.insert(url, entry);
-
-    QDir().mkpath(QFileInfo(m_path).absolutePath());
-    const QByteArray data = QJsonDocument(QJsonObject{{"items", m_items}}).toJson(QJsonDocument::Indented);
-    QSaveFile file(m_path);
-    return file.open(QIODevice::WriteOnly) && file.write(data) == data.size() && file.commit();
+        m_items.insert(key, entry);
+    // The answers themselves are events in the database, written by setCheck.
+    QJsonObject row = entry;
+    row.remove("checks");
+    return m_database.saveEntry(key, row);
 }
 
 bool Progress::setRead(const QString &url, const QString &category, bool read, const QDate &day) {
@@ -96,6 +97,23 @@ bool Progress::setPracticeDone(const QString &url, int index, bool done) {
     });
 }
 
+bool Progress::setCheck(const QString &url, const QString &category, const QString &question, const QString &result) {
+    if (question.isEmpty() || (!result.isEmpty() && result != "knew" && result != "missed")
+        || !m_database.addCheck(Store::canonicalUrl(url), question, result))
+        return false;
+    return update(url, category, [&](QJsonObject &entry) {
+        QJsonObject checks = entry.value("checks").toObject();
+        if (result.isEmpty())
+            checks.remove(question);
+        else
+            checks.insert(question, result);
+        if (checks.isEmpty())
+            entry.remove("checks");
+        else
+            entry.insert("checks", checks);
+    });
+}
+
 int Progress::streak(const QDate &today) const {
     QSet<QDate> days;
     for (const auto &value : m_items)
@@ -110,20 +128,25 @@ int Progress::streak(const QDate &today) const {
     return count;
 }
 
-QJsonObject Progress::stats() const {
-    int read = 0, lab = 0, favorites = 0;
+QJsonObject Progress::stats(const QHash<QString, QString> &categories) const {
+    int read = 0, lab = 0, favorites = 0, checked = 0, knew = 0;
     QJsonObject byCategory;
-    for (const auto &value : m_items) {
-        const QJsonObject entry = value.toObject();
+    for (auto it = m_items.begin(); it != m_items.end(); ++it) {
+        const QJsonObject entry = it.value().toObject();
         if (entry.contains("read")) {
             ++read;
-            const QString category = entry.value("category").toString("Other");
+            const QString category = categories.value(it.key(), entry.value("category").toString("Other"));
             byCategory.insert(category, byCategory.value(category).toInt() + 1);
         }
         lab += entry.contains("lab");
         favorites += entry.value("favorite").toBool();
+        for (const auto &result : entry.value("checks").toObject()) {
+            ++checked;
+            knew += result.toString() == "knew";
+        }
     }
-    return {{"read", read}, {"lab", lab}, {"favorites", favorites}, {"byCategory", byCategory}};
+    return {{"read", read}, {"lab", lab}, {"favorites", favorites}, {"checked", checked}, {"knew", knew},
+            {"byCategory", byCategory}};
 }
 
 QStringList Progress::favorites() const {

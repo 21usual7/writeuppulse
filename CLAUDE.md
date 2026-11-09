@@ -73,12 +73,31 @@ the QML window.
   `QFileSystemWatcher`; "running" = the lock file's pid is alive (read via
   `getLockInfo`, never `tryLock`, which would touch the directory and re-trigger the
   watcher), plus a short `m_starting` grace timer.
+- **Database:** `Database` (`src/database.cpp`) is a SQLite file (`QT += sql`, the
+  `qsqlite` driver, FTS5) at `<data>/library/library.db`. It is in a subdirectory on
+  purpose: SQLite's journal would otherwise wake the data-directory watcher. Schema
+  changes are migrations in `Database::migrate`, one `PRAGMA user_version` step per
+  version inside `BEGIN IMMEDIATE`; never edit an applied step, add the next one. It
+  holds user data nothing can rebuild (`progress`, `events`) and an index that
+  `Database::index` rebuilds per day from the JSON files by mtime+size (`days`,
+  `writeups` FTS5). JSON days stay the source of truth for content (site, sync).
+  Only the window and `writeuppulse export` open it; fetch and sync never do.
+  Version 1 imported `progress.json` once (canonical URLs) and left the file alone.
 - **Progress:** `Progress` (`src/progress.cpp`) keeps what the user did — read,
-  done in lab, favorite, tags, checked practice items — in `progress.json`, keyed by
-  article URL (so it survives a day being re-fetched). Only the window writes it; the
-  fetch never does. Streak = consecutive days with a writeup marked read (explicitly,
-  never automatically). QML reads it through `backend.state(url)` in bindings that also
-  touch `backend.progressRevision`, which bumps on every change.
+  done in lab, favorite, tags, checked practice items, self-check answers — through
+  `Database`, keyed by `Store::canonicalUrl` (http→https, no `www.`, fragment,
+  `utm_*`/`fbclid`/`gclid`, or trailing slash), so it survives a day being re-fetched
+  and links with different tails. Self-check answers are `events` rows (`kind =
+  'check'`, subject = the question text, result `knew`/`missed`/empty to take it
+  back); the entry's `checks` map is the latest per question. Streak = consecutive
+  days with a writeup marked read (explicitly, never automatically). Statistics take
+  each writeup's category from its day (`Backend::m_categories`), not the copy saved
+  with the progress. QML reads it through `backend.state(url)` in bindings that also
+  touch `backend.progressRevision`, which bumps on every change. Another window's
+  commits are seen through a watch on the database file plus `PRAGMA data_version`.
+- **Search:** each word is a quoted FTS5 prefix (`"word"*`, so typed operators are
+  text) via `Database::match`, or part of one of the user's tags; every word must
+  match; results are ordered by summed BM25 (title 10, summary 4, rest 1).
 - **Agent output fields:** category (fixed list in `Store`, grouped into topics; unknown
   → Other), level, 5–8 takeaways, 3–5 questions with answers, 3–6 practice ideas. The
   app is for learning, not attacking: the prompt forbids code/commands/payloads/PoCs,
@@ -135,6 +154,9 @@ the QML window.
 
 ## Gotchas
 
+- `Database` objects own a named `QSqlDatabase` connection and remove it in the
+  destructor; don't copy them or keep `QSqlQuery`/`QSqlDatabase` handles past them.
+  In tests, declare `Database` before the `Progress` that uses it.
 - **moc silently skips the test file** ("No relevant classes found" → vtable link
   errors) when a test contains raw string literals with JSON like `R"({... "https://..."})"`.
   Build JSON fixtures with `QJsonObject` instead. After such a failure, `rm -rf build/tests`.

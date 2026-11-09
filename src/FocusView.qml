@@ -25,6 +25,7 @@ Rectangle {
     signal openArticle()
     signal toggleStar()
     signal practiceToggled(int index, bool done)
+    signal questionJudged(string question, string result)
     signal finished()
 
     function nextStep() {
@@ -215,7 +216,7 @@ Rectangle {
                 Text {
                     Layout.topMargin: 26
                     visible: study.step === 2
-                    text: qsTr("Answer in your head, then reveal.")
+                    text: qsTr("Answer in your head, reveal, then say if you knew it.")
                     color: Style.muted
                     font.family: Style.sans
                     font.pixelSize: 13
@@ -230,6 +231,8 @@ Rectangle {
                         question: modelData.question
                         answer: modelData.answer
                         shown: index < study.revealed
+                        result: (study.progress.checks || {})[modelData.question] || ""
+                        onJudged: result => study.questionJudged(modelData.question, result)
                     }
                 }
 

@@ -33,7 +33,7 @@ Flickable {
 
         GridLayout {
             Layout.fillWidth: true
-            columns: column.width > 560 ? 4 : 2
+            columns: column.width > 680 ? 5 : 3
             columnSpacing: 12
             rowSpacing: 12
             Repeater {
@@ -41,7 +41,8 @@ Flickable {
                     [backend.streak, qsTr("days in a row"), Style.accent],
                     [backend.stats.read || 0, qsTr("writeups read"), Style.ink],
                     [backend.stats.lab || 0, qsTr("done in a lab"), Style.done],
-                    [backend.stats.favorites || 0, qsTr("in favorites"), Style.ink]
+                    [backend.stats.favorites || 0, qsTr("in favorites"), Style.ink],
+                    [backend.stats.knew || 0, qsTr("answers known of %1").arg((backend.stats.checked || 0).toLocaleString(Qt.locale(), 'f', 0)), Style.done]
                 ]
                 Rectangle {
                     required property var modelData

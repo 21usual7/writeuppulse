@@ -10,6 +10,7 @@
 #include <QStandardPaths>
 
 #include "backend.h"
+#include "database.h"
 #include "fetcher.h"
 #include "filepicker.h"
 #include "progress.h"
@@ -135,7 +136,8 @@ private slots:
         QTemporaryDir dir;
         const QDate today(2026, 11, 9);
         {
-            Progress progress(dir.path());
+            Database database(dir.path());
+            Progress progress(database);
             QVERIFY(progress.setRead("https://a", "Web", true, today.addDays(-2)));
             QVERIFY(progress.setRead("https://b", "Pwn", true, today.addDays(-1)));
             QVERIFY(progress.setRead("https://c", "Web", true, today.addDays(-1)));
@@ -147,7 +149,8 @@ private slots:
 
         // A fresh load sees everything written, and today not yet read keeps
         // yesterday's streak alive.
-        Progress progress(dir.path());
+        Database database(dir.path());
+        Progress progress(database);
         QCOMPARE(progress.streak(today), 2);
         QCOMPARE(progress.streak(today.addDays(1)), 0);
         progress.setRead("https://d", "Crypto", true, today);
@@ -240,15 +243,158 @@ private slots:
         QString error;
         for (const QString date : {"2026-11-01", "2026-11-03", "2026-11-09"})
             QVERIFY(store.saveDigest(sampleDigest(date, "https://example.com/" + date), &error));
-        Progress progress(dir.path());
+        Database database(dir.path());
+        Progress progress(database);
         progress.setRead("https://example.com/2026-11-09", "Web", true);
+        QVERIFY(progress.setCheck("https://example.com/2026-11-09", "Web", "Why?", "knew"));
 
         const QString week = store.exportMarkdown("2026-11-09", true, &progress);
         QVERIFY(!week.contains("2026-11-01"));
         QVERIFY(week.indexOf("— 2026-11-03") < week.indexOf("— 2026-11-09"));
         QVERIFY(week.contains("✓ Read"));
+        QVERIFY(week.contains("- Why? ✓"));
         QVERIFY(!store.exportMarkdown("2026-11-09", false).contains("2026-11-03"));
         QVERIFY(store.exportMarkdown("2026-11-05", false).isEmpty());
+    }
+
+    void canonicalUrlFoldsTheFormsOfOneLink()
+    {
+        const QString plain = Store::canonicalUrl("https://example.com/post");
+        QCOMPARE(plain, QString("https://example.com/post"));
+        for (const QString url : {"http://www.example.com/post/", "https://EXAMPLE.com/post#part",
+                                   "https://example.com:443/post?utm_source=hn&utm_medium=x", "https://example.com/post?fbclid=1"})
+            QCOMPARE(Store::canonicalUrl(url), plain);
+        QCOMPARE(Store::canonicalUrl("https://example.com/post?id=7&utm_campaign=a"), QString("https://example.com/post?id=7"));
+        QCOMPARE(Store::canonicalUrl("not a url"), QString("not a url"));
+    }
+
+    void progressMovesFromJsonOnce()
+    {
+        QTemporaryDir dir;
+        const QJsonObject old{{"items", QJsonObject{
+            {"https://www.example.com/a/?utm_source=hn", QJsonObject{{"read", "2026-11-08"}, {"category", "Web"}}},
+            {"https://example.com/a", QJsonObject{{"favorite", true}, {"tags", QJsonArray{"study"}}}},
+            {"https://example.com/b", QJsonObject{{"done", QJsonArray{1}}}}}}};
+        const QByteArray json = QJsonDocument(old).toJson();
+        write(dir.path() + "/progress.json", json);
+        {
+            Database database(dir.path());
+            QVERIFY2(database.error().isEmpty(), qPrintable(database.error()));
+            Progress progress(database);
+            // Two forms of one link become one entry with both sets of marks.
+            const QJsonObject a = progress.entry("https://example.com/a");
+            QCOMPARE(a.value("read").toString(), QString("2026-11-08"));
+            QVERIFY(a.value("favorite").toBool());
+            QCOMPARE(progress.entry("http://example.com/b/").value("done").toArray().first().toInt(), 1);
+            QCOMPARE(progress.favorites(), QStringList({"https://example.com/a"}));
+            progress.setRead("https://example.com/a", {}, false);
+        }
+        // The old file stays as it was and is never read again.
+        QFile file(dir.path() + "/progress.json");
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), json);
+        Database database(dir.path());
+        Progress progress(database);
+        QVERIFY(!progress.entry("https://example.com/a").contains("read"));
+        QVERIFY(progress.entry("https://example.com/a").value("favorite").toBool());
+    }
+
+    void searchRanksThroughTheIndex()
+    {
+        QTemporaryDir dir;
+        Store store(dir.path());
+        QString error;
+        auto item = [](const QString &title, const QString &summary) {
+            return QJsonObject{{"title", title}, {"url", "https://example.com/" + title.left(4)}, {"summary", summary}};
+        };
+        QVERIFY(store.saveDigest({{"date", "2026-11-08"}, {"items", QJsonArray{
+            item("Kernel heap grooming", "Shaping the allocator."), item("Notes", "A word about heap spraying.")}}}, &error));
+        QVERIFY(store.saveDigest({{"date", "2026-11-09"}, {"items", QJsonArray{
+            item("Уязвимость в ядре", "Разбор ошибки в драйвере.")}}}, &error));
+        Backend backend(dir.path(), false);
+
+        // A title hit comes before a summary hit, and words match as prefixes.
+        backend.setQuery("hea");
+        QCOMPARE(backend.items().size(), 2);
+        QCOMPARE(backend.items().first().toMap().value("title").toString(), QString("Kernel heap grooming"));
+        backend.setQuery("УЯЗВИМ драйв");
+        QCOMPARE(backend.items().size(), 1);
+        // What the user typed is only text, never FTS5 syntax.
+        backend.setQuery("heap\" OR \"kernel");
+        QCOMPARE(backend.items().size(), 0);
+        backend.setQuery("NOT");
+        QCOMPARE(backend.items().size(), 1);
+
+        // The user's own tags count as text too.
+        backend.setTags("https://example.com/Note", {"later"});
+        backend.setQuery("heap later");
+        QCOMPARE(backend.items().size(), 1);
+
+        // A day written again is reindexed; a removed one leaves the index.
+        QVERIFY(store.saveDigest({{"date", "2026-11-08"}, {"items", QJsonArray{item("Fresh title", "Nothing else.")}}}, &error));
+        QVERIFY(QFile::remove(dir.path() + "/2026-11-09.json"));
+        QTRY_COMPARE(backend.dates().size(), 1);
+        backend.setQuery("fresh");
+        QCOMPARE(backend.items().size(), 1);
+        backend.setQuery("heap");
+        QCOMPARE(backend.items().size(), 0);
+        QVERIFY(Database(dir.path()).match("ядре").isEmpty());
+    }
+
+    void selfCheckAnswersAreKept()
+    {
+        QTemporaryDir dir;
+        Store store(dir.path());
+        QString error;
+        QVERIFY(store.saveDigest(sampleDigest("2026-11-09", "https://example.com/x"), &error));
+        {
+            Backend backend(dir.path(), false);
+            const QVariantMap item = backend.items().first().toMap();
+            backend.setCheck(item, "Why?", "missed");
+            backend.setCheck(item, "Why?", "knew");
+            backend.setCheck(item, "How?", "missed");
+            backend.setCheck(item, "How?", "");
+            QCOMPARE(backend.stats().value("checked").toInt(), 1);
+            QCOMPARE(backend.stats().value("knew").toInt(), 1);
+        }
+        // The latest answer for each question survives a restart.
+        Database database(dir.path());
+        Progress progress(database);
+        const QJsonObject checks = progress.entry("https://example.com/x").value("checks").toObject();
+        QCOMPARE(checks, QJsonObject({{"Why?", "knew"}}));
+        QVERIFY(!progress.setCheck("https://example.com/x", {}, "Why?", "maybe"));
+    }
+
+    void statsUseTheCategoryOfTheDay()
+    {
+        QTemporaryDir dir;
+        Store store(dir.path());
+        QString error;
+        {
+            Database database(dir.path());
+            Progress progress(database);
+            progress.setRead("https://example.com/x", "Other", true);
+        }
+        QJsonObject digest = sampleDigest("2026-11-09", "https://example.com/x");
+        QJsonArray items = digest.value("items").toArray();
+        QJsonObject first = items.first().toObject();
+        first.insert("category", "Web");
+        items.replace(0, first);
+        digest.insert("items", items);
+        QVERIFY(store.saveDigest(digest, &error));
+        Backend backend(dir.path(), false);
+        QCOMPARE(backend.stats().value("byCategory").toMap(), QVariantMap({{"Web", 1}}));
+    }
+
+    void secondWindowSeesProgress()
+    {
+        QTemporaryDir dir;
+        Store store(dir.path());
+        QString error;
+        QVERIFY(store.saveDigest(sampleDigest("2026-11-09", "https://example.com/x"), &error));
+        Backend first(dir.path(), false), second(dir.path(), false);
+        first.setFavorite(first.items().first().toMap(), true);
+        QTRY_COMPARE(second.favoriteCount(), 1);
     }
 
     void backendExportsThroughThePicker()
@@ -568,7 +714,8 @@ private:
     {
         return {{"date", date}, {"items", QJsonArray{QJsonObject{
             {"title", "A writeup"}, {"url", url}, {"source", "example.com"}, {"popularity", "HN · 100 points"},
-            {"why", "Because."}, {"summary", "Summary."}, {"takeaways", QJsonArray{"First lesson"}}, {"tags", QJsonArray{"security"}}}}}};
+            {"why", "Because."}, {"summary", "Summary."}, {"takeaways", QJsonArray{"First lesson"}}, {"tags", QJsonArray{"security"}},
+            {"questions", QJsonArray{QJsonObject{{"question", "Why?"}, {"answer", "Because."}}}}}}}};
     }
 
     static QString fakeClaude(const QString &directory, const QJsonObject &answer)

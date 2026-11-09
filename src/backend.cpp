@@ -18,8 +18,10 @@
 static QByteArray stamp(const QString &path);
 
 Backend::Backend(const QString &directory, bool systemd, QObject *parent)
-    : QObject(parent), m_store(directory), m_progress(m_store.directory()), m_systemd(systemd) {
+    : QObject(parent), m_store(directory), m_database(m_store.directory()), m_progress(m_database), m_systemd(systemd) {
     QDir().mkpath(m_store.directory());
+    if (!m_database.error().isEmpty())
+        setProblem(tr("Your progress can't be saved: %1").arg(m_database.error()));
     m_agentMissing = Fetcher::findClaude().isEmpty();
     m_language = Fetcher::language();
     m_source = Syncer::source();
@@ -38,6 +40,8 @@ Backend::Backend(const QString &directory, bool systemd, QObject *parent)
     connect(&m_debounce, &QTimer::timeout, this, &Backend::reload);
     connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, [this] { m_debounce.start(); });
     m_watcher.addPath(m_store.directory());
+    // A commit from another window changes the database file.
+    connect(&m_watcher, &QFileSystemWatcher::fileChanged, this, [this] { m_debounce.start(); });
 
     // Covers the moment between asking systemd for a fetch and the fetch
     // taking its lock, so the button doesn't flicker back.
@@ -86,8 +90,7 @@ void Backend::setLanguage(const QString &language) {
 
 void Backend::progressSaved(bool ok) {
     if (!ok)
-        setProblem(tr("Could not save your progress to %1.").arg(m_store.directory()));
-    m_progressStamp = stamp(m_store.directory() + "/progress.json");
+        setProblem(tr("Could not save your progress to %1.").arg(m_database.path()));
     ++m_progressRevision;
     emit progressChanged();
     // Hiding read writeups and the favorites view both depend on progress.
@@ -224,7 +227,7 @@ void Backend::rebuild() {
     QVariantList source;
     for (const auto &value : m_library) {
         const QVariantMap item = value.toMap();
-        if (searching || (m_view == "favorites" ? favorites.contains(item.value("url").toString())
+        if (searching || (m_view == "favorites" ? favorites.contains(Store::canonicalUrl(item.value("url").toString()))
                                                 : m_view == "day" && item.value("date") == m_date))
             source << item;
     }
@@ -235,8 +238,14 @@ void Backend::rebuild() {
             if (value.toMap().value("category") == category && !shown.contains(category))
                 shown << category;
 
-    // A search hit that a filter hides counts as hidden; a miss doesn't.
+    // Every word has to start a word of the writeup (through the full-text
+    // index) or be part of one of the user's tags; the best matches come
+    // first. A search hit that a filter hides counts as hidden; a miss doesn't.
     const QStringList words = m_query.toLower().split(' ', Qt::SkipEmptyParts);
+    QList<QHash<QString, double>> hits;
+    for (const auto &word : words)
+        hits << m_database.match(word);
+    QHash<QString, double> scores;
     QVariantList items;
     int hidden = 0;
     for (const auto &value : source) {
@@ -244,12 +253,19 @@ void Backend::rebuild() {
         const QJsonObject state = m_progress.entry(item.value("url").toString());
         const QStringList userTags = state.value("tags").toVariant().toStringList();
         if (!words.isEmpty()) {
-            const QString haystack = QStringList{item.value("title").toString(), item.value("summary").toString(),
-                item.value("why").toString(), item.value("source").toString(), item.value("category").toString(),
-                item.value("takeaways").toStringList().join(' '), item.value("tags").toStringList().join(' '),
-                userTags.join(' ')}.join(' ').toLower();
-            if (!std::all_of(words.begin(), words.end(), [&](const QString &word) { return haystack.contains(word); }))
+            const QString key = item.value("date").toString() + "\t" + item.value("url").toString();
+            const QString tagText = userTags.join(' ').toLower();
+            double score = 0;
+            bool all = true;
+            for (int i = 0; all && i < words.size(); ++i) {
+                if (hits.at(i).contains(key))
+                    score += hits.at(i).value(key);
+                else
+                    all = tagText.contains(words.at(i));
+            }
+            if (!all)
                 continue;
+            scores.insert(key, score);
         }
         if ((!m_categoryFilter.isEmpty() && !m_categoryFilter.contains(item.value("category").toString()))
             || (!m_levelFilter.isEmpty() && item.value("level") != m_levelFilter)
@@ -260,6 +276,15 @@ void Backend::rebuild() {
         }
         items << item;
     }
+
+    // BM25 scores are negative, lower is better; ties keep the newest first.
+    if (!words.isEmpty())
+        std::stable_sort(items.begin(), items.end(), [&scores](const QVariant &a, const QVariant &b) {
+            auto key = [](const QVariant &item) {
+                return item.toMap().value("date").toString() + "\t" + item.toMap().value("url").toString();
+            };
+            return scores.value(key(a)) < scores.value(key(b));
+        });
 
     // A day lists the directions the user prefers first, otherwise in the
     // agent's order.
@@ -297,6 +322,10 @@ void Backend::setPracticeDone(const QString &url, int index, bool done) {
     progressSaved(m_progress.setPracticeDone(url, index, done));
 }
 
+void Backend::setCheck(const QVariantMap &item, const QString &question, const QString &result) {
+    progressSaved(m_progress.setCheck(item.value("url").toString(), item.value("category").toString(), question, result));
+}
+
 void Backend::setDate(const QString &date) {
     if (!m_dates.contains(date) || (date == m_date && m_view == "day" && m_query.isEmpty()))
         return;
@@ -331,6 +360,8 @@ void Backend::reload() {
     // Deleting and recreating the directory drops the watch; re-arm it every time.
     if (!m_watcher.directories().contains(m_store.directory()))
         m_watcher.addPath(m_store.directory());
+    if (!m_watcher.files().contains(m_database.path()) && QFileInfo::exists(m_database.path()))
+        m_watcher.addPath(m_database.path());
 
     const QStringList dates = m_store.dates();
     if (dates != m_dates) {
@@ -353,21 +384,28 @@ void Backend::reload() {
     if (libraryStamp != m_libraryStamp) {
         m_libraryStamp = libraryStamp;
         m_library.clear();
+        m_categories.clear();
         for (const auto &date : m_dates)
             for (const auto &value : m_store.digest(date).value("items").toArray()) {
                 QVariantMap item = value.toObject().toVariantMap();
                 item.insert("date", date);
                 if (!Store::categories().contains(item.value("category").toString()))
                     item.insert("category", "Other");
+                m_categories.insert(Store::canonicalUrl(item.value("url").toString()), item.value("category").toString());
                 m_library << item;
             }
+        QString error;
+        if (!m_database.index(m_store, &error))
+            setProblem(error);
         rebuildNeeded = true;
+        // The statistics read the categories of the days.
+        emit progressChanged();
     }
 
     // Another window may have marked something; pick it up.
-    const QByteArray progressStamp = stamp(m_store.directory() + "/progress.json");
-    if (progressStamp != m_progressStamp) {
-        m_progressStamp = progressStamp;
+    const int dataVersion = m_database.dataVersion();
+    if (dataVersion != m_dataVersion) {
+        m_dataVersion = dataVersion;
         m_progress.load();
         ++m_progressRevision;
         emit progressChanged();

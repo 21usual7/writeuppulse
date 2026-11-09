@@ -11,6 +11,7 @@
 #include <QSaveFile>
 #include <QTextStream>
 
+#include "database.h"
 #include "fetcher.h"
 #include "progress.h"
 #include "store.h"
@@ -115,7 +116,10 @@ int runCli(int argc, char *argv[]) {
                 return fail("--output needs a file name.");
         }
         const QString date = args.value(1, store.dates().value(0));
-        const Progress progress(store.directory());
+        Database database(store.directory());
+        if (!database.error().isEmpty())
+            QTextStream(stderr) << "Exporting without your progress: " << database.error() << Qt::endl;
+        const Progress progress(database);
         const QString markdown = store.exportMarkdown(date, week, &progress);
         if (markdown.isEmpty())
             return fail(date.isEmpty() ? "No digests yet. Run `writeuppulse fetch`." : "No digest for " + date + ".");

@@ -526,6 +526,7 @@ ApplicationWindow {
                     onToggleStar: win.toggleStar(win.current)
                     onFocusRequested: win.focusVisible = true
                     onPracticeToggled: (step, done) => backend.setPracticeDone(win.item.url, step, done)
+                    onQuestionJudged: (question, result) => backend.setCheck(win.item, question, result)
                     onTagsEdited: tags => backend.setTags(win.item.url, tags)
                 }
                 Text {
@@ -554,6 +555,7 @@ ApplicationWindow {
             onOpenArticle: win.openArticle(win.current)
             onToggleStar: win.toggleStar(win.current)
             onPracticeToggled: (step, done) => backend.setPracticeDone(win.item.url, step, done)
+            onQuestionJudged: (question, result) => backend.setCheck(win.item, question, result)
             onFinished: win.finishInFocus()
         }
 

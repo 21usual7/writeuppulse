@@ -29,6 +29,9 @@ public:
     static QString topicOf(const QString &category);
     static QStringList levels();
 
+    // One form for the many links to the same page (http or https, www,
+    // tracking parameters, fragment, trailing slash), used to key progress.
+    static QString canonicalUrl(const QString &url);
     static QJsonObject normalize(const QJsonObject &output, const QString &date, QString *error);
     // With progress, the Markdown also says what the user read, did in a lab,
     // tagged, and checked off.

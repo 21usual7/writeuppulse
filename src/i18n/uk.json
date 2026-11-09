@@ -85,7 +85,7 @@
   "%1/%2": "%1/%2",
   "AI / ML": "AI / ML",
   "All": "Усі",
-  "Answer in your head, then reveal.": "Відповідайте подумки, потім відкрийте відповідь.",
+  "Answer in your head, reveal, then say if you knew it.": "Відповідайте подумки, відкрийте відповідь і позначте, чи знали ви її.",
   "Engineering": "Інженерія",
   "Focus mode": "Режим фокусу",
   "Hide": "Сховати",
@@ -150,5 +150,9 @@
   "Stop": "Стоп",
   "Send": "Надіслати",
   "The tutor is off while the laptop runs on battery, so the local model doesn't drain it. Plug in the charger and press Check again.": "Тьютор вимкнений, поки ноутбук працює від батареї, щоб локальна модель не розряджала її. Підключіть зарядку й натисніть «Перевірити знову».",
-  "Off on battery": "Вимкнена на батареї"
+  "Off on battery": "Вимкнена на батареї",
+  "I knew it": "Знав",
+  "I didn't": "Не знав",
+  "answers known of %1": "відповідей знав із %1",
+  "Your progress can't be saved: %1": "Прогрес не зберігається: %1"
 }

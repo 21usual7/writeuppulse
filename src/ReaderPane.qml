@@ -25,6 +25,7 @@ Flickable {
     signal toggleStar()
     signal focusRequested()
     signal practiceToggled(int index, bool done)
+    signal questionJudged(string question, string result)
     signal tagsEdited(var tags)
 
     onItemChanged: {
@@ -257,6 +258,8 @@ Flickable {
                     Layout.fillWidth: true
                     question: modelData.question
                     answer: modelData.answer
+                    result: (pane.progress.checks || {})[modelData.question] || ""
+                    onJudged: result => pane.questionJudged(modelData.question, result)
                 }
             }
         }

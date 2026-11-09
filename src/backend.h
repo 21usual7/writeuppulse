@@ -6,6 +6,7 @@
 #include <QTimer>
 #include <QVariantList>
 
+#include "database.h"
 #include "filepicker.h"
 #include "progress.h"
 #include "store.h"
@@ -99,7 +100,7 @@ public:
     void setSource(const QString &source);
     int progressRevision() const { return m_progressRevision; }
     int streak() const { return m_progress.streak(); }
-    QVariantMap stats() const { return m_progress.stats().toVariantMap(); }
+    QVariantMap stats() const { return m_progress.stats(m_categories).toVariantMap(); }
     QStringList tags() const { return m_progress.tags(); }
 
     // QML reads a writeup's state through state(url) in bindings that also
@@ -110,6 +111,8 @@ public:
     Q_INVOKABLE void setFavorite(const QVariantMap &item, bool favorite);
     Q_INVOKABLE void setTags(const QString &url, const QStringList &tags);
     Q_INVOKABLE void setPracticeDone(const QString &url, int index, bool done);
+    // result is "knew", "missed", or empty to take the answer back.
+    Q_INVOKABLE void setCheck(const QVariantMap &item, const QString &question, const QString &result);
 
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void setTimerEnabled(bool enabled);
@@ -144,9 +147,12 @@ private:
     void setNotice(const QString &notice);
 
     Store m_store;
+    Database m_database;
     Progress m_progress;
     int m_progressRevision = 0;
-    QByteArray m_progressStamp;
+    int m_dataVersion = -1;
+    // Canonical URL → the category its day has now, for the statistics.
+    QHash<QString, QString> m_categories;
     bool m_systemd;
     QFileSystemWatcher m_watcher;
     QTimer m_debounce, m_starting;
