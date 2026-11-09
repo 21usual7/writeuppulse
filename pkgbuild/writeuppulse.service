@@ -2,6 +2,10 @@
 Description=WriteupPulse daily digest of technical writeups (from the site or your own agent)
 Wants=network-online.target
 After=network-online.target
+# Three failed runs in two hours stop the retries, so a lasting failure doesn't
+# rerun the agent every 10 minutes. These keys only work in [Unit].
+StartLimitIntervalSec=2h
+StartLimitBurst=3
 
 [Service]
 Type=oneshot
@@ -10,5 +14,3 @@ TimeoutStartSec=40min
 # A morning run right after resume can find no network yet; try again a bit later.
 Restart=on-failure
 RestartSec=10min
-StartLimitIntervalSec=2h
-StartLimitBurst=3
