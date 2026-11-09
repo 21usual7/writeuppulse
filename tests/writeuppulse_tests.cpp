@@ -11,10 +11,23 @@
 
 #include "backend.h"
 #include "fetcher.h"
+#include "filepicker.h"
 #include "progress.h"
 #include "store.h"
 #include "theme.h"
 #include "translator.h"
+
+// Answers the save dialog at once with a fixed file.
+class FakePicker : public FilePicker {
+    Q_OBJECT
+public:
+    QString answer;
+    QUrl suggested;
+    void saveMarkdown(const QUrl &url) override {
+        suggested = url;
+        emit saveSelected(QUrl::fromLocalFile(answer));
+    }
+};
 
 class WriteupPulseTests : public QObject {
     Q_OBJECT
@@ -214,6 +227,64 @@ private slots:
         backend.setDate("2026-11-08");
         QCOMPARE(backend.view(), QString("day"));
         QCOMPARE(backend.items().size(), 1);
+    }
+
+    void exportCoversTheWeekWithProgress()
+    {
+        QTemporaryDir dir;
+        Store store(dir.path());
+        QString error;
+        for (const QString date : {"2026-11-01", "2026-11-03", "2026-11-09"})
+            QVERIFY(store.saveDigest(sampleDigest(date, "https://example.com/" + date), &error));
+        Progress progress(dir.path());
+        progress.setRead("https://example.com/2026-11-09", "Web", true);
+
+        const QString week = store.exportMarkdown("2026-11-09", true, &progress);
+        QVERIFY(!week.contains("2026-11-01"));
+        QVERIFY(week.indexOf("— 2026-11-03") < week.indexOf("— 2026-11-09"));
+        QVERIFY(week.contains("✓ Read"));
+        QVERIFY(!store.exportMarkdown("2026-11-09", false).contains("2026-11-03"));
+        QVERIFY(store.exportMarkdown("2026-11-05", false).isEmpty());
+    }
+
+    void backendExportsThroughThePicker()
+    {
+        QTemporaryDir dir;
+        Store store(dir.path());
+        QString error;
+        QVERIFY(store.saveDigest(sampleDigest("2026-11-09", "https://example.com/x"), &error));
+        Backend backend(dir.path(), false);
+        FakePicker picker;
+        picker.answer = dir.path() + "/out.md";
+        backend.setFilePicker(&picker);
+        backend.exportMarkdown(true);
+        QVERIFY(picker.suggested.toLocalFile().endsWith("writeuppulse-week-2026-11-09.md"));
+        QFile out(picker.answer);
+        QVERIFY(out.open(QIODevice::ReadOnly));
+        QVERIFY(out.readAll().startsWith("# WriteupPulse — 2026-11-09"));
+        QVERIFY(backend.notice().contains("out.md"));
+    }
+
+    void preferencesReachTheAgentAndTheOrder()
+    {
+        QTemporaryDir dir;
+        Store store(dir.path());
+        QString error;
+        auto item = [](const QString &title, const QString &category) {
+            return QJsonObject{{"title", title}, {"url", "https://example.com/" + title}, {"summary", "s"}, {"category", category}};
+        };
+        QVERIFY(store.saveDigest({{"date", "2026-11-09"}, {"items", QJsonArray{item("a", "Web"), item("b", "Pwn")}}}, &error));
+        Backend backend(dir.path(), false);
+        backend.setPreferredCategories({"Pwn"});
+        QCOMPARE(backend.items().first().toMap().value("title").toString(), QString("b"));
+
+        backend.setSearchCategories(Store::categories());
+        QVERIFY(backend.searchCategories().isEmpty());
+        backend.setSearchCategories({"Pwn", "Web"});
+        QCOMPARE(backend.searchCategories(), QStringList({"Web", "Pwn"}));
+        QVERIFY(Fetcher(Store(dir.path()), "/bin/true").prompt("2026-11-09").contains("especially wants: Pwn."));
+        backend.setSearchCategories({});
+        backend.setPreferredCategories({});
     }
 
     void storeSavesJsonAndMarkdown()

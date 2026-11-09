@@ -20,6 +20,7 @@ ApplicationWindow {
     readonly property color dim: "#9a9aa2"
     readonly property color panel: "#17171a"
     property bool helpVisible: false
+    property bool directionsVisible: false
     property int current: 0
     property var expanded: ({})
     // Single-key shortcuts stay quiet while the user types in a field.
@@ -57,6 +58,18 @@ ApplicationWindow {
         const at = list.indexOf(category)
         if (at >= 0) list.splice(at, 1); else list.push(category)
         backend.categoryFilter = list
+    }
+    function toggleSearched(category) {
+        const list = backend.searchCategories.length ? backend.searchCategories.slice() : backend.categoriesOf("")
+        const at = list.indexOf(category)
+        if (at >= 0) list.splice(at, 1); else list.push(category)
+        backend.searchCategories = list
+    }
+    function togglePreferred(category) {
+        const list = backend.preferredCategories.slice()
+        const at = list.indexOf(category)
+        if (at >= 0) list.splice(at, 1); else list.push(category)
+        backend.preferredCategories = list
     }
     function clearFilters() {
         backend.categoryFilter = []
@@ -108,6 +121,7 @@ ApplicationWindow {
         context: Qt.ApplicationShortcut
         onActivated: {
             if (win.helpVisible) win.helpVisible = false
+            else if (win.directionsVisible) win.directionsVisible = false
             else if (win.typing) { search.text = ""; cards.forceActiveFocus() }
         }
     }
@@ -122,6 +136,8 @@ ApplicationWindow {
     Shortcut { sequence: "B"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.toggleLab(win.current) }
     Shortcut { sequence: "F"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.toggleStar(win.current) }
     Shortcut { sequence: "H"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: backend.hideRead = !backend.hideRead }
+    Shortcut { sequence: "E"; context: Qt.ApplicationShortcut; enabled: !win.typing && backend.dates.length > 0; onActivated: exportMenu.popup(exportButton, 0, exportButton.height) }
+    Shortcut { sequence: "P"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.directionsVisible = !win.directionsVisible }
     Shortcut { sequence: "S"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: backend.view = backend.view === "stats" ? "day" : "stats" }
     Shortcut { sequences: ["Down", "J"]; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.move(1) }
     Shortcut { sequences: ["Up", "K"]; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.move(-1) }
@@ -263,6 +279,12 @@ ApplicationWindow {
                         }
                         ItemDelegate {
                             Layout.fillWidth: true
+                            text: "⚙  " + qsTr("Directions")
+                            Material.roundedScale: Math.min(4, theme.radius)
+                            onClicked: win.directionsVisible = true
+                        }
+                        ItemDelegate {
+                            Layout.fillWidth: true
                             text: "∑  " + qsTr("Statistics")
                             highlighted: backend.view === "stats" && !win.searching
                             Material.roundedScale: Math.min(4, theme.radius)
@@ -358,6 +380,22 @@ ApplicationWindow {
                             checked: backend.hideRead
                             onToggled: { backend.hideRead = checked; checked = Qt.binding(() => backend.hideRead) }
                         }
+                        Button {
+                            id: exportButton
+                            height: 40
+                            flat: true
+                            visible: backend.dates.length > 0
+                            text: qsTr("Export") + " ▾"
+                            Material.roundedScale: theme.radius
+                            onClicked: exportMenu.popup(exportButton, 0, exportButton.height)
+                            Menu {
+                                id: exportMenu
+                                Material.roundedScale: theme.radius
+                                width: 280
+                                MenuItem { text: qsTr("This day as Markdown"); onTriggered: backend.exportMarkdown(false) }
+                                MenuItem { text: qsTr("This week as Markdown"); onTriggered: backend.exportMarkdown(true) }
+                            }
+                        }
                     }
 
                     Flow {
@@ -422,8 +460,8 @@ ApplicationWindow {
                         model: backend.items
                         boundsBehavior: Flickable.StopAtBounds
                         ScrollBar.vertical: ScrollBar {}
-                        // ListView pins delegates to x: 0, so each one is a
-                        // full-width row that centers a card of readable width.
+                        // Cards keep a readable width and line up with the
+                        // heading and filters above them.
                         delegate: Item {
                             id: row
                             required property var modelData
@@ -432,7 +470,7 @@ ApplicationWindow {
                             height: card.implicitHeight
                             WriteupCard {
                                 id: card
-                                anchors.horizontalCenter: parent.horizontalCenter
+                                anchors.left: parent.left
                                 width: Math.min(parent.width, 940)
                                 height: implicitHeight
                                 item: row.modelData
@@ -468,6 +506,120 @@ ApplicationWindow {
             }
         }
 
+        // A short confirmation after an export, at the bottom of the window.
+        Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 28
+            visible: backend.notice.length > 0
+            implicitWidth: noticeLabel.implicitWidth + 32
+            implicitHeight: 40
+            radius: theme.radius
+            color: "#26262c"
+            border.color: theme.accent
+            Label {
+                id: noticeLabel
+                anchors.centerIn: parent
+                text: backend.notice
+            }
+        }
+
+        // Which directions the agent searches, and which it picks more often.
+        Popup {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 80, 720)
+            height: Math.min(parent.height - 80, directionsColumn.implicitHeight + 48)
+            modal: true
+            visible: win.directionsVisible
+            onClosed: win.directionsVisible = false
+            padding: 24
+            Material.roundedScale: theme.radius
+            Overlay.modal: Rectangle { color: "#a0000000" }
+
+            Flickable {
+                anchors.fill: parent
+                contentHeight: directionsColumn.implicitHeight
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.vertical: ScrollBar {}
+
+                ColumnLayout {
+                    id: directionsColumn
+                    width: parent.width
+                    spacing: 12
+
+                    Label {
+                        text: qsTr("Directions")
+                        font.pixelSize: 20
+                        font.bold: true
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.Wrap
+                        color: win.dim
+                        text: qsTr("The agent searches the highlighted directions, from the next fetch on. Star the ones it should pick more often; they also come first in each day.")
+                    }
+                    Repeater {
+                        model: backend.topics
+                        ColumnLayout {
+                            id: topic
+                            required property string modelData
+                            Layout.fillWidth: true
+                            spacing: 6
+                            Label {
+                                Layout.topMargin: 6
+                                text: topic.modelData === "Other" ? qsTr("Other") : topic.modelData
+                                color: theme.accent
+                                font.bold: true
+                            }
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                Repeater {
+                                    model: backend.categoriesOf(topic.modelData)
+                                    Row {
+                                        required property string modelData
+                                        spacing: 2
+                                        FilterChip {
+                                            text: modelData
+                                            on: backend.searchCategories.length === 0 || backend.searchCategories.indexOf(modelData) >= 0
+                                            onClicked: win.toggleSearched(modelData)
+                                        }
+                                        Label {
+                                            width: 26
+                                            height: 28
+                                            horizontalAlignment: Text.AlignHCenter
+                                            verticalAlignment: Text.AlignVCenter
+                                            text: backend.preferredCategories.indexOf(modelData) >= 0 ? "★" : "☆"
+                                            color: backend.preferredCategories.indexOf(modelData) >= 0 ? theme.accent : win.dim
+                                            font.pixelSize: 16
+                                            TapHandler { onTapped: win.togglePreferred(modelData) }
+                                            HoverHandler { cursorShape: Qt.PointingHandCursor }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    RowLayout {
+                        Layout.topMargin: 8
+                        Button {
+                            flat: true
+                            text: qsTr("Search everything")
+                            Material.foreground: theme.accent
+                            onClicked: { backend.searchCategories = []; backend.preferredCategories = [] }
+                        }
+                        Item { Layout.fillWidth: true }
+                        Button {
+                            flat: true
+                            text: qsTr("Done")
+                            onClicked: win.directionsVisible = false
+                        }
+                    }
+                }
+            }
+        }
+
         Popup {
             anchors.centerIn: parent
             modal: true
@@ -494,6 +646,8 @@ ApplicationWindow {
                         ["H", qsTr("Hide or show read writeups")],
                         ["Ctrl+F  /", qsTr("Search all writeups")],
                         ["S", qsTr("Statistics")],
+                        ["P", qsTr("Directions the agent searches")],
+                        ["E", qsTr("Export the day or week as Markdown")],
                         ["R", qsTr("Fetch today's writeups now")],
                         ["?", qsTr("Show or hide shortcuts")],
                         ["Q", qsTr("Quit")]

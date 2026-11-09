@@ -8,6 +8,7 @@
 #include <QJsonDocument>
 #include <QLockFile>
 #include <QProcess>
+#include <QSaveFile>
 #include <QSettings>
 #include <QStandardPaths>
 
@@ -23,6 +24,11 @@ Backend::Backend(const QString &directory, bool systemd, QObject *parent)
     const QSettings settings("writeuppulse", "writeuppulse");
     m_deepMode = settings.value("deepMode", false).toBool();
     m_hideRead = settings.value("hideRead", false).toBool();
+    m_searchCategories = settings.value("categories").toStringList();
+    m_preferredCategories = settings.value("preferred").toStringList();
+    m_noticeTimer.setSingleShot(true);
+    m_noticeTimer.setInterval(6000);
+    connect(&m_noticeTimer, &QTimer::timeout, this, [this] { setNotice({}); });
 
     // A fetch writes its files and lock into the data directory, so watching
     // that one directory follows timer runs and manual ones alike.
@@ -59,6 +65,77 @@ void Backend::progressSaved(bool ok) {
     emit progressChanged();
     // Hiding read writeups and the favorites view both depend on progress.
     rebuild();
+}
+
+void Backend::setSearchCategories(const QStringList &categories) {
+    // Every direction picked is the same as none: search them all.
+    QStringList list;
+    for (const auto &category : Store::categories())
+        if (categories.contains(category))
+            list << category;
+    if (list.size() == Store::categories().size())
+        list.clear();
+    if (list != m_searchCategories) {
+        m_searchCategories = list;
+        QSettings("writeuppulse", "writeuppulse").setValue("categories", list);
+        emit preferencesChanged();
+    }
+}
+
+void Backend::setPreferredCategories(const QStringList &categories) {
+    QStringList list;
+    for (const auto &category : Store::categories())
+        if (categories.contains(category))
+            list << category;
+    if (list != m_preferredCategories) {
+        m_preferredCategories = list;
+        QSettings("writeuppulse", "writeuppulse").setValue("preferred", list);
+        emit preferencesChanged();
+        rebuild();
+    }
+}
+
+void Backend::setNotice(const QString &notice) {
+    if (notice != m_notice) {
+        m_notice = notice;
+        emit noticeChanged();
+    }
+    if (!notice.isEmpty())
+        m_noticeTimer.start();
+}
+
+void Backend::setFilePicker(FilePicker *picker) {
+    m_picker = picker;
+    connect(picker, &FilePicker::saveSelected, this, &Backend::saveExport);
+    connect(picker, &FilePicker::failed, this, &Backend::setProblem);
+}
+
+void Backend::exportMarkdown(bool week) {
+    const QString date = m_date.isEmpty() ? QDate::currentDate().toString(Qt::ISODate) : m_date;
+    m_pendingExport = m_store.exportMarkdown(date, week, &m_progress);
+    if (m_pendingExport.isEmpty()) {
+        setProblem(tr("There is nothing to export yet."));
+        return;
+    }
+    if (!m_picker) {
+        setProblem(tr("The save dialog is not available."));
+        return;
+    }
+    const QString documents = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    const QString folder = QDir(documents).exists() ? documents : QDir::homePath();
+    m_picker->saveMarkdown(QUrl::fromLocalFile(QString("%1/writeuppulse-%2%3.md").arg(folder, week ? "week-" : "", date)));
+}
+
+void Backend::saveExport(const QUrl &url) {
+    const QByteArray data = m_pendingExport.toUtf8();
+    QSaveFile file(url.toLocalFile());
+    if (m_pendingExport.isEmpty() || !file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit()) {
+        setProblem(tr("Could not save %1.").arg(url.toLocalFile()));
+        return;
+    }
+    setProblem({});
+    setNotice(tr("Saved %1").arg(QFileInfo(url.toLocalFile()).fileName()));
+    m_pendingExport.clear();
 }
 
 void Backend::filtersChanged() {
@@ -164,6 +241,14 @@ void Backend::rebuild() {
         }
         items << item;
     }
+
+    // A day lists the directions the user prefers first, otherwise in the
+    // agent's order.
+    if (m_view == "day" && words.isEmpty() && !m_preferredCategories.isEmpty())
+        std::stable_sort(items.begin(), items.end(), [this](const QVariant &a, const QVariant &b) {
+            return m_preferredCategories.contains(a.toMap().value("category").toString())
+                   > m_preferredCategories.contains(b.toMap().value("category").toString());
+        });
 
     m_hiddenCount = hidden;
     if (items != m_items || shown != m_shownCategories) {

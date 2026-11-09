@@ -5,12 +5,14 @@
 #include <QDate>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QSaveFile>
 #include <QTextStream>
 
 #include "fetcher.h"
+#include "progress.h"
 #include "store.h"
 
 static const char *usage = R"(Usage: writeuppulse [command]
@@ -19,6 +21,10 @@ static const char *usage = R"(Usage: writeuppulse [command]
   fetch [--json]       Run the agent now and save today's digest
   list [--json]        List the saved days
   show [DATE] [--json] Print a day's digest as Markdown (latest by default)
+  export [DATE] [--week] [--output FILE] [--json]
+                       Export a day, or the week ending on it, as Markdown
+                       with your progress (latest day by default; stdout
+                       unless --output)
   skill install        Install the WriteupPulse skill for Claude Code
 )";
 
@@ -74,6 +80,36 @@ int runCli(int argc, char *argv[]) {
             print(digest);
         else
             QTextStream(stdout) << Store::markdown(digest);
+        return 0;
+    }
+
+    if (command == "export") {
+        const bool week = args.removeAll("--week") > 0;
+        QString output;
+        const int at = args.indexOf("--output");
+        if (at >= 0) {
+            output = args.value(at + 1);
+            args.remove(at, qMin(2, args.size() - at));
+            if (output.isEmpty())
+                return fail("--output needs a file name.");
+        }
+        const QString date = args.value(1, store.dates().value(0));
+        const Progress progress(store.directory());
+        const QString markdown = store.exportMarkdown(date, week, &progress);
+        if (markdown.isEmpty())
+            return fail(date.isEmpty() ? "No digests yet. Run `writeuppulse fetch`." : "No digest for " + date + ".");
+        if (output.isEmpty()) {
+            QTextStream(stdout) << markdown;
+            return 0;
+        }
+        QSaveFile file(output);
+        const QByteArray data = markdown.toUtf8();
+        if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit())
+            return fail("Could not write " + output);
+        if (json)
+            print({{"ok", true}, {"path", QFileInfo(output).absoluteFilePath()}});
+        else
+            QTextStream(stdout) << "Saved " << output << Qt::endl;
         return 0;
     }
 

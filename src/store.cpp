@@ -11,6 +11,8 @@
 #include <QStandardPaths>
 #include <QUrl>
 
+#include "progress.h"
+
 Store::Store(const QString &directory)
     : m_directory(!directory.isEmpty() ? directory
                   : !qEnvironmentVariableIsEmpty("WRITEUPPULSE_DATA") ? qEnvironmentVariable("WRITEUPPULSE_DATA")
@@ -169,7 +171,7 @@ QJsonObject Store::normalize(const QJsonObject &output, const QString &date, QSt
     return {{"date", date}, {"generatedAt", QDateTime::currentDateTime().toString(Qt::ISODate)}, {"items", items}};
 }
 
-QString Store::markdown(const QJsonObject &digest) {
+QString Store::markdown(const QJsonObject &digest, const Progress *progress) {
     QString md = QString("# WriteupPulse — %1\n").arg(digest.value("date").toString());
     int number = 0;
     for (const auto &value : digest.value("items").toArray()) {
@@ -181,6 +183,18 @@ QString Store::markdown(const QJsonObject &digest) {
         if (!meta.isEmpty())
             md += " · " + meta.join(" · ");
         md += "\n\n";
+        const QJsonObject state = progress ? progress->entry(item.value("url").toString()) : QJsonObject();
+        QStringList marks;
+        if (state.contains("read"))
+            marks << "✓ Read";
+        if (state.contains("lab"))
+            marks << "✓ Done in lab";
+        if (state.value("favorite").toBool())
+            marks << "★";
+        for (const auto &tag : state.value("tags").toArray())
+            marks << "#" + tag.toString();
+        if (!marks.isEmpty())
+            md += marks.join(" · ") + "\n\n";
         if (!item.value("why").toString().isEmpty())
             md += "*" + item.value("why").toString() + "*\n\n";
         md += item.value("summary").toString() + "\n";
@@ -195,8 +209,25 @@ QString Store::markdown(const QJsonObject &digest) {
                                                      entry.toObject().value("answer").toString());
         }
         const QStringList practice = strings(item.value("practice"));
+        const QJsonArray done = state.value("done").toArray();
         if (!practice.isEmpty())
-            md += "\n**Try it yourself**\n\n- [ ] " + practice.join("\n- [ ] ") + "\n";
+            md += "\n**Try it yourself**\n\n";
+        for (int i = 0; i < practice.size(); ++i)
+            md += QString("- [%1] %2\n").arg(done.contains(i) ? "x" : " ", practice.at(i));
     }
     return md;
+}
+
+QString Store::exportMarkdown(const QString &date, bool week, const Progress *progress) const {
+    const QDate last = QDate::fromString(date, Qt::ISODate);
+    QStringList days;
+    for (const auto &day : dates()) {
+        const QDate d = QDate::fromString(day, Qt::ISODate);
+        if (d == last || (week && d < last && d > last.addDays(-7)))
+            days.prepend(day);
+    }
+    QStringList parts;
+    for (const auto &day : days)
+        parts << markdown(digest(day), progress);
+    return parts.join("\n---\n\n");
 }

@@ -1,7 +1,7 @@
 pkgname=writeuppulse
 pkgver=0.1.0
 pkgrel=1
-pkgdesc='Daily digest of popular technical writeups, summarized by Claude'
+pkgdesc='Learn every day from popular technical writeups, summarized by Claude'
 arch=('x86_64' 'aarch64')
 license=('MIT')
 depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'systemd')

@@ -6,6 +6,7 @@
 #include <QTimer>
 #include <QVariantList>
 
+#include "filepicker.h"
 #include "progress.h"
 #include "store.h"
 
@@ -42,6 +43,10 @@ class Backend : public QObject {
     Q_PROPERTY(QStringList tags READ tags NOTIFY progressChanged)
     Q_PROPERTY(int favoriteCount READ favoriteCount NOTIFY progressChanged)
     Q_PROPERTY(QStringList levels READ levels CONSTANT)
+    Q_PROPERTY(QStringList topics READ topics CONSTANT)
+    Q_PROPERTY(QStringList searchCategories READ searchCategories WRITE setSearchCategories NOTIFY preferencesChanged)
+    Q_PROPERTY(QStringList preferredCategories READ preferredCategories WRITE setPreferredCategories NOTIFY preferencesChanged)
+    Q_PROPERTY(QString notice READ notice NOTIFY noticeChanged)
 
 public:
     explicit Backend(const QString &directory = {}, bool systemd = true, QObject *parent = nullptr);
@@ -69,6 +74,19 @@ public:
     int favoriteCount() const { return m_progress.favorites().size(); }
     QStringList levels() const { return Store::levels(); }
     Q_INVOKABLE QString topicOf(const QString &category) const { return Store::topicOf(category); }
+    QStringList topics() const { return Store::topics(); }
+    Q_INVOKABLE QStringList categoriesOf(const QString &topic) const { return Store::categories(topic); }
+    // Which directions the agent searches (empty means all) and which it
+    // picks more often; kept in settings, where the fetch reads them.
+    QStringList searchCategories() const { return m_searchCategories; }
+    void setSearchCategories(const QStringList &categories);
+    QStringList preferredCategories() const { return m_preferredCategories; }
+    void setPreferredCategories(const QStringList &categories);
+    QString notice() const { return m_notice; }
+
+    // The picker answers asynchronously; the export is written when it does.
+    void setFilePicker(FilePicker *picker);
+    Q_INVOKABLE void exportMarkdown(bool week);
     bool running() const { return m_lockHeld || m_starting.isActive(); }
     QDateTime lastRun() const { return m_lastRun; }
     bool lastOk() const { return m_lastOk; }
@@ -108,6 +126,8 @@ signals:
     void problemChanged();
     void languageChanged();
     void progressChanged();
+    void preferencesChanged();
+    void noticeChanged();
 
 private:
     void reload();
@@ -118,6 +138,8 @@ private:
     bool systemctl(const QStringList &arguments, QString *output = nullptr);
     void readTimer();
     void progressSaved(bool ok);
+    void saveExport(const QUrl &url);
+    void setNotice(const QString &notice);
 
     Store m_store;
     Progress m_progress;
@@ -136,6 +158,11 @@ private:
     bool m_hideRead = false;
     bool m_deepMode = false;
     int m_hiddenCount = 0;
+    QStringList m_searchCategories, m_preferredCategories;
+    FilePicker *m_picker = nullptr;
+    QString m_pendingExport;
+    QString m_notice;
+    QTimer m_noticeTimer;
     bool m_lockHeld = false;
     QDateTime m_lastRun;
     bool m_lastOk = true;

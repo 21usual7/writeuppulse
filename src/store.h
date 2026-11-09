@@ -4,6 +4,8 @@
 #include <QString>
 #include <QStringList>
 
+class Progress;
+
 // The digests on disk: one <date>.json and <date>.md per day, plus
 // status.json for the last run, all in ~/.local/share/writeuppulse.
 class Store {
@@ -28,7 +30,11 @@ public:
     static QStringList levels();
 
     static QJsonObject normalize(const QJsonObject &output, const QString &date, QString *error);
-    static QString markdown(const QJsonObject &digest);
+    // With progress, the Markdown also says what the user read, did in a lab,
+    // tagged, and checked off.
+    static QString markdown(const QJsonObject &digest, const Progress *progress = nullptr);
+    // One day, or the seven days ending on it, oldest first.
+    QString exportMarkdown(const QString &date, bool week, const Progress *progress = nullptr) const;
 
 private:
     QString m_directory;

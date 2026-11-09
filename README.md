@@ -1,6 +1,6 @@
 # WriteupPulse
 
-![WriteupPulse showing today's writeups](docs/screenshot.png)
+![WriteupPulse showing a writeup in the deep view](docs/screenshot.png)
 
 Every morning WriteupPulse has Claude Code look through Hacker News, r/netsec,
 r/programming, lobste.rs, GitHub Trending, and engineering blogs. It picks the
@@ -42,6 +42,11 @@ you control. WriteupPulse is for understanding, not attacking: the agent is told
 never to write code, commands, payloads, or exploits, and the app cuts out any
 code block that slips through.
 
+**Directions** (P) picks which directions the agent searches and stars the ones it
+should pick more often; starred directions also come first in each day. **Export**
+(E) saves the day, or the week ending on it, as Markdown through the desktop's save
+dialog, with your read marks, tags, and checked practice items.
+
 Mark writeups as read (M), done in a lab (B), or favorite (F), and tag favorites.
 Filters narrow a day by direction, level, and read state; search covers every
 saved day. Your progress lives in `~/.local/share/writeuppulse/progress.json`,
@@ -64,6 +69,7 @@ Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`
 | `writeuppulse fetch [--json]` | Run the agent now and save today's digest |
 | `writeuppulse list [--json]` | List the saved days |
 | `writeuppulse show [DATE] [--json]` | Print a day's digest |
+| `writeuppulse export [DATE] [--week] [--output FILE]` | Export a day or week as Markdown with your progress |
 | `writeuppulse skill install` | Install a Claude Code skill for reading digests |
 
 ## Shortcuts
@@ -81,6 +87,8 @@ Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`
 | H | Hide or show read writeups |
 | Ctrl+F or / | Search all saved writeups |
 | S | Statistics |
+| P | Directions the agent searches |
+| E | Export the day or week as Markdown |
 | R | Fetch today's writeups now |
 | ? | Show or hide shortcuts |
 | Q | Quit |

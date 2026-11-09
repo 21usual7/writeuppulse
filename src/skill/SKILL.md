@@ -11,6 +11,9 @@ and `<date>.md`. Use its commands instead of reading the files by hand:
 - `writeuppulse list --json` lists the saved days, newest first.
 - `writeuppulse show [DATE]` prints a day's digest as Markdown; `--json` gives
   the items with title, url, source, popularity, why, summary, takeaways, tags.
+- `writeuppulse export [DATE] [--week] [--output FILE]` writes a day, or the
+  week ending on it, as Markdown with the user's read marks, tags, and checked
+  practice items.
 - `writeuppulse fetch --json` runs a new search now. It takes several minutes
   and spends Claude usage, so only run it when the user asks for a refresh.
 

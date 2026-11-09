@@ -55,6 +55,12 @@ One binary, two modes (`src/main.cpp`): any first argument other than `open` goe
   app is for learning, not attacking: the prompt forbids code/commands/payloads/PoCs,
   the schema has no code field, and `normalize` strips fenced code blocks. Old digests
   lack these fields and must still render.
+- **Preferences and export:** the Directions popup writes `categories` (empty = all)
+  and `preferred` to `QSettings`; `Fetcher::prompt` reads them, and `Backend::rebuild`
+  puts preferred directions first in a day. Export goes through `FilePicker`
+  (abstract; tests inject a fake) → `PortalFilePicker`, adapted from Omacut, which
+  asks xdg-desktop-portal's `SaveFile`; `Store::exportMarkdown` builds the text with
+  the user's progress. `writeuppulse export` does the same headless.
 - **Language:** one picker (en/ru/uk) stored in `QSettings("writeuppulse","writeuppulse")`
   drives both the UI (`Translator::setOverride`) and the summary language in the prompt
   (`Fetcher::language()`); unset → Omarchy's language if offered, else English.
@@ -74,6 +80,8 @@ One binary, two modes (`src/main.cpp`): any first argument other than `open` goe
 - Offscreen rendering (`QT_QPA_PLATFORM=offscreen`) does not draw Material button and
   popup backgrounds. For screenshots that must look real, run the QML harness with
   `QT_QPA_PLATFORM=wayland` and `grabWindow()`.
+- The QML harness must run with its own `XDG_CONFIG_HOME`: pressing keys like D or H
+  in it otherwise writes into the user's real `~/.config/writeuppulse`.
 - A real `writeuppulse fetch` spends the user's Claude usage and takes minutes; don't
   run it just to test — use the fake `claude` script pattern in the tests.
 
