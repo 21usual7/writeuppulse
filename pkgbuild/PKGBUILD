@@ -1,5 +1,5 @@
 pkgname=writeuppulse
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc='Learn every day from popular technical writeups, summarized by Claude'
 arch=('x86_64' 'aarch64')

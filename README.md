@@ -11,6 +11,10 @@ window shows today's picks and every earlier day.
 The agent gets only web search and web fetch. It has no shell and no file
 access, and it answers with JSON that WriteupPulse checks before saving.
 
+You don't need an agent of your own: the daily picks are published at
+[21usual7.github.io/writeuppulse](https://21usual7.github.io/writeuppulse/), and
+the app downloads them from there by default.
+
 ## Install
 
 Out of the box, WriteupPulse downloads the writeups published on
@@ -19,20 +23,34 @@ is needed. To run your own agent instead, install
 [Claude Code](https://claude.com/claude-code), sign in (`claude`), and pick
 **My Claude Code** under **Writeups from** in Settings (P).
 
+On Arch or Omarchy, download the package from
+[Releases](https://github.com/21usual7/writeuppulse/releases/latest), then:
+
 ```sh
+sudo pacman -U writeuppulse-*.pkg.tar.zst
+systemctl --user enable --now writeuppulse.timer
+```
+
+Or build it from source:
+
+```sh
+git clone https://github.com/21usual7/writeuppulse.git
+cd writeuppulse
 bin/install
 ```
 
 This builds the package, installs it with `makepkg -fsi`, and turns on the
-daily timer. WriteupPulse then shows up in the app launcher (`Super + Space`).
+daily timer. Either way, WriteupPulse then shows up in the app launcher
+(`Super + Space`).
 
 ## How it runs
 
 - `writeuppulse.timer` starts `writeuppulse.service` (`writeuppulse update`:
-  download from the site, or run your agent) every day at 08:00. While the
-  window is open, it also checks the site every hour. If the
-  machine was off then, it runs on the next boot. Turn it off and on with the
-  switch in the window, or with `systemctl --user disable --now writeuppulse.timer`.
+  download from the site, or run your agent) every day at 08:00. If the machine
+  was off then, it runs on the next boot. Turn it off and on with the switch in
+  the window, or with `systemctl --user disable --now writeuppulse.timer`.
+- While the window is open and it reads the site, it also checks for new days
+  every hour.
 - **Refresh now** starts the same service, so a fetch keeps going after the
   window closes. A fetch takes a few minutes. Logs: `journalctl --user -u writeuppulse`.
 - Digests are saved as `~/.local/share/writeuppulse/<date>.json` and `<date>.md`.
@@ -63,53 +81,6 @@ day, or the week ending on it, as Markdown through the desktop's save dialog, wi
 your read marks, tags, and checked practice items. Progress lives in
 `~/.local/share/writeuppulse/progress.json`; Statistics shows the streak and what
 you read most.
-
-## Install
-
-Out of the box, WriteupPulse downloads the writeups published on
-[the WriteupPulse site](https://21usual7.github.io/writeuppulse/): nothing else
-is needed. To run your own agent instead, install
-[Claude Code](https://claude.com/claude-code), sign in (`claude`), and pick
-**My Claude Code** under **Writeups from** in Settings (P).
-
-```sh
-bin/install
-```
-
-This builds the package, installs it with `makepkg -fsi`, and turns on the
-daily timer. WriteupPulse then shows up in the app launcher (`Super + Space`).
-
-## How it runs
-
-- `writeuppulse.timer` starts `writeuppulse.service` (`writeuppulse update`:
-  download from the site, or run your agent) every day at 08:00. While the
-  window is open, it also checks the site every hour. If the
-  machine was off then, it runs on the next boot. Turn it off and on with the
-  switch in the window, or with `systemctl --user disable --now writeuppulse.timer`.
-- **Refresh now** starts the same service, so a fetch keeps going after the
-  window closes. A fetch takes a few minutes. Logs: `journalctl --user -u writeuppulse`.
-- Digests are saved as `~/.local/share/writeuppulse/<date>.json` and `<date>.md`.
-
-## Learning
-
-Each writeup comes with its direction (Web, Pwn, Reverse, Crypto, Cloud Security,
-Red Team, Blue Team, Malware, OSINT, LLM & Agents, ML Engineering, Systems &
-Performance, Backend & Databases, DevOps & Infra, Postmortems, Other) and a level
-(Junior, Middle, Senior). The deep view adds 5–8 takeaways, self-check questions
-with hidden answers, and a "Try it yourself" checklist of practice ideas for a lab
-you control. WriteupPulse is for understanding, not attacking: the agent is told
-never to write code, commands, payloads, or exploits, and the app cuts out any
-code block that slips through.
-
-**Directions** (P) picks which directions the agent searches and stars the ones it
-should pick more often; starred directions also come first in each day. **Export**
-(E) saves the day, or the week ending on it, as Markdown through the desktop's save
-dialog, with your read marks, tags, and checked practice items.
-
-Mark writeups as read (M), done in a lab (B), or favorite (F), and tag favorites.
-Filters narrow a day by direction, level, and read state; search covers every
-saved day. Your progress lives in `~/.local/share/writeuppulse/progress.json`,
-and Statistics shows the reading streak, counts, and directions you read most.
 
 Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`),
 `WRITEUPPULSE_CLAUDE` (path to `claude` if it isn't found),
