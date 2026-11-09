@@ -27,7 +27,8 @@ switching to `bin/install`, remove those copies first or they shadow the package
 
 One binary, two modes (`src/main.cpp`): any first argument other than `open` goes to
 `runCli` (`src/cli.cpp`, headless `QCoreApplication`: `fetch`, `list`, `show`,
-`export`, `publish`, `skill install`, all with `--json`); otherwise the QML window.
+`update`, `sync`, `export`, `publish`, `skill install`, all with `--json`); otherwise
+the QML window.
 
 - **Fetch path:** `Fetcher` (`src/fetcher.cpp`) runs `claude -p <prompt>` with only
   `WebSearch,WebFetch` tools, `--strict-mcp-config`, `--output-format json` and a
@@ -76,6 +77,16 @@ One binary, two modes (`src/main.cpp`): any first argument other than `open` goe
   Agent text goes into the DOM only via text nodes; only http(s) URLs become links.
   Preview: `writeuppulse publish site/data` (ignored by git), then
   `python3 -m http.server -d site`.
+- **Two sources:** QSettings `source` = `feed` (default) or `claude`. `update` (what
+  the unit runs) dispatches to `sync` or `fetch`. `Syncer` (`src/syncer.cpp`) gets
+  `index.json` and new or re-published days (by `generatedAt`) from the site with
+  `QNetworkAccessManager` (size caps, transfer timeout), checks dates before they become
+  file names, runs `normalize`, and saves through `Store` under the same lock and
+  `status.json` as a fetch. In feed mode the window syncs on open and hourly if the last
+  run is over 30 min old (only with `systemd` true, so tests never start anything).
+  Tests use a `file://` feed. The maintainer's machine has `source=claude` and a local
+  unit that runs `fetch` plus a drop-in (`writeuppulse.service.d/publish.conf`) that runs
+  `bin/publish` after it.
 - **Look:** the app has its own palette on purpose (the user chose it over following the
   Omarchy theme): colours, fonts, and radius live in the `Style` QML singleton
   (`src/Style.qml`, registered by `src/qmldir`). Layout is a reader — icon rail, list

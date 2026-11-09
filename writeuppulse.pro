@@ -1,4 +1,4 @@
-QT += core gui qml quick quickcontrols2 dbus
+QT += core gui qml quick quickcontrols2 dbus network
 
 CONFIG += c++17 release
 TARGET = writeuppulse
@@ -12,6 +12,7 @@ HEADERS += \
     src/portalfilepicker.h \
     src/progress.h \
     src/store.h \
+    src/syncer.h \
     src/translator.h
 
 SOURCES += \
@@ -22,6 +23,7 @@ SOURCES += \
     src/portalfilepicker.cpp \
     src/progress.cpp \
     src/store.cpp \
+    src/syncer.cpp \
     src/translator.cpp
 
 RESOURCES += src/resources.qrc

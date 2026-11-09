@@ -18,7 +18,6 @@
   "Fetch today's writeups now": "Завантажити сьогоднішні розбори зараз",
   "Show or hide shortcuts": "Показати або сховати клавіші",
   "Quit": "Вийти",
-  "Could not start a fetch.": "Не вдалося запустити завантаження.",
   "Could not change the daily timer: %1": "Не вдалося змінити щоденний таймер: %1",
   "Read": "Прочитано",
   "Mark read": "Позначити прочитаним",
@@ -115,5 +114,16 @@
   "The language is used for the window and for new summaries, from the next fetch on.": "Мова вікна й нових самарі, починаючи з наступного завантаження.",
   "Unread": "Непрочитані",
   "Read it": "Читати",
-  "←  previous step     Space  reveal or next     →  next step     M  mark read     Esc  back to the list": "←  назад     Пробіл  показати або далі     →  далі     M  прочитано     Esc  до списку"
+  "←  previous step     Space  reveal or next     →  next step     M  mark read     Esc  back to the list": "←  назад     Пробіл  показати або далі     →  далі     M  прочитано     Esc  до списку",
+  "Downloading new writeups…": "Завантажую нові розбори…",
+  "Downloading writeups from the site…": "Завантажую розбори з сайту…",
+  "No writeups yet. Press R to download them.": "Розборів поки немає. Натисніть R, щоб завантажити.",
+  "Writeups from": "Звідки розбори",
+  "The WriteupPulse site": "Сайт WriteupPulse",
+  "My Claude Code": "Мій Claude Code",
+  "New days come from the WriteupPulse site as soon as they are published. No Claude Code needed.": "Нові дні надходять із сайту WriteupPulse одразу після публікації. Claude Code не потрібен.",
+  "Your own Claude Code finds and summarizes the writeups every morning, using your Claude usage.": "Ваш Claude Code щоранку знаходить і переказує розбори, витрачаючи ваш ліміт Claude.",
+  "The language is used for the window. Summaries from the site stay in the language they were published in.": "Мова використовується для вікна. Перекази з сайту лишаються мовою публікації.",
+  "Star the directions you want first in each day. The highlighted ones only matter with your own Claude Code.": "Позначте зірочкою напрями, які потрібні першими в кожному дні. Виділення важливе лише для власного Claude Code.",
+  "Could not start an update.": "Не вдалося запустити оновлення."
 }

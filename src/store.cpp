@@ -264,8 +264,9 @@ bool Store::publish(const QString &directory, QString *error) const {
     const Store site(directory);
     QJsonArray days;
     for (const auto &date : site.dates()) {
+        const QJsonObject published = site.digest(date);
         QJsonArray items;
-        for (const auto &value : site.digest(date).value("items").toArray()) {
+        for (const auto &value : published.value("items").toArray()) {
             const QJsonObject item = value.toObject();
             items.append(QJsonObject{
                 {"title", item.value("title")},
@@ -276,7 +277,7 @@ bool Store::publish(const QString &directory, QString *error) const {
                 {"tags", item.value("tags")},
             });
         }
-        days.append(QJsonObject{{"date", date}, {"items", items}});
+        days.append(QJsonObject{{"date", date}, {"generatedAt", published.value("generatedAt")}, {"items", items}});
     }
     if (!writeAtomically(directory + "/index.json", QJsonDocument(QJsonObject{{"days", days}}).toJson(QJsonDocument::Compact))) {
         if (error)

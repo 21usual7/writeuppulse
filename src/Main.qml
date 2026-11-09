@@ -107,9 +107,13 @@ ApplicationWindow {
         return new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString(Qt.locale(), "dddd, d MMMM")
     }
 
+    // Only running the agent here needs Claude Code; reading the site doesn't.
+    readonly property bool agentNeeded: backend.agentMissing && backend.source === "claude"
+
     function statusText() {
         translator.language
-        if (backend.running) return qsTr("Searching and summarizing, this takes a few minutes…")
+        if (backend.running) return backend.source === "feed" ? qsTr("Downloading new writeups…")
+                                                              : qsTr("Searching and summarizing, this takes a few minutes…")
         if (isNaN(backend.lastRun.getTime())) return qsTr("Never synced")
         const when = backend.lastRun.toLocaleString(Qt.locale(), Locale.ShortFormat)
         return backend.lastOk ? qsTr("Last sync %1").arg(when)
@@ -134,8 +138,10 @@ ApplicationWindow {
     }
 
     function emptyText() {
-        if (backend.running && !backend.dates.length) return qsTr("The agent is reading today's writeups…")
-        if (!backend.dates.length) return qsTr("No writeups yet. Press R to fetch today's.")
+        if (backend.running && !backend.dates.length) return backend.source === "feed" ? qsTr("Downloading writeups from the site…")
+                                                                                      : qsTr("The agent is reading today's writeups…")
+        if (!backend.dates.length) return backend.source === "feed" ? qsTr("No writeups yet. Press R to download them.")
+                                                                    : qsTr("No writeups yet. Press R to fetch today's.")
         if (backend.hiddenCount > 0) return qsTr("Every writeup here is hidden by the filters.")
         if (win.searching) return qsTr("Nothing found.")
         if (backend.view === "favorites") return qsTr("No favorites yet. Press F on a writeup to keep it here.")
@@ -323,7 +329,7 @@ ApplicationWindow {
                                 Menu {
                                     id: moreMenu
                                     width: 260
-                                    MenuItem { text: qsTr("Refresh now"); enabled: !backend.running && !backend.agentMissing; onTriggered: backend.refresh() }
+                                    MenuItem { text: qsTr("Refresh now"); enabled: !backend.running && !win.agentNeeded; onTriggered: backend.refresh() }
                                     MenuSeparator {}
                                     MenuItem { text: qsTr("This day as Markdown"); enabled: backend.dates.length > 0; onTriggered: backend.exportMarkdown(false) }
                                     MenuItem { text: qsTr("This week as Markdown"); enabled: backend.dates.length > 0; onTriggered: backend.exportMarkdown(true) }
@@ -357,7 +363,7 @@ ApplicationWindow {
                                 ToolTip.text: text
                             }
                             Text {
-                                visible: !backend.running && !backend.agentMissing
+                                visible: !backend.running && !win.agentNeeded
                                 text: "↻ " + qsTr("Refresh")
                                 color: Style.accent
                                 font.family: Style.sans
@@ -449,7 +455,7 @@ ApplicationWindow {
                             color: Style.danger
                             font.family: Style.sans
                             font.pixelSize: 12
-                            text: backend.agentMissing
+                            text: win.agentNeeded
                                   ? qsTr("Claude Code isn't installed, so there is no agent to fetch writeups. Install it and sign in with `claude`.")
                                   : backend.problem
                         }
@@ -593,6 +599,31 @@ ApplicationWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 14
+                        Text { text: qsTr("Writeups from"); color: Style.muted; font.family: Style.sans; font.pixelSize: 14 }
+                        Repeater {
+                            model: [["feed", qsTr("The WriteupPulse site")], ["claude", qsTr("My Claude Code")]]
+                            Pill {
+                                required property var modelData
+                                text: modelData[1]
+                                on: backend.source === modelData[0]
+                                onClicked: backend.source = modelData[0]
+                            }
+                        }
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        wrapMode: Text.Wrap
+                        text: backend.source === "feed"
+                              ? qsTr("New days come from the WriteupPulse site as soon as they are published. No Claude Code needed.")
+                              : qsTr("Your own Claude Code finds and summarizes the writeups every morning, using your Claude usage.")
+                        color: Style.faint
+                        font.family: Style.sans
+                        font.pixelSize: 12
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 14
                         Text { text: qsTr("Language"); color: Style.muted; font.family: Style.sans; font.pixelSize: 14 }
                         Repeater {
                             model: [["en", "English"], ["ru", "Русский"], ["uk", "Українська"]]
@@ -614,7 +645,9 @@ ApplicationWindow {
                     Text {
                         Layout.fillWidth: true
                         wrapMode: Text.Wrap
-                        text: qsTr("The language is used for the window and for new summaries, from the next fetch on.")
+                        text: backend.source === "feed"
+                              ? qsTr("The language is used for the window. Summaries from the site stay in the language they were published in.")
+                              : qsTr("The language is used for the window and for new summaries, from the next fetch on.")
                         color: Style.faint
                         font.family: Style.sans
                         font.pixelSize: 12
@@ -628,7 +661,9 @@ ApplicationWindow {
                         color: Style.muted
                         font.family: Style.sans
                         font.pixelSize: 13
-                        text: qsTr("The agent searches the highlighted directions, from the next fetch on. Star the ones it should pick more often; they also come first in each day.")
+                        text: backend.source === "feed"
+                              ? qsTr("Star the directions you want first in each day. The highlighted ones only matter with your own Claude Code.")
+                              : qsTr("The agent searches the highlighted directions, from the next fetch on. Star the ones it should pick more often; they also come first in each day.")
                     }
                     Repeater {
                         model: backend.topics

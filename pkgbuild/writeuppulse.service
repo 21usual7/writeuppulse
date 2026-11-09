@@ -1,11 +1,11 @@
 [Unit]
-Description=WriteupPulse daily digest of technical writeups
+Description=WriteupPulse daily digest of technical writeups (from the site or your own agent)
 Wants=network-online.target
 After=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/writeuppulse fetch
+ExecStart=/usr/bin/writeuppulse update
 TimeoutStartSec=40min
 # A morning run right after resume can find no network yet; try again a bit later.
 Restart=on-failure

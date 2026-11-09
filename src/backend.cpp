@@ -13,6 +13,7 @@
 #include <QStandardPaths>
 
 #include "fetcher.h"
+#include "syncer.h"
 
 static QByteArray stamp(const QString &path);
 
@@ -21,6 +22,7 @@ Backend::Backend(const QString &directory, bool systemd, QObject *parent)
     QDir().mkpath(m_store.directory());
     m_agentMissing = Fetcher::findClaude().isEmpty();
     m_language = Fetcher::language();
+    m_source = Syncer::source();
     const QSettings settings("writeuppulse", "writeuppulse");
     m_hideRead = settings.value("hideRead", false).toBool();
     m_searchCategories = settings.value("categories").toStringList();
@@ -46,6 +48,32 @@ Backend::Backend(const QString &directory, bool systemd, QObject *parent)
     if (m_systemd)
         readTimer();
     reload();
+
+    // Readers of the site's feed get new days while the window is open, not
+    // only from the morning timer: the site updates whenever its agent runs.
+    if (m_systemd) {
+        m_syncTimer.setInterval(60 * 60 * 1000);
+        connect(&m_syncTimer, &QTimer::timeout, this, &Backend::syncIfStale);
+        m_syncTimer.start();
+        syncIfStale();
+    }
+}
+
+void Backend::syncIfStale() {
+    if (m_source == "feed" && !running()
+        && (!m_lastRun.isValid() || m_lastRun.secsTo(QDateTime::currentDateTime()) > 30 * 60))
+        refresh();
+}
+
+void Backend::setSource(const QString &source) {
+    if (source == m_source)
+        return;
+    Syncer::setSource(source);
+    m_source = Syncer::source();
+    emit sourceChanged();
+    setProblem({});
+    if (m_source == "feed")
+        refresh();
 }
 
 void Backend::setLanguage(const QString &language) {
@@ -396,7 +424,7 @@ void Backend::readTimer() {
 void Backend::refresh() {
     if (running())
         return;
-    if (m_agentMissing) {
+    if (m_source == "claude" && m_agentMissing) {
         setProblem(tr("Claude Code isn't installed, so there is no agent to fetch writeups. Install it and sign in with `claude`."));
         return;
     }
@@ -405,8 +433,8 @@ void Backend::refresh() {
     // Through systemd when the package is installed, so the fetch outlives
     // the window and lands in the journal; straight from this binary otherwise.
     if (!(m_systemd && systemctl({"start", "--no-block", "writeuppulse.service"}))
-        && !QProcess::startDetached(QCoreApplication::applicationFilePath(), {"fetch"})) {
-        setProblem(tr("Could not start a fetch."));
+        && !QProcess::startDetached(QCoreApplication::applicationFilePath(), {"update"})) {
+        setProblem(tr("Could not start an update."));
         return;
     }
     m_starting.start();

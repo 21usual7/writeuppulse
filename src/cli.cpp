@@ -14,10 +14,14 @@
 #include "fetcher.h"
 #include "progress.h"
 #include "store.h"
+#include "syncer.h"
 
 static const char *usage = R"(Usage: writeuppulse [command]
 
   open                 Open the window (the default)
+  update [--json]      Sync from the site or run the agent, as set in the
+                       window (the timer runs this)
+  sync [--json]        Download new days published on the WriteupPulse site
   fetch [--json]       Run the agent now and save today's digest
   list [--json]        List the saved days
   show [DATE] [--json] Print a day's digest as Markdown (latest by default)
@@ -44,7 +48,9 @@ int runCli(int argc, char *argv[]) {
     app.setApplicationName("writeuppulse");
     QStringList args = app.arguments().mid(1);
     const bool json = args.removeAll("--json") > 0;
-    const QString command = args.value(0);
+    QString command = args.value(0);
+    if (command == "update")
+        command = Syncer::source() == "claude" ? "fetch" : "sync";
     Store store;
 
     if (command == "fetch") {
@@ -60,6 +66,19 @@ int runCli(int argc, char *argv[]) {
             print({{"ok", true}, {"date", date}, {"count", count}, {"path", store.directory() + "/" + date + ".md"}});
         else
             QTextStream(stdout) << QString("Saved %1 writeups to %2/%3.md").arg(count).arg(store.directory(), date) << Qt::endl;
+        return 0;
+    }
+
+    if (command == "sync") {
+        Syncer syncer(store);
+        QString error;
+        int count = 0;
+        if (!syncer.run(&error, &count))
+            return fail(error);
+        if (json)
+            print({{"ok", true}, {"count", count}, {"feed", syncer.feed().toString()}});
+        else
+            QTextStream(stdout) << QString("Downloaded %1 new days from %2").arg(count).arg(syncer.feed().toString()) << Qt::endl;
         return 0;
     }
 

@@ -13,7 +13,11 @@ access, and it answers with JSON that WriteupPulse checks before saving.
 
 ## Install
 
-Needs [Claude Code](https://claude.com/claude-code), signed in (`claude`).
+Out of the box, WriteupPulse downloads the writeups published on
+[the WriteupPulse site](https://21usual7.github.io/writeuppulse/): nothing else
+is needed. To run your own agent instead, install
+[Claude Code](https://claude.com/claude-code), sign in (`claude`), and pick
+**My Claude Code** under **Writeups from** in Settings (P).
 
 ```sh
 bin/install
@@ -24,7 +28,9 @@ daily timer. WriteupPulse then shows up in the app launcher (`Super + Space`).
 
 ## How it runs
 
-- `writeuppulse.timer` starts `writeuppulse.service` every day at 08:00. If the
+- `writeuppulse.timer` starts `writeuppulse.service` (`writeuppulse update`:
+  download from the site, or run your agent) every day at 08:00. While the
+  window is open, it also checks the site every hour. If the
   machine was off then, it runs on the next boot. Turn it off and on with the
   switch in the window, or with `systemctl --user disable --now writeuppulse.timer`.
 - **Refresh now** starts the same service, so a fetch keeps going after the
@@ -60,7 +66,11 @@ you read most.
 
 ## Install
 
-Needs [Claude Code](https://claude.com/claude-code), signed in (`claude`).
+Out of the box, WriteupPulse downloads the writeups published on
+[the WriteupPulse site](https://21usual7.github.io/writeuppulse/): nothing else
+is needed. To run your own agent instead, install
+[Claude Code](https://claude.com/claude-code), sign in (`claude`), and pick
+**My Claude Code** under **Writeups from** in Settings (P).
 
 ```sh
 bin/install
@@ -71,7 +81,9 @@ daily timer. WriteupPulse then shows up in the app launcher (`Super + Space`).
 
 ## How it runs
 
-- `writeuppulse.timer` starts `writeuppulse.service` every day at 08:00. If the
+- `writeuppulse.timer` starts `writeuppulse.service` (`writeuppulse update`:
+  download from the site, or run your agent) every day at 08:00. While the
+  window is open, it also checks the site every hour. If the
   machine was off then, it runs on the next boot. Turn it off and on with the
   switch in the window, or with `systemctl --user disable --now writeuppulse.timer`.
 - **Refresh now** starts the same service, so a fetch keeps going after the
@@ -100,7 +112,8 @@ saved day. Your progress lives in `~/.local/share/writeuppulse/progress.json`,
 and Statistics shows the reading streak, counts, and directions you read most.
 
 Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`),
-`WRITEUPPULSE_CLAUDE` (path to `claude` if it isn't found), and
+`WRITEUPPULSE_CLAUDE` (path to `claude` if it isn't found),
+`WRITEUPPULSE_FEED` (the site's data URL, for a fork), and
 `WRITEUPPULSE_DATA` (the data directory).
 
 ## Commands
@@ -108,6 +121,8 @@ Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`
 | Command | What it does |
 | --- | --- |
 | `writeuppulse` / `writeuppulse open` | Open the window |
+| `writeuppulse update [--json]` | Download from the site or run the agent, as set in Settings |
+| `writeuppulse sync [--json]` | Download new days from the site |
 | `writeuppulse fetch [--json]` | Run the agent now and save today's digest |
 | `writeuppulse list [--json]` | List the saved days |
 | `writeuppulse show [DATE] [--json]` | Print a day's digest |

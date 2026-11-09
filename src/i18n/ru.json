@@ -18,7 +18,6 @@
   "Fetch today's writeups now": "Загрузить сегодняшние разборы сейчас",
   "Show or hide shortcuts": "Показать или скрыть клавиши",
   "Quit": "Выйти",
-  "Could not start a fetch.": "Не удалось запустить загрузку.",
   "Could not change the daily timer: %1": "Не удалось изменить ежедневный таймер: %1",
   "Read": "Прочитано",
   "Mark read": "Отметить прочитанным",
@@ -115,5 +114,16 @@
   "The language is used for the window and for new summaries, from the next fetch on.": "Язык окна и новых саммари, начиная со следующей загрузки.",
   "Unread": "Непрочитанные",
   "Read it": "Читать",
-  "←  previous step     Space  reveal or next     →  next step     M  mark read     Esc  back to the list": "←  назад     Пробел  показать или дальше     →  дальше     M  прочитано     Esc  к списку"
+  "←  previous step     Space  reveal or next     →  next step     M  mark read     Esc  back to the list": "←  назад     Пробел  показать или дальше     →  дальше     M  прочитано     Esc  к списку",
+  "Downloading new writeups…": "Загружаю новые разборы…",
+  "Downloading writeups from the site…": "Загружаю разборы с сайта…",
+  "No writeups yet. Press R to download them.": "Разборов пока нет. Нажмите R, чтобы загрузить.",
+  "Writeups from": "Откуда разборы",
+  "The WriteupPulse site": "Сайт WriteupPulse",
+  "My Claude Code": "Мой Claude Code",
+  "New days come from the WriteupPulse site as soon as they are published. No Claude Code needed.": "Новые дни приходят с сайта WriteupPulse сразу после публикации. Claude Code не нужен.",
+  "Your own Claude Code finds and summarizes the writeups every morning, using your Claude usage.": "Ваш Claude Code каждое утро находит и пересказывает разборы, расходуя ваш лимит Claude.",
+  "The language is used for the window. Summaries from the site stay in the language they were published in.": "Язык используется для окна. Пересказы с сайта остаются на языке публикации.",
+  "Star the directions you want first in each day. The highlighted ones only matter with your own Claude Code.": "Отметьте звёздочкой направления, которые нужны первыми в каждом дне. Выделение важно только для своего Claude Code.",
+  "Could not start an update.": "Не удалось запустить обновление."
 }

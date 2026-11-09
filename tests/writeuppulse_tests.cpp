@@ -14,6 +14,7 @@
 #include "filepicker.h"
 #include "progress.h"
 #include "store.h"
+#include "syncer.h"
 #include "translator.h"
 
 // Answers the save dialog at once with a fixed file.
@@ -333,6 +334,54 @@ private slots:
         QCOMPARE(days.size(), 2);
         QCOMPARE(days[0]["items"][0]["title"].toString(), QString("New"));
         QCOMPARE(days[1]["items"][0]["topic"].toString(), QString("Other"));
+    }
+
+    void syncDownloadsOnlyNewCheckedDays()
+    {
+        QTemporaryDir author, site, reader;
+        QJsonObject day = Store::normalize(QJsonObject{{"items", QJsonArray{QJsonObject{
+            {"title", "Shared"}, {"url", "https://example.com/s"}, {"summary", "S"}, {"category", "Pwn"}}}}},
+            "2026-11-09", nullptr);
+        QVERIFY(Store(author.path()).saveDigest(day, nullptr));
+        QVERIFY(Store(author.path()).publish(site.path(), nullptr));
+
+        const Store store(reader.path());
+        Syncer syncer(store, QUrl::fromLocalFile(site.path()));
+        QString error;
+        int count = -1;
+        QVERIFY2(syncer.run(&error, &count), qPrintable(error));
+        QCOMPARE(count, 1);
+        QCOMPARE(store.digest("2026-11-09")["items"][0]["title"].toString(), QString("Shared"));
+        QVERIFY(store.status().value("ok").toBool());
+
+        QVERIFY(syncer.run(&error, &count));
+        QCOMPARE(count, 0);
+
+        // A republished day comes again; a date that isn't one never becomes a file.
+        day.insert("generatedAt", "2026-11-09T20:00:00");
+        QVERIFY(Store(author.path()).saveDigest(day, nullptr));
+        QVERIFY(Store(author.path()).publish(site.path(), nullptr));
+        QFile index(site.path() + "/index.json");
+        QVERIFY(index.open(QIODevice::ReadOnly));
+        QJsonArray days = QJsonDocument::fromJson(index.readAll())["days"].toArray();
+        index.close();
+        days.append(QJsonObject{{"date", "../evil"}});
+        write(site.path() + "/index.json", QJsonDocument(QJsonObject{{"days", days}}).toJson());
+        QVERIFY(syncer.run(&error, &count));
+        QCOMPARE(count, 1);
+        QVERIFY(!QFile::exists(reader.path() + "/../evil.json"));
+
+        QVERIFY(!Syncer(store, QUrl::fromLocalFile(reader.path() + "/missing")).run(&error));
+        QVERIFY(!store.status().value("ok").toBool());
+    }
+
+    void sourceDefaultsToTheSite()
+    {
+        QSettings("writeuppulse", "writeuppulse").clear();
+        QCOMPARE(Syncer::source(), QString("feed"));
+        Syncer::setSource("claude");
+        QCOMPARE(Syncer::source(), QString("claude"));
+        QSettings("writeuppulse", "writeuppulse").clear();
     }
 
     void fetcherSavesTheAgentsAnswer()

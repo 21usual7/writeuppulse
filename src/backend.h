@@ -36,6 +36,7 @@ class Backend : public QObject {
     Q_PROPERTY(bool timerEnabled READ timerEnabled NOTIFY timerChanged)
     Q_PROPERTY(QString problem READ problem NOTIFY problemChanged)
     Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
+    Q_PROPERTY(QString source READ source WRITE setSource NOTIFY sourceChanged)
     Q_PROPERTY(int progressRevision READ progressRevision NOTIFY progressChanged)
     Q_PROPERTY(int streak READ streak NOTIFY progressChanged)
     Q_PROPERTY(QVariantMap stats READ stats NOTIFY progressChanged)
@@ -93,7 +94,9 @@ public:
     bool timerEnabled() const { return m_timerEnabled; }
     QString problem() const { return m_problem; }
     QString language() const { return m_language; }
+    QString source() const { return m_source; }
     void setLanguage(const QString &language);
+    void setSource(const QString &source);
     int progressRevision() const { return m_progressRevision; }
     int streak() const { return m_progress.streak(); }
     QVariantMap stats() const { return m_progress.stats().toVariantMap(); }
@@ -122,12 +125,14 @@ signals:
     void timerChanged();
     void problemChanged();
     void languageChanged();
+    void sourceChanged();
     void progressChanged();
     void preferencesChanged();
     void noticeChanged();
 
 private:
     void reload();
+    void syncIfStale();
     void rebuild();
     void filtersChanged();
     void step(int delta);
@@ -168,4 +173,6 @@ private:
     bool m_timerEnabled = false;
     QString m_problem;
     QString m_language;
+    QString m_source;
+    QTimer m_syncTimer;
 };
