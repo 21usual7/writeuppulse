@@ -20,8 +20,18 @@ bin/install                    # makepkg -fsi + enable the user timer (needs sud
 On this machine the app is currently installed **without** the package, for the user
 only: `~/.local/bin/writeuppulse`, `~/.local/share/applications/writeuppulse.desktop`,
 `~/.config/systemd/user/writeuppulse.{service,timer}` (ExecStart uses `%h/.local/bin`).
-After a change the user should see, copy `build/writeuppulse` to `~/.local/bin/`. If
-switching to `bin/install`, remove those copies first or they shadow the package.
+After a change the user should see, copy `build/writeuppulse` to `~/.local/bin/` (to a
+temp name, then `mv`, since the window may be running). If switching to `bin/install`,
+remove those copies first or they shadow the package.
+
+This machine is the publisher: its `~/.config/writeuppulse/writeuppulse.conf` has
+`source=claude`, its local unit runs `writeuppulse fetch`, and the drop-in
+`~/.config/systemd/user/writeuppulse.service.d/publish.conf` runs `bin/publish` after each
+fetch (`ExecStartPost=-…`, so a failed publish never reruns the agent) with
+`GIT_SSH_COMMAND` set to `~/keys/git_key`. Site: <https://21usual7.github.io/writeuppulse/>,
+served by GitHub Pages from the `pages` branch (only `bin/publish` writes it, from the
+worktree in `~/.cache/writeuppulse/pages`). Changes to `site/` reach the site only once
+committed on `master` and published.
 
 ## Architecture
 
@@ -110,6 +120,11 @@ the QML window.
 - Offscreen rendering (`QT_QPA_PLATFORM=offscreen`) is fine for the hand-drawn UI but
   does not draw Material control backgrounds (menus, switches); use
   `QT_QPA_PLATFORM=wayland` when those must look real.
+- `build/writeuppulse` (window) talks to the real systemd unit: with `source=feed` it
+  starts `writeuppulse.service` on open, which on this machine runs the agent. For
+  scratch runs set `XDG_CONFIG_HOME` to a dir whose `writeuppulse/writeuppulse.conf` has
+  `source=claude`, and don't press R. `writeuppulse sync` against the live site into a
+  scratch `WRITEUPPULSE_DATA` is safe (read-only, seconds).
 - The harness must run with its own `XDG_CONFIG_HOME`: keys like U or the language
   pills otherwise write into the user's real `~/.config/writeuppulse`.
 - A real `writeuppulse fetch` spends the user's Claude usage and takes minutes; don't
@@ -120,5 +135,10 @@ the QML window.
 - Commit messages in **English**, short and imperative ("Pick the language of …").
 - Branch `master`, remote `git@github.com:21usual7/writeuppulse.git` (public). Push only
   when asked: `GIT_SSH_COMMAND="ssh -i ~/keys/git_key -o IdentitiesOnly=yes" git push`.
+- Releases: bump `pkgver` in `pkgbuild/PKGBUILD`, `cd pkgbuild && makepkg -f` (not
+  `bin/install`, which also installs), commit, push, then
+  `gh release create vX.Y.Z pkgbuild/writeuppulse-X.Y.Z-1-x86_64.pkg.tar.zst --target master`
+  (only the main package, not `-debug`). The README's install steps link to the latest
+  release. Ask before publishing a release.
 - README screenshots (`docs/screenshot.png`, `docs/focus.png`) use made-up data, the
   English UI, and the app's own palette; retake them when the UI changes.
