@@ -148,5 +148,7 @@
   "What did you try?": "Что вы попробовали?",
   "Ask about this writeup": "Вопрос об этом разборе",
   "Stop": "Стоп",
-  "Send": "Отправить"
+  "Send": "Отправить",
+  "The tutor is off while the laptop runs on battery, so the local model doesn't drain it. Plug in the charger and press Check again.": "Тьютор выключен, пока ноутбук работает от батареи, чтобы локальная модель не разряжала её. Подключите зарядку и нажмите «Проверить снова».",
+  "Off on battery": "Выключена на батарее"
 }

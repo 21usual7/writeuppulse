@@ -37,6 +37,12 @@ served by GitHub Pages from the `pages` branch (only `bin/publish` writes it, fr
 worktree in `~/.cache/writeuppulse/pages`). Changes to `site/` reach the site only once
 committed on `master` and published.
 
+Ollama (package `ollama` + `ollama-vulkan` for the Radeon 680M) runs only on AC power, as
+the user asked: `/etc/systemd/system/ollama.service.d/ac-power.conf` sets
+`ConditionACPower=true`, and `/etc/udev/rules.d/99-ollama-ac-power.rules` stops it on
+unplug and starts it on plug-in (only while the service is enabled). Don't run models on
+battery for tests.
+
 ## Architecture
 
 One binary, two modes (`src/main.cpp`): any first argument other than `open` goes to
@@ -104,7 +110,9 @@ the QML window.
 - **Tutor:** `Tutor` (`src/tutor.cpp`, QML context property `tutor`) talks to a local
   Ollama (`WRITEUPPULSE_OLLAMA`, default `http://127.0.0.1:11434`; model in QSettings
   `tutorModel`, default `qwen3:8b`). `status` comes from `/api/tags`; `ask` streams
-  `/api/chat` (NDJSON, `think: false`) with a system prompt holding the writeup and the
+  `/api/chat` (NDJSON, `think: false`); when Ollama is unreachable and `onAcPower()` (reads
+  `/sys/class/power_supply`) is false, `status` is `battery` (this machine stops Ollama off
+  AC, see below) with a system prompt holding the writeup and the
   no-code rule, plus a practice idea when one is open. Conversations are in memory, keyed
   by URL + practice index (−1 = whole writeup), capped at 20 messages. `clean()` cuts
   `<think>` and fenced code. UI: the Ask tab (`TutorChat.qml`, key 5) and "Discuss" on

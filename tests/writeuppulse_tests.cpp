@@ -441,6 +441,24 @@ private slots:
         QSettings("writeuppulse", "writeuppulse").clear();
     }
 
+    void tutorKnowsWhenItRunsOnBattery()
+    {
+        QTemporaryDir dir;
+        auto supply = [&](const QString &name, const QByteArray &type, const QByteArray &online) {
+            QDir().mkpath(dir.path() + "/" + name);
+            write(dir.path() + "/" + name + "/type", type + "\n");
+            if (!online.isEmpty())
+                write(dir.path() + "/" + name + "/online", online + "\n");
+        };
+        QVERIFY(Tutor::onAcPower(dir.path()));
+        supply("BAT0", "Battery", "");
+        supply("ACAD", "Mains", "0");
+        supply("ucsi-source-psy-1", "USB", "0");
+        QVERIFY(!Tutor::onAcPower(dir.path()));
+        supply("ucsi-source-psy-1", "USB", "1");
+        QVERIFY(Tutor::onAcPower(dir.path()));
+    }
+
     void tutorReportsAMissingOllama()
     {
         QTcpServer closed;
@@ -448,7 +466,7 @@ private slots:
         const quint16 port = closed.serverPort();
         closed.close();
         Tutor tutor(QUrl(QString("http://127.0.0.1:%1").arg(port)));
-        QTRY_COMPARE(tutor.status(), QString("missing"));
+        QTRY_COMPARE(tutor.status(), QString(Tutor::onAcPower() ? "missing" : "battery"));
         tutor.open(QVariantMap{{"url", "https://example.com/a"}, {"title", "T"}});
         tutor.ask("Hello?");
         QTRY_VERIFY(!tutor.busy());

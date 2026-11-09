@@ -671,6 +671,7 @@ ApplicationWindow {
                             elide: Text.ElideRight
                             text: tutor.status === "ready" ? qsTr("Ready")
                                 : tutor.status === "noModel" ? qsTr("Not downloaded: ollama pull %1").arg(tutor.model)
+                                : tutor.status === "battery" ? qsTr("Off on battery")
                                 : qsTr("Ollama is not running")
                             color: tutor.status === "ready" ? Style.done : Style.faint
                             font.family: Style.sans

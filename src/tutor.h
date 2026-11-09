@@ -17,7 +17,8 @@ class QNetworkReply;
 // tools. Conversations live as long as the window.
 class Tutor : public QObject {
     Q_OBJECT
-    // "missing" (Ollama isn't running), "noModel" (the model isn't pulled), "ready".
+    // "missing" (Ollama isn't running), "battery" (not running, and the laptop is on
+    // battery, where this machine keeps it off), "noModel" (the model isn't pulled), "ready".
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(QString model READ model WRITE setModel NOTIFY statusChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY messagesChanged)
@@ -46,6 +47,8 @@ public:
     QString systemPrompt() const;
     // The app teaches without code, so fenced blocks and a model's thinking are cut.
     static QString clean(const QString &text);
+    // True with a charger plugged in, or on a machine without a battery.
+    static bool onAcPower(const QString &directory = "/sys/class/power_supply");
 
 signals:
     void statusChanged();

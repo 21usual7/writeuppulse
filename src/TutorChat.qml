@@ -36,7 +36,9 @@ ColumnLayout {
         color: Style.muted
         font.family: Style.sans
         font.pixelSize: 14
-        text: tutor.status === "missing"
+        text: tutor.status === "battery"
+              ? qsTr("The tutor is off while the laptop runs on battery, so the local model doesn't drain it. Plug in the charger and press Check again.")
+              : tutor.status === "missing"
               ? qsTr("The tutor runs on your machine with Ollama, so your questions stay local. Install and start it (sudo pacman -S ollama, then systemctl enable --now ollama), and download the model: ollama pull %1").arg(tutor.model)
               : qsTr("Ollama is running, but the model %1 isn't downloaded yet. Run: ollama pull %1. Or pick another model in Settings (P).").arg(tutor.model)
     }

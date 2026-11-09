@@ -1,5 +1,7 @@
 #include "tutor.h"
 
+#include <QDir>
+#include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkReply>
@@ -34,7 +36,7 @@ void Tutor::check() {
     QNetworkReply *reply = m_network.get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply] {
         reply->deleteLater();
-        QString status = "missing";
+        QString status = onAcPower() ? "missing" : "battery";
         if (reply->error() == QNetworkReply::NoError) {
             status = "noModel";
             const QString wanted = m_model.contains(':') ? m_model : m_model + ":latest";
@@ -47,6 +49,22 @@ void Tutor::check() {
             emit statusChanged();
         }
     });
+}
+
+static QByteArray readLine(const QString &path) {
+    QFile file(path);
+    return file.open(QIODevice::ReadOnly) ? file.readLine().trimmed() : QByteArray();
+}
+
+bool Tutor::onAcPower(const QString &directory) {
+    bool battery = false;
+    for (const auto &name : QDir(directory).entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        const QByteArray type = readLine(directory + "/" + name + "/type");
+        if ((type == "Mains" || type == "USB") && readLine(directory + "/" + name + "/online") == "1")
+            return true;
+        battery = battery || type == "Battery";
+    }
+    return !battery;
 }
 
 QString Tutor::key() const {
