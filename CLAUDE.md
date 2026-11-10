@@ -213,7 +213,9 @@ the QML window.
   kept by shortening the source list (budget rule).
 - **Notes:** `notes` table (database version 4: url, text, notion page id). Notes open
   in `NotesWindow.qml`, a separate `Window` (N, or "Notes" among the reader's actions;
-  the user asked for a mini window, one at a time): it stays on the writeup it was
+  the user asked for a mini window, one at a time; `flags: Qt.Dialog` with
+  `transientParent: win` makes Hyprland float it instead of tiling it beside the
+  main window): it stays on the writeup it was
   opened for while the main window moves on, and `openFor` another writeup saves and
   switches. It saves 0.8 s after typing stops, when it loses focus, and on close; the
   main window closes it. The main window's shortcuts are `Qt.ApplicationShortcut`, so

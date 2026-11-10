@@ -12,6 +12,10 @@ Window {
     property var item: null
     property string note: ""
 
+    // A dialog of the main window: tiling window managers (Hyprland) float it
+    // over the reader instead of halving the screen for it.
+    transientParent: win
+    flags: Qt.Dialog
     width: 480
     height: 560
     minimumWidth: 340
