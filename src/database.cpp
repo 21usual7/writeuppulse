@@ -81,6 +81,20 @@ bool Database::migrate(const QString &directory) {
                  "CREATE VIRTUAL TABLE passages USING fts5 (url UNINDEXED, n UNINDEXED, text,"
                  " tokenize = 'unicode61 remove_diacritics 2')"})
             ok = ok && run(sql);
+    if (ok && current < 3)
+        for (const char *sql : {
+                 "CREATE TABLE concepts (id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL)",
+                 "CREATE TABLE aliases (alias TEXT PRIMARY KEY, concept TEXT NOT NULL)",
+                 "CREATE TABLE mentions (url TEXT NOT NULL, concept TEXT NOT NULL, PRIMARY KEY (url, concept))",
+                 "CREATE INDEX mentions_by_concept ON mentions (concept)",
+                 "CREATE TABLE edges (url TEXT NOT NULL, source TEXT NOT NULL, target TEXT NOT NULL, type TEXT NOT NULL,"
+                 " passage INTEGER NOT NULL, weight INTEGER NOT NULL DEFAULT 1, model TEXT NOT NULL)",
+                 "CREATE INDEX edges_by_url ON edges (url)",
+                 "CREATE INDEX edges_by_source ON edges (source)",
+                 "CREATE INDEX edges_by_target ON edges (target)",
+                 "CREATE TABLE extractions (url TEXT PRIMARY KEY, status TEXT NOT NULL, source TEXT, model TEXT,"
+                 " error TEXT, attempts INTEGER NOT NULL DEFAULT 0, at TEXT NOT NULL)"})
+            ok = ok && run(sql);
     ok = ok && (current == version || run(QString("PRAGMA user_version = %1").arg(version))) && run("COMMIT");
     if (!ok)
         QSqlQuery(connection()).exec("ROLLBACK");
@@ -330,4 +344,111 @@ QHash<QString, double> Database::matchPages(const QString &word) const {
                 hits.insert(url, score);
         }
     return hits;
+}
+
+bool Database::wantsConcepts(const QString &url) const {
+    QSqlQuery query(connection());
+    query.prepare("SELECT status, source, attempts, at FROM extractions WHERE url = ?");
+    query.addBindValue(url);
+    if (!query.exec() || !query.next())
+        return true;
+    const int attempts = query.value(2).toInt();
+    const bool retry = attempts < 3
+        && QDateTime::fromString(query.value(3).toString(), Qt::ISODate).secsTo(QDateTime::currentDateTime()) > 6 * 3600;
+    if (query.value(0).toString() == "ok")
+        return query.value(1).toString() == "summary" && pageStatus(url) == "ok" && (attempts == 0 || retry);
+    return retry;
+}
+
+bool Database::saveConcepts(const QString &url, const QString &status, const QJsonObject &result, const QString &source,
+                            const QString &model, const QString &error) {
+    QSqlDatabase db = connection();
+    QSqlQuery query(db);
+    bool ok = db.transaction();
+    auto exec = [&](const QString &sql, const QVariantList &values) {
+        query.prepare(sql);
+        for (const auto &value : values)
+            query.addBindValue(value);
+        ok = ok && query.exec();
+    };
+    query.prepare("SELECT status, attempts FROM extractions WHERE url = ?");
+    query.addBindValue(url);
+    const bool known = query.exec() && query.next();
+    const QString now = QDateTime::currentDateTime().toString(Qt::ISODate);
+    // A failure after a good run keeps the good concepts and only counts.
+    if (status != "ok" && known && query.value(0).toString() == "ok") {
+        exec("UPDATE extractions SET attempts = attempts + 1, error = ?, at = ? WHERE url = ?", {error, now, url});
+        return ok && db.commit();
+    }
+    const int attempts = status == "ok" ? 0 : known ? query.value(1).toInt() + 1 : 1;
+    if (status == "ok") {
+        exec("DELETE FROM mentions WHERE url = ?", {url});
+        exec("DELETE FROM edges WHERE url = ?", {url});
+        // Each name and alias leads to the concept that first had it.
+        QHash<QString, QString> resolved;
+        for (const auto &value : result.value("concepts").toArray()) {
+            const QJsonObject node = value.toObject();
+            const QString id = node.value("id").toString();
+            QStringList names{id};
+            for (const auto &alias : node.value("aliases").toArray())
+                names << alias.toString();
+            QString target = id;
+            for (const auto &name : names) {
+                query.prepare("SELECT concept FROM aliases WHERE alias = ?");
+                query.addBindValue(name);
+                if (query.exec() && query.next()) {
+                    target = query.value(0).toString();
+                    break;
+                }
+            }
+            resolved.insert(id, target);
+            exec("INSERT OR IGNORE INTO concepts (id, name, kind) VALUES (?, ?, ?)",
+                 {target, node.value("name").toString(), node.value("kind").toString()});
+            for (const auto &name : names)
+                exec("INSERT OR IGNORE INTO aliases (alias, concept) VALUES (?, ?)", {name, target});
+            exec("INSERT OR IGNORE INTO mentions (url, concept) VALUES (?, ?)", {url, target});
+        }
+        for (const auto &value : result.value("edges").toArray()) {
+            const QJsonObject edge = value.toObject();
+            const QString from = resolved.value(edge.value("from").toString()), to = resolved.value(edge.value("to").toString());
+            if (!from.isEmpty() && !to.isEmpty() && from != to)
+                exec("INSERT INTO edges (url, source, target, type, passage, weight, model) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                     {url, from, to, edge.value("type").toString(), edge.value("passage").toInt(-1),
+                      edge.value("weight").toInt(1), model});
+        }
+        exec("DELETE FROM concepts WHERE id NOT IN (SELECT concept FROM mentions)", {});
+        exec("DELETE FROM aliases WHERE concept NOT IN (SELECT id FROM concepts)", {});
+    }
+    exec("INSERT OR REPLACE INTO extractions (url, status, source, model, error, attempts, at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+         {url, status, source, model, error, attempts, now});
+    if (ok && db.commit())
+        return true;
+    db.rollback();
+    return false;
+}
+
+QJsonObject Database::knowledge(const QString &url) const {
+    QJsonArray concepts, edges;
+    QSqlQuery query(connection());
+    query.prepare("SELECT c.id, c.name, c.kind FROM mentions m JOIN concepts c ON c.id = m.concept WHERE m.url = ? ORDER BY c.name");
+    query.addBindValue(url);
+    if (query.exec())
+        while (query.next())
+            concepts.append(QJsonObject{{"id", query.value(0).toString()}, {"name", query.value(1).toString()},
+                                        {"kind", query.value(2).toString()}});
+    query.prepare("SELECT source, target, type, passage, weight, model FROM edges WHERE url = ? ORDER BY rowid");
+    query.addBindValue(url);
+    if (query.exec())
+        while (query.next())
+            edges.append(QJsonObject{{"from", query.value(0).toString()}, {"to", query.value(1).toString()},
+                                     {"type", query.value(2).toString()}, {"passage", query.value(3).toInt()},
+                                     {"weight", query.value(4).toInt()}, {"model", query.value(5).toString()}});
+    return {{"concepts", concepts}, {"edges", edges}};
+}
+
+QString Database::conceptsStatus(const QString &url) const {
+    QSqlQuery query(connection());
+    query.prepare("SELECT status FROM extractions WHERE url = ?");
+    query.addBindValue(url);
+    return query.exec() && query.next() ? query.value(0).toString() : QString();
 }

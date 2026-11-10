@@ -1,70 +1,14 @@
 #include "tutor.h"
 
-#include <QDir>
-#include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkReply>
 #include <QRegularExpression>
-#include <QSettings>
 
 #include "fetcher.h"
 
-Tutor::Tutor(const QUrl &host, QObject *parent)
-    : QObject(parent),
-      m_host(!host.isEmpty() ? host
-             : !qEnvironmentVariableIsEmpty("WRITEUPPULSE_OLLAMA") ? QUrl(qEnvironmentVariable("WRITEUPPULSE_OLLAMA"))
-             : QUrl("http://127.0.0.1:11434")),
-      m_model(QSettings("writeuppulse", "writeuppulse").value("tutorModel", "qwen3:8b").toString()) {
-    check();
-}
-
-void Tutor::setModel(const QString &model) {
-    const QString name = model.trimmed();
-    if (name.isEmpty() || name == m_model)
-        return;
-    m_model = name;
-    QSettings("writeuppulse", "writeuppulse").setValue("tutorModel", name);
-    emit statusChanged();
-    check();
-}
-
-// Asks Ollama which models are pulled; "qwen3" also matches "qwen3:latest".
-void Tutor::check() {
-    QNetworkRequest request(m_host.resolved(QUrl("/api/tags")));
-    request.setTransferTimeout(3000);
-    QNetworkReply *reply = m_network.get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply] {
-        reply->deleteLater();
-        QString status = onAcPower() ? "missing" : "battery";
-        if (reply->error() == QNetworkReply::NoError) {
-            status = "noModel";
-            const QString wanted = m_model.contains(':') ? m_model : m_model + ":latest";
-            for (const auto &model : QJsonDocument::fromJson(reply->readAll())["models"].toArray())
-                if (model.toObject().value("name").toString() == wanted || model.toObject().value("model").toString() == wanted)
-                    status = "ready";
-        }
-        if (status != m_status) {
-            m_status = status;
-            emit statusChanged();
-        }
-    });
-}
-
-static QByteArray readLine(const QString &path) {
-    QFile file(path);
-    return file.open(QIODevice::ReadOnly) ? file.readLine().trimmed() : QByteArray();
-}
-
-bool Tutor::onAcPower(const QString &directory) {
-    bool battery = false;
-    for (const auto &name : QDir(directory).entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
-        const QByteArray type = readLine(directory + "/" + name + "/type");
-        if ((type == "Mains" || type == "USB") && readLine(directory + "/" + name + "/online") == "1")
-            return true;
-        battery = battery || type == "Battery";
-    }
-    return !battery;
+Tutor::Tutor(LlmClient &llm, QObject *parent) : QObject(parent), m_llm(llm) {
+    connect(&m_llm, &LlmClient::statusChanged, this, &Tutor::statusChanged);
 }
 
 QString Tutor::key() const {
@@ -145,36 +89,22 @@ void Tutor::ask(const QString &text) {
         messages.append(message);
     conversation.append(QJsonObject{{"role", "assistant"}, {"content", ""}});
 
-    QNetworkRequest request(m_host.resolved(QUrl("/api/chat")));
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    request.setTransferTimeout(120000);
-    const QJsonObject body{{"model", m_model}, {"messages", messages}, {"stream", true}, {"think", false},
-                           {"options", QJsonObject{{"temperature", 0.3}}}};
     m_error.clear();
     m_buffer.clear();
-    m_reply = m_network.post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    m_reply = m_llm.chat(messages, 0.3);
     connect(m_reply, &QNetworkReply::readyRead, this, &Tutor::read);
     connect(m_reply, &QNetworkReply::finished, this, &Tutor::finish);
     emit messagesChanged();
 }
 
-// Ollama streams one JSON object per line, each with the next piece of text.
 void Tutor::read() {
     if (!m_reply)
         return;
     m_buffer += m_reply->readAll();
     QJsonArray &conversation = m_conversations[m_replyKey];
-    qsizetype end;
-    while ((end = m_buffer.indexOf('\n')) >= 0) {
-        const QJsonObject chunk = QJsonDocument::fromJson(m_buffer.left(end)).object();
-        m_buffer.remove(0, end + 1);
-        if (chunk.contains("error"))
-            m_error = chunk.value("error").toString();
-        QJsonObject last = conversation.last().toObject();
-        last.insert("content", last.value("content").toString()
-                                   + chunk.value("message").toObject().value("content").toString());
-        conversation.replace(conversation.size() - 1, last);
-    }
+    QJsonObject last = conversation.last().toObject();
+    last.insert("content", last.value("content").toString() + LlmClient::take(m_buffer, &m_error));
+    conversation.replace(conversation.size() - 1, last);
     emit messagesChanged();
 }
 
@@ -199,7 +129,7 @@ void Tutor::finish() {
     }
     reply->deleteLater();
     if (!m_error.isEmpty())
-        check();
+        m_llm.check();
     emit messagesChanged();
 }
 

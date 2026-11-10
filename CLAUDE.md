@@ -14,9 +14,9 @@ what is done) is `docs/ROADMAP.md`; mark stages done there. **The Claude budget 
 grow** (the user's decision): keep `Fetcher`'s prompt and schema the size they are, and
 build new features locally — SQLite, the local Ollama model, the article pages themselves.
 
-## Status (2026-11-09)
+## Status (2026-11-10)
 
-Roadmap stages done, each with tests (35 passing) and docs:
+Roadmap stages done, each with tests (38 passing) and docs:
 
 - **0 (bugs):** start limits in `[Unit]` (packaged and local unit), statistics take
   the category from the day, progress keyed by `Store::canonicalUrl`.
@@ -26,17 +26,20 @@ Roadmap stages done, each with tests (35 passing) and docs:
   imported, FTS5 search with BM25.
 - **3 (article texts):** `Archive` saves each writeup's page as passages; search
   covers them; Settings switch "Save article texts for search".
+- **4 (concepts):** `LlmClient` shared by `Tutor` and `Extractor`; the local model
+  lists concepts, the app relates the ones named in the same passage (database
+  version 3). Nothing in the window shows them yet.
 
-On this machine the window runs the new binary: the database is at version 2 and all
-5 saved writeups have their page text (`pages` status `ok`). Nothing is pushed; the
+On this machine `~/.local/bin/writeuppulse` is still the stage-3 binary: the database
+is at version 2, every saved writeup has its page text (`pages` status `ok`), and no
+concepts are extracted yet. Installing the new binary migrates it to version 3 and
+starts extraction in the window whenever Ollama is up (~1.5–4 min of CPU per writeup). Nothing is pushed; the
 last release is still 0.3.0, so cutting 0.4.0 would need the user's go-ahead.
 
-**Next: stage 4**, concept and relation extraction with the local Ollama (not Claude):
-an `LlmClient` taken out of `Tutor` (chat, structured output with `format`, so the
-JSON is validated before saving), an `Extractor` queue that runs only while the tutor
-is `ready` (Ollama is off on battery here), reading `Database::passages` or the summary
-when a page has none, and storing concepts and edges with provenance (passage, model
-name) in a version 3 migration. Then stage 5, the graph view. See `docs/ROADMAP.md`.
+**Next: stage 5**, the graph view: concept search, a node inspector with its writeups
+and neighbours (edges by weight, with the passage), a timeline, and a note for feed
+readers without Ollama instead of an empty graph. Concepts are model-extracted: say
+so. See `docs/ROADMAP.md`.
 
 ## Commands
 
@@ -75,7 +78,8 @@ Site: <https://21usual7.github.io/writeuppulse/>, served by GitHub Pages from th
 worktree in `~/.cache/writeuppulse/pages`). Changes to `site/` reach the site only once
 committed on `master` and published.
 
-Ollama (package `ollama` + `ollama-vulkan` for the Radeon 680M) runs only on AC power, as
+Ollama (package `ollama` + `ollama-vulkan` for the Radeon 680M, which Ollama 0.40 still
+skips as an integrated GPU unless `OLLAMA_IGPU_ENABLE=1` is set, so it runs on CPU) runs only on AC power, as
 the user asked: `/etc/systemd/system/ollama.service.d/ac-power.conf` sets
 `ConditionACPower=true`, and `/etc/udev/rules.d/99-ollama-ac-power.rules` runs
 `/usr/local/bin/ollama-ac-power` through `systemd-run --on-active=3
@@ -182,17 +186,49 @@ the QML window.
   run is over 30 min old (only with `systemd` true, so tests never start anything).
   Tests use a `file://` feed. The packaged unit runs `update`; this machine's runs
   `fetch` (see the publisher setup above).
-- **Tutor:** `Tutor` (`src/tutor.cpp`, QML context property `tutor`) talks to a local
-  Ollama (`WRITEUPPULSE_OLLAMA`, default `http://127.0.0.1:11434`; model in QSettings
-  `tutorModel`, default `qwen3:8b`). `status` comes from `/api/tags`: `ready`, `noModel`,
-  `missing`, or `battery` when Ollama is unreachable and `onAcPower()` (reads
-  `/sys/class/power_supply`) is false (this machine stops Ollama off AC, see above).
-  `ask` streams `/api/chat` (NDJSON, `think: false`) with a system prompt holding the
-  writeup and the no-code rule, plus a practice idea when one is open. Conversations are in memory, keyed
-  by URL + practice index (−1 = whole writeup), capped at 20 messages. `clean()` cuts
-  `<think>` and fenced code. UI: the Ask tab (`TutorChat.qml`, key 5) and "Discuss" on
-  `PracticeStep`. Tests use a `QTcpServer` stand-in for Ollama. Claude still does all
-  searching and summarizing; the tutor never writes to disk.
+- **Local model:** `LlmClient` (`src/llmclient.cpp`, created in `main` and shared) is
+  the only Ollama HTTP client (`WRITEUPPULSE_OLLAMA`, default `http://127.0.0.1:11434`;
+  model in QSettings `tutorModel`, default `qwen3:8b`). `status` comes from `/api/tags`:
+  `ready`, `noModel`, `missing`, or `battery` when Ollama is unreachable and
+  `onAcPower()` (reads `/sys/class/power_supply`) is false (this machine stops Ollama
+  off AC, see above). `chat` streams `/api/chat` (NDJSON, `think: false`, `num_ctx`
+  8192 for every chat so the model isn't reloaded between users), optionally with a
+  JSON schema as `format`; `take()` parses the stream. A foreground chat emits
+  `foregroundStarted`, and `idle()` is false until it ends.
+- **Tutor:** `Tutor` (`src/tutor.cpp`, QML context property `tutor`) forwards
+  `status`/`model`/`check` to the `LlmClient`. `ask` streams with a system prompt
+  holding the writeup and the no-code rule, plus a practice idea when one is open.
+  Conversations are in memory, keyed by URL + practice index (−1 = whole writeup),
+  capped at 20 messages. `clean()` cuts `<think>` and fenced code. UI: the Ask tab
+  (`TutorChat.qml`, key 5) and "Discuss" on `PracticeStep`. Tests use a `QTcpServer`
+  stand-in for Ollama. Claude still does all searching and summarizing; the tutor
+  never writes to disk.
+- **Concepts:** `Extractor` (`src/extractor.cpp`, owned by `Backend` once `main` calls
+  `setLlm`) asks the local model, never Claude, only for the concepts a writeup teaches
+  (≤ 20, English names, ≤ 3 aliases, kind: concept/technique/tool/vulnerability/
+  technology), held to `Extractor::schema()` as `format`; the `maxItems` limits and
+  `num_predict` 1500 are what stop qwen3:8b from listing variations of one name until
+  it runs out of tokens (seen on real pages). Relations come from the app, not the
+  model (qwen3:8b made stars around one concept with made-up passage numbers):
+  `validate` relates concepts named, by name or alias as whole words, in the same
+  passage of the whole saved page (`RELATED_TO`, first passage, `weight` = passages
+  shared, the 30 strongest, ≤ 6 per concept; a passage naming more than 6 is an
+  overview and relates nothing), and drops general words the model lists anyway (exploit, CVE,
+  proof of concept). Material: the first ~12000 characters of `Database::passages`,
+  or the summary and takeaways when there is no page (`source` `summary`, passages
+  then −1). One writeup at a time, only while `LlmClient` is `ready`; with page
+  downloads on it waits until the `Archive` has tried the page. A tutor question
+  aborts the running extraction, which restarts `pauseMs` (60 s) after the last
+  answer; a refused connection (Ollama stopped on unplugging) requeues without
+  counting. Stored by `Database::saveConcepts` (version 3): `concepts` (id =
+  `Extractor::id(name)`), `aliases` (every name and alias → the concept that first had
+  it, so "XSS" in one writeup joins "Cross-site scripting" from another), `mentions`
+  (url, concept), `edges` (url, source, target, type, passage, weight, model; `type`
+  leaves room for typed relations later), `extractions` (status, source, model,
+  attempts). Summary concepts are redone once the page is saved; failures retry after
+  6 h up to 3 times, and a failure after a good run keeps the good one. On this
+  machine's CPU a writeup takes ~2–4 min at ~6 tokens/s (Ollama 0.40 drops the 680M
+  iGPU unless `OLLAMA_IGPU_ENABLE=1`). Show the concepts as model-extracted (stage 5).
 - **Look:** the app has its own palette on purpose (the user chose it over following the
   Omarchy theme): colours, fonts, and radius live in the `Style` QML singleton
   (`src/Style.qml`, registered by `src/qmldir`). Layout is a reader — icon rail, list

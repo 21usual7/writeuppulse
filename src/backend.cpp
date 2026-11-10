@@ -34,6 +34,7 @@ Backend::Backend(const QString &directory, bool systemd, QObject *parent)
     connect(&m_archive, &Archive::saved, this, [this] {
         if (!m_query.trimmed().isEmpty())
             rebuild();
+        extract();
     });
     m_noticeTimer.setSingleShot(true);
     m_noticeTimer.setInterval(6000);
@@ -141,6 +142,20 @@ void Backend::setSaveTexts(bool save) {
         archive();
     else
         m_archive.clear();
+    extract();
+}
+
+void Backend::setLlm(LlmClient *llm) {
+    m_extractor = std::make_unique<Extractor>(m_database, *llm);
+    extract();
+}
+
+// After the page, when there will be one, so the concepts come from its text.
+void Backend::extract() {
+    if (!m_extractor)
+        return;
+    m_extractor->waitForPages = m_systemd && m_saveTexts;
+    m_extractor->enqueue(m_library);
 }
 
 // Newest first, so today's writeups are searchable before older ones.
@@ -432,6 +447,7 @@ void Backend::reload() {
         if (!m_database.index(m_store, &error))
             setProblem(error);
         archive();
+        extract();
         rebuildNeeded = true;
         // The statistics read the categories of the days.
         emit progressChanged();

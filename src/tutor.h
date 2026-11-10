@@ -2,12 +2,13 @@
 
 #include <QHash>
 #include <QJsonArray>
-#include <QNetworkAccessManager>
 #include <QObject>
 #include <QPointer>
 #include <QUrl>
 #include <QVariantList>
 #include <QVariantMap>
+
+#include "llmclient.h"
 
 class QNetworkReply;
 
@@ -17,8 +18,7 @@ class QNetworkReply;
 // tools. Conversations live as long as the window.
 class Tutor : public QObject {
     Q_OBJECT
-    // "missing" (Ollama isn't running), "battery" (not running, and the laptop is on
-    // battery, where this machine keeps it off), "noModel" (the model isn't pulled), "ready".
+    // LlmClient::status(): "missing", "battery", "noModel", or "ready".
     Q_PROPERTY(QString status READ status NOTIFY statusChanged)
     Q_PROPERTY(QString model READ model WRITE setModel NOTIFY statusChanged)
     Q_PROPERTY(bool busy READ busy NOTIFY messagesChanged)
@@ -27,17 +27,17 @@ class Tutor : public QObject {
     Q_PROPERTY(QString error READ error NOTIFY messagesChanged)
 
 public:
-    explicit Tutor(const QUrl &host = {}, QObject *parent = nullptr);
+    explicit Tutor(LlmClient &llm, QObject *parent = nullptr);
 
-    QString status() const { return m_status; }
-    QString model() const { return m_model; }
-    void setModel(const QString &model);
+    QString status() const { return m_llm.status(); }
+    QString model() const { return m_llm.model(); }
+    void setModel(const QString &model) { m_llm.setModel(model); }
     bool busy() const { return m_reply != nullptr; }
     QVariantList messages() const;
     int practice() const { return m_practice; }
     QString error() const { return m_error; }
 
-    Q_INVOKABLE void check();
+    Q_INVOKABLE void check() { m_llm.check(); }
     // Switches to the conversation about this writeup, or about one of its
     // practice ideas when practice >= 0.
     Q_INVOKABLE void open(const QVariantMap &item, int practice = -1);
@@ -47,8 +47,6 @@ public:
     QString systemPrompt() const;
     // The app teaches without code, so fenced blocks and a model's thinking are cut.
     static QString clean(const QString &text);
-    // True with a charger plugged in, or on a machine without a battery.
-    static bool onAcPower(const QString &directory = "/sys/class/power_supply");
 
 signals:
     void statusChanged();
@@ -59,10 +57,7 @@ private:
     void read();
     void finish();
 
-    QUrl m_host;
-    QString m_model;
-    QString m_status = "missing";
-    QNetworkAccessManager m_network;
+    LlmClient &m_llm;
     QPointer<QNetworkReply> m_reply;
     QString m_replyKey;
     QByteArray m_buffer;

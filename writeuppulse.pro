@@ -12,7 +12,9 @@ HEADERS += \
     src/backend.h \
     src/cli.h \
     src/database.h \
+    src/extractor.h \
     src/fetcher.h \
+    src/llmclient.h \
     src/filepicker.h \
     src/portalfilepicker.h \
     src/progress.h \
@@ -27,7 +29,9 @@ SOURCES += \
     src/backend.cpp \
     src/cli.cpp \
     src/database.cpp \
+    src/extractor.cpp \
     src/fetcher.cpp \
+    src/llmclient.cpp \
     src/portalfilepicker.cpp \
     src/progress.cpp \
     src/store.cpp \

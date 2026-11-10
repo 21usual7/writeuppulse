@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include <QDateTime>
 #include <QFileSystemWatcher>
 #include <QObject>
@@ -8,6 +10,7 @@
 
 #include "archive.h"
 #include "database.h"
+#include "extractor.h"
 #include "filepicker.h"
 #include "progress.h"
 #include "store.h"
@@ -91,6 +94,8 @@ public:
 
     // The picker answers asynchronously; the export is written when it does.
     void setFilePicker(FilePicker *picker);
+    // Concepts are extracted with this local model from then on.
+    void setLlm(LlmClient *llm);
     Q_INVOKABLE void exportMarkdown(bool week);
     bool running() const { return m_lockHeld || m_starting.isActive(); }
     QDateTime lastRun() const { return m_lastRun; }
@@ -152,11 +157,13 @@ private:
     void saveExport(const QUrl &url);
     void setNotice(const QString &notice);
     void archive();
+    void extract();
 
     Store m_store;
     Database m_database;
     Progress m_progress;
     Archive m_archive;
+    std::unique_ptr<Extractor> m_extractor;
     bool m_saveTexts = true;
     int m_progressRevision = 0;
     int m_dataVersion = -1;

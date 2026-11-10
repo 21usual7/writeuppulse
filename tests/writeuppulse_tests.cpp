@@ -12,8 +12,10 @@
 #include "archive.h"
 #include "backend.h"
 #include "database.h"
+#include "extractor.h"
 #include "fetcher.h"
 #include "filepicker.h"
+#include "llmclient.h"
 #include "progress.h"
 #include "store.h"
 #include "syncer.h"
@@ -22,6 +24,9 @@
 
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <memory>
 
 // Answers the save dialog at once with a fixed file.
 class FakePicker : public FilePicker {
@@ -678,7 +683,8 @@ private slots:
         });
 
         QSettings("writeuppulse", "writeuppulse").setValue("tutorModel", "tiny");
-        Tutor tutor(QUrl(QString("http://127.0.0.1:%1").arg(server.serverPort())));
+        LlmClient llm(QUrl(QString("http://127.0.0.1:%1").arg(server.serverPort())));
+        Tutor tutor(llm);
         QTRY_COMPARE(tutor.status(), QString("ready"));
 
         tutor.open(QVariantMap{{"url", "https://example.com/a"}, {"title", "Overflow"}, {"summary", "About buffers."},
@@ -712,13 +718,13 @@ private slots:
             if (!online.isEmpty())
                 write(dir.path() + "/" + name + "/online", online + "\n");
         };
-        QVERIFY(Tutor::onAcPower(dir.path()));
+        QVERIFY(LlmClient::onAcPower(dir.path()));
         supply("BAT0", "Battery", "");
         supply("ACAD", "Mains", "0");
         supply("ucsi-source-psy-1", "USB", "0");
-        QVERIFY(!Tutor::onAcPower(dir.path()));
+        QVERIFY(!LlmClient::onAcPower(dir.path()));
         supply("ucsi-source-psy-1", "USB", "1");
-        QVERIFY(Tutor::onAcPower(dir.path()));
+        QVERIFY(LlmClient::onAcPower(dir.path()));
     }
 
     void tutorReportsAMissingOllama()
@@ -727,13 +733,214 @@ private slots:
         QVERIFY(closed.listen(QHostAddress::LocalHost));
         const quint16 port = closed.serverPort();
         closed.close();
-        Tutor tutor(QUrl(QString("http://127.0.0.1:%1").arg(port)));
-        QTRY_COMPARE(tutor.status(), QString(Tutor::onAcPower() ? "missing" : "battery"));
+        LlmClient llm(QUrl(QString("http://127.0.0.1:%1").arg(port)));
+        Tutor tutor(llm);
+        QTRY_COMPARE(tutor.status(), QString(LlmClient::onAcPower() ? "missing" : "battery"));
         tutor.open(QVariantMap{{"url", "https://example.com/a"}, {"title", "T"}});
         tutor.ask("Hello?");
         QTRY_VERIFY(!tutor.busy());
         QVERIFY(!tutor.error().isEmpty());
         QCOMPARE(tutor.messages().size(), 0);
+    }
+
+    void extractorValidatesTheModelsAnswer()
+    {
+        QCOMPARE(Extractor::id("  Cross-site Scripting (XSS) "), QString("cross-site-scripting-xss"));
+        QCOMPARE(Extractor::id("C++"), QString("c++"));
+        auto concept_ = [](const QString &name, const QString &kind, const QStringList &aliases = {}) {
+            return QJsonObject{{"name", name}, {"kind", kind}, {"aliases", QJsonArray::fromStringList(aliases)}};
+        };
+        const QJsonObject answer{{"concepts", QJsonArray{
+            concept_("Cross-site scripting", "vulnerability", {"XSS", "cross site scripting", "Exploit"}),
+            concept_("`DOM`", "magic"), concept_("cross-site scripting", "concept"), concept_("Proof of Concept", "technique"),
+            concept_("", "tool"), concept_(QString(90, 'a'), "tool"), concept_("Content Security Policy", "technology", {"CSP"})}}};
+        const QStringList passages{"An XSS payload changes the DOM.", "CSP stops most cross-site scripting.",
+                                   "The DOM, again, with XSS.", "Nothing here mentions a domain."};
+        const QJsonObject valid = Extractor::validate(answer, passages, true);
+        const QJsonArray concepts = valid.value("concepts").toArray();
+        QCOMPARE(concepts.size(), 3);
+        QCOMPARE(concepts[0].toObject().value("id").toString(), QString("cross-site-scripting"));
+        QCOMPARE(concepts[0].toObject().value("aliases").toArray(), QJsonArray{"xss"});
+        QCOMPARE(concepts[1].toObject().value("name").toString(), QString("DOM"));
+        QCOMPARE(concepts[1].toObject().value("kind").toString(), QString("concept"));
+        // Concepts named in one passage, by name or alias, whole words only; the strongest pair first.
+        const QJsonArray edges = valid.value("edges").toArray();
+        QCOMPARE(edges.size(), 2);
+        QCOMPARE(edges[0].toObject().value("from").toString(), QString("cross-site-scripting"));
+        QCOMPARE(edges[0].toObject().value("to").toString(), QString("dom"));
+        QCOMPARE(edges[0].toObject().value("weight").toInt(), 2);
+        QCOMPARE(edges[0].toObject().value("passage").toInt(), 0);
+        QCOMPARE(edges[1].toObject().value("from").toString(), QString("content-security-policy"));
+        QCOMPARE(edges[1].toObject().value("passage").toInt(), 1);
+        QCOMPARE(Extractor::validate(answer, passages, false).value("edges").toArray().first().toObject().value("passage").toInt(), -1);
+
+        // No concept is tied to everything.
+        QJsonArray many{concept_("Hub", "concept")};
+        QString text = "hub";
+        QStringList pairs;
+        for (int i = 0; i < 10; ++i) {
+            many.append(concept_(QString("Leaf%1").arg(i), "concept"));
+            text += QString(" leaf%1").arg(i);
+            pairs << QString("hub leaf%1").arg(i);
+        }
+        int hub = 0;
+        for (const auto &edge : Extractor::validate({{"concepts", many}}, pairs, true).value("edges").toArray())
+            hub += edge.toObject().value("from").toString() == "hub" || edge.toObject().value("to").toString() == "hub";
+        QCOMPARE(hub, 6);
+        // ... and an overview naming more than six relates nothing.
+        QVERIFY(Extractor::validate({{"concepts", many}}, {text.section(' ', 0, 7)}, true).value("edges").toArray().isEmpty());
+    }
+
+    void conceptsJoinAcrossWriteups()
+    {
+        QTemporaryDir dir;
+        Database database(dir.path());
+        QVERIFY(database.error().isEmpty());
+        auto concept_ = [](const QString &name, const QStringList &aliases = {}) {
+            return QJsonObject{{"name", name}, {"kind", "vulnerability"}, {"aliases", QJsonArray::fromStringList(aliases)}};
+        };
+        auto result = [](const QJsonArray &concepts, const QStringList &passages = {}) {
+            return Extractor::validate(QJsonObject{{"concepts", concepts}}, passages, true);
+        };
+        const QString a = "https://example.com/a", b = "https://example.com/b";
+        QVERIFY(database.wantsConcepts(a));
+        QVERIFY(database.saveConcepts(a, "ok", result({concept_("Cross-site scripting", {"XSS"}), concept_("DOM")},
+            {"Intro.", "Nothing.", "XSS rewrites the DOM."}), "page", "tiny"));
+        QVERIFY(!database.wantsConcepts(a));
+        // Another writeup's "XSS" is the same concept.
+        QVERIFY(database.saveConcepts(b, "ok", result({concept_("XSS"), concept_("Content Security Policy")}), "summary", "tiny"));
+        const QJsonArray concepts = database.knowledge(b).value("concepts").toArray();
+        QCOMPARE(concepts.size(), 2);
+        QCOMPARE(concepts[1].toObject().value("id").toString(), QString("cross-site-scripting"));
+        const QJsonObject edge = database.knowledge(a).value("edges").toArray().first().toObject();
+        QCOMPARE(edge.value("from").toString(), QString("cross-site-scripting"));
+        QCOMPARE(edge.value("type").toString(), QString("RELATED_TO"));
+        QCOMPARE(edge.value("passage").toInt(), 2);
+        QCOMPARE(edge.value("weight").toInt(), 1);
+        QCOMPARE(edge.value("model").toString(), QString("tiny"));
+
+        // Summary concepts are done again once the page is saved; a failure then keeps them.
+        QVERIFY(!database.wantsConcepts(b));
+        QVERIFY(database.savePage(b, "ok", {"Text."}, {}));
+        QVERIFY(database.wantsConcepts(b));
+        QVERIFY(database.saveConcepts(b, "failed", {}, "page", "tiny", "Timed out."));
+        QVERIFY(!database.wantsConcepts(b));
+        QCOMPARE(database.conceptsStatus(b), QString("ok"));
+        QCOMPARE(database.knowledge(b).value("concepts").toArray().size(), 2);
+
+        // A new run replaces the old one, and concepts nothing mentions go.
+        QVERIFY(database.saveConcepts(b, "ok", result({concept_("Clickjacking")}), "page", "tiny"));
+        QCOMPARE(database.knowledge(b).value("concepts").toArray().size(), 1);
+        QSqlQuery query(QSqlDatabase::database(QSqlDatabase::connectionNames().first()));
+        QVERIFY(query.exec("SELECT count(*) FROM concepts") && query.next());
+        QCOMPARE(query.value(0).toInt(), 3);
+
+        QVERIFY(database.saveConcepts("https://example.com/c", "failed", {}, "summary", "tiny", "No JSON."));
+        QVERIFY(!database.wantsConcepts("https://example.com/c"));
+    }
+
+    void extractorWaitsForTheReader()
+    {
+        // A stand-in for Ollama that holds extraction requests until released.
+        QTcpServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        QList<QPointer<QTcpSocket>> held;
+        QByteArrayList extractions;
+        const QJsonObject answer{
+            {"concepts", QJsonArray{QJsonObject{{"name", "Heap spraying"}, {"kind", "technique"}, {"aliases", QJsonArray{"spraying"}}},
+                                    QJsonObject{{"name", "Heap"}, {"kind", "concept"}, {"aliases", QJsonArray{}}}}}};
+        const QByteArray json = QJsonDocument(answer).toJson(QJsonDocument::Compact);
+        auto stream = [](const QList<QByteArray> &pieces) {
+            QByteArray body;
+            for (const auto &piece : pieces)
+                body += QJsonDocument(QJsonObject{{"message", QJsonObject{{"content", QString::fromUtf8(piece)}}}}).toJson(QJsonDocument::Compact) + "\n";
+            return "HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\n\r\n" + body;
+        };
+        connect(&server, &QTcpServer::newConnection, this, [&] {
+            QTcpSocket *socket = server.nextPendingConnection();
+            auto request = std::make_shared<QByteArray>();
+            connect(socket, &QTcpSocket::readyRead, socket, [&, socket, request] {
+                *request += socket->readAll();
+                const qsizetype head = request->indexOf("\r\n\r\n");
+                if (head < 0)
+                    return;
+                const QByteArray length = request->mid(request->toLower().indexOf("content-length:") + 15).split('\r').value(0).trimmed();
+                if (request->startsWith("POST") && request->size() - head - 4 < length.toInt())
+                    return;
+                if (request->startsWith("GET")) {
+                    const QByteArray body = QJsonDocument(QJsonObject{{"models", QJsonArray{QJsonObject{{"name", "tiny:latest"}}}}}).toJson(QJsonDocument::Compact);
+                    socket->write("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\n\r\n" + body);
+                    socket->disconnectFromHost();
+                } else if (request->contains("\"format\"")) {
+                    extractions << request->mid(head + 4);
+                    held << socket;
+                } else {
+                    socket->write(stream({"Heap spraying fills memory."}));
+                    socket->disconnectFromHost();
+                }
+            });
+        });
+        auto release = [&] {
+            for (const auto &socket : held)
+                if (socket && socket->state() == QAbstractSocket::ConnectedState) {
+                    socket->write(stream({json.left(20), json.mid(20)}));
+                    socket->disconnectFromHost();
+                }
+            held.clear();
+        };
+
+        QSettings("writeuppulse", "writeuppulse").setValue("tutorModel", "tiny");
+        QTemporaryDir dir;
+        Database database(dir.path());
+        LlmClient llm(QUrl(QString("http://127.0.0.1:%1").arg(server.serverPort())));
+        Extractor extractor(database, llm);
+        extractor.pauseMs = 50;
+        QSignalSpy extracted(&extractor, &Extractor::extracted);
+        const QVariantMap item{{"url", "https://example.com/heap"}, {"title", "Heaps"}, {"summary", "About heaps."}};
+        const QVariantMap waiting{{"url", "https://example.com/later"}, {"title", "Later"}, {"summary", "Not yet."}};
+        QVERIFY(database.savePage("https://example.com/heap", "ok", {"Heaps grow.", "Spraying needs a heap."}, {}));
+
+        // Nothing is asked before the model is ready, or before a page the Archive will still get.
+        extractor.enqueue({item, waiting});
+        QVERIFY(!extractor.busy());
+        QTRY_COMPARE(llm.status(), QString("ready"));
+        QTRY_COMPARE(extractions.size(), 1);
+        QVERIFY(extractions[0].contains("Heaps grow.\\n\\nSpraying needs a heap."));
+        QVERIFY(extractions[0].contains("\"stream\":true"));
+        // A model that repeats itself can't go on for long.
+        QVERIFY(extractions[0].contains("\"maxItems\":20"));
+        QVERIFY(extractions[0].contains("\"num_predict\":1500"));
+
+        // A question to the tutor stops the extraction, which starts over after the answer.
+        Tutor tutor(llm);
+        tutor.open(item);
+        tutor.ask("What is spraying?");
+        QVERIFY(!extractor.busy());
+        QTRY_VERIFY(!tutor.busy());
+        QCOMPARE(tutor.messages().size(), 2);
+        QCOMPARE(extracted.count(), 0);
+        QTRY_COMPARE(extractions.size(), 2);
+        release();
+        QTRY_COMPARE(extracted.count(), 1);
+
+        const QJsonObject knowledge = database.knowledge("https://example.com/heap");
+        QCOMPARE(knowledge.value("concepts").toArray().size(), 2);
+        const QJsonObject edge = knowledge.value("edges").toArray().first().toObject();
+        QCOMPARE(edge.value("from").toString(), QString("heap"));
+        QCOMPARE(edge.value("to").toString(), QString("heap-spraying"));
+        QCOMPARE(edge.value("passage").toInt(), 1);
+        QCOMPARE(edge.value("model").toString(), QString("tiny"));
+        QCOMPARE(database.conceptsStatus("https://example.com/later"), QString());
+
+        // Without page downloads, the summary is the material.
+        extractor.waitForPages = false;
+        extractor.enqueue({item, waiting});
+        QTRY_COMPARE(extractions.size(), 3);
+        QVERIFY(extractions[2].contains("Not yet."));
+        release();
+        QTRY_COMPARE(extracted.count(), 2);
+        QVERIFY(!database.wantsConcepts("https://example.com/later"));
+        QSettings("writeuppulse", "writeuppulse").clear();
     }
 
     void fetcherSavesTheAgentsAnswer()

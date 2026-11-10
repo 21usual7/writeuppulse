@@ -160,6 +160,15 @@ Modules, one class per role like the current code:
   (public hosts only, redirects checked, no code blocks), cut into FTS5
   passages; search covers it. 4 of 5 real pages saved on the first try; the
   fifth is a slow site, retried later.
+- 2026-11-10, stage 4: `LlmClient` (the Ollama client, shared by `Tutor` and
+  `Extractor`); `Extractor` asks the local model for concepts with a JSON
+  schema in `format` (limits in the schema, or qwen3:8b loops), checks the
+  answer again, and saves it in database version 3 with provenance (model,
+  page or summary). Relations are concepts named in the same passage, found by
+  the app, with that passage: qwen3:8b's own typed relations were noise (all
+  from one concept, passages made up), so typed edges wait for a better model.
+  Names and aliases merge concepts across writeups. It runs only while the
+  model is ready and steps aside while the reader asks the tutor.
 
 ## 7–9. Roadmap
 

@@ -11,6 +11,7 @@
 
 #include "backend.h"
 #include "cli.h"
+#include "llmclient.h"
 #include "portalfilepicker.h"
 #include "tutor.h"
 #include "translator.h"
@@ -36,10 +37,13 @@ int main(int argc, char *argv[]) {
     Translator translator;
     app.installTranslator(&translator);
 
+    // Before the Backend, whose Extractor uses it.
+    LlmClient llm;
     Backend backend;
     PortalFilePicker picker;
     backend.setFilePicker(&picker);
-    Tutor tutor;
+    backend.setLlm(&llm);
+    Tutor tutor(llm);
 
     QQmlApplicationEngine engine;
     QObject::connect(&translator, &Translator::changed, &engine, &QQmlEngine::retranslate);

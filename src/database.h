@@ -11,7 +11,8 @@ class Store;
 // The local SQLite file, <data>/library/library.db. It keeps what the user did
 // (progress and self-check answers), which nothing can rebuild, a full-text
 // index of the saved days, which reindexing can, and the text of the
-// writeups' own pages, which the Archive downloads. It sits in a
+// writeups' own pages, which the Archive downloads, and the concepts and
+// relations the Extractor's local model found in them. It sits in a
 // subdirectory so its journal doesn't wake the window's watcher of the data
 // directory. Only the window and `export` open it; fetches and syncs never do.
 class Database {
@@ -21,7 +22,7 @@ public:
     Database(const Database &) = delete;
     Database &operator=(const Database &) = delete;
 
-    static constexpr int version = 2;
+    static constexpr int version = 3;
 
     QString path() const { return m_path; }
     // Empty when the file opened and is at the current version.
@@ -54,6 +55,21 @@ public:
     QString pageStatus(const QString &url) const;
     // Pages with a word starting with this one, canonical URL → best BM25.
     QHash<QString, double> matchPages(const QString &word) const;
+
+    // True while a writeup has no concepts yet, or has them only from its
+    // summary while its page text is saved now; a failure is tried again
+    // after six hours, three times in all.
+    bool wantsConcepts(const QString &url) const;
+    // result is what Extractor::validate returns; status "ok", or "failed"
+    // with error. source: "page" (edge passages index passages(url)) or
+    // "summary" (passage -1). A concept whose name or alias another writeup
+    // already gave joins that concept.
+    bool saveConcepts(const QString &url, const QString &status, const QJsonObject &result, const QString &source,
+                      const QString &model, const QString &error = {});
+    // {"concepts": [{id, name, kind}], "edges": [{from, to, type, passage, weight, model}]}
+    // for one writeup.
+    QJsonObject knowledge(const QString &url) const;
+    QString conceptsStatus(const QString &url) const;
 
 private:
     QSqlDatabase connection() const;
