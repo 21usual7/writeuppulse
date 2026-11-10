@@ -1,0 +1,260 @@
+{
+    "date": "2026-11-10",
+    "generatedAt": "2026-11-10T08:27:37",
+    "items": [
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "Hacker News · 32 points",
+            "practice": [
+                "Read about how assertions and debug-only checks differ from runtime validation, then audit a small open-source project of your own for checks that vanish in release builds.",
+                "Build a deliberately buggy parser of your own and run it under memory-error detection tools to see how overflows are reported.",
+                "Use a CTF platform's embedded or firmware category to practise reading a binary without hardware.",
+                "Set up a local fuzzing exercise against a toy line-based command parser you wrote, and write down which input shapes found crashes.",
+                "Practise writing a short vulnerability report that separates hardware-confirmed findings from tool-confirmed ones, with a CVSS score and rationale for each."
+            ],
+            "questions": [
+                {
+                    "answer": "The buffer length check was only a debug assertion, which release builds strip out, so an overlong path from the cloud endpoint overflowed a shared buffer.",
+                    "question": "Why was the most serious bug exploitable in release firmware?"
+                },
+                {
+                    "answer": "The attacker must control or intercept the Prusa Connect endpoint, for example through a man-in-the-middle position on the local network.",
+                    "question": "What precondition does the top-rated attack need?"
+                },
+                {
+                    "answer": "Sanitizer builds of the parsing code, emulation of the signed firmware, fuzzing of G-code and network interfaces, reverse engineering, and parallel source audits.",
+                    "question": "Which testing methods did the researcher combine?"
+                },
+                {
+                    "answer": "They were grouped by confidence: one package confirmed on physical hardware, the other confirmed only under tooling or by source review.",
+                    "question": "Why were the findings delivered as two packages?"
+                },
+                {
+                    "answer": "The vendor responded quickly, validated the findings, asked for a delay instead of silence, fixed all issues in one firmware release and published advisories.",
+                    "question": "What made the disclosure process a good example?"
+                }
+            ],
+            "source": "dixken.de (Yannick Dixken)",
+            "summary": "A researcher spent about a week auditing the firmware (6.5.7) of the Prusa MK4S 3D printer. He combined several methods: building the parsing code for a desktop with memory-error detection, running the real signed firmware in an emulator, fuzzing the G-code parser and network interfaces with millions of mutated inputs, reverse engineering the binary, and running parallel source audits. The work produced 14 reports covering about 23 defects. Most of the effort went into finding the one working exploit path among many candidates.\n\nThe worst finding was an 8.1 High remote code execution bug. A long file path in a command from the Prusa Connect cloud service could overflow a shared buffer. The length check existed only as a debug-mode assertion, which release builds remove. The attacker needs to control or intercept the Connect endpoint, for example by being a man-in-the-middle on the local network. Other findings included a USB filename overflow, a heap overflow in an encrypted file header, a G-code buffer overflow, and network receive-pool exhaustion.\n\nThe disclosure went well. Prusa acknowledged the reports quickly, reproduced them on their own hardware, asked for an embargo instead of silence, and fixed everything in firmware 7.0.0 across about fifteen printer models. The author also reflects that AI tooling has made deep firmware research much cheaper, and that this adds to the CVE volume that maintainers must handle.",
+            "tags": [
+                "firmware",
+                "fuzzing",
+                "memory-safety"
+            ],
+            "takeaways": [
+                "Assertions that disappear in release builds are not input validation; a length check that exists only in debug mode leaves the shipped firmware exposed.",
+                "Embedded targets can be tested without hardware by compiling parsing code for a desktop with sanitizers and by emulating the real firmware.",
+                "Fuzzing several input surfaces (G-code, network, USB files) finds different bug classes than reading code.",
+                "Cloud-management channels are attack surface: trusting a server-supplied path length without checking it turns a man-in-the-middle into code execution.",
+                "Physical-access bugs (USB filenames) score lower than network-reachable ones, and CVSS reflects that.",
+                "Splitting findings by confidence (confirmed on hardware versus sanitizer-only or source-only) makes reports easier for a vendor to triage.",
+                "A cooperative vendor response (fast acknowledgment, an embargo request, credit) is worth noting; a working security.txt helps researchers reach the right people.",
+                "Cheaper AI-assisted research increases report volume, which strains maintainers."
+            ],
+            "title": "Never Gonna Print You Up",
+            "topic": "Security",
+            "url": "https://dixken.de/blog/never-gonna-print-you-up",
+            "why": "A realistic end-to-end firmware audit showing methods, a debug-only-check bug, and a model vendor disclosure."
+        },
+        {
+            "category": "LLM & Agents",
+            "level": "Junior",
+            "popularity": "Hacker News · 98 points",
+            "practice": [
+                "Read about time difference of arrival and sketch on paper how three microphones at known positions pin down a source.",
+                "Record a clap with two devices you own and try to reason about how their clocks differ.",
+                "Study how a high-pass filter and a frequency transform can isolate a narrow tone from room noise, using your own recordings.",
+                "Write a short design for a sensor network of phones in your home and list where clock drift and network latency would hurt accuracy."
+            ],
+            "questions": [
+                {
+                    "answer": "The chirp gives every device a common reference sound so the recordings can be aligned in time, which is needed to compute the source's position.",
+                    "question": "Why does the system make one device play a chirp?"
+                },
+                {
+                    "answer": "It keeps a 60-second audio buffer and applies an FFT-based detector with a high-pass filter.",
+                    "question": "How does each listener detect the beep?"
+                },
+                {
+                    "answer": "A 2007 acoustic ranging paper called BeepBeep, which Claude found while researching.",
+                    "question": "What prior work inspired the ranging approach?"
+                },
+                {
+                    "answer": "The beep was located within about 40 cm, and it was an old carbon monoxide detector needing new batteries.",
+                    "question": "What was the result?"
+                }
+            ],
+            "source": "simonwillison.net",
+            "summary": "Simon Willison had an intermittent beep coming from a room full of unpacked boxes, with beeps too far apart to chase by ear. He had Claude Code build a tool called Beep Locator that uses several devices (two iPads, a phone and two laptops) as microphones to triangulate the sound.\n\nA Python web server coordinates the devices, which join through a QR code or URL and stream via WebSockets using browser audio. Each listener keeps a 60-second buffer and runs a beep detector built on an FFT and a high-pass filter. When a beep is detected, the closest device plays a short chirp so that recordings from every device can be time-aligned. The design draws on a 2007 acoustic ranging paper called BeepBeep, which Claude found during research.\n\nThe agent built it in stages, adding a rough mode for dragging device positions, a clap test mode, replay, and a way for the server to push new code to connected listeners. The system placed the beep within about 40 cm, and the source turned out to be an old carbon monoxide detector needing new batteries.",
+            "tags": [
+                "audio",
+                "agents",
+                "signal-processing"
+            ],
+            "takeaways": [
+                "Triangulating a sound needs time-aligned recordings from several microphones, so a shared reference signal is required.",
+                "A short chirp played by one device gives all listeners a common timing marker.",
+                "Simple signal processing (an FFT plus a high-pass filter) is enough to detect a distinct beep.",
+                "Rolling audio buffers let you look back at what happened just before a detection.",
+                "Ordinary consumer devices with browsers can act as a sensor network with no app installs.",
+                "Coding agents can find and apply a relevant research paper, not only write glue code.",
+                "Building in small stages and adding features from real-use feedback worked well.",
+                "A server that pushes new code to clients makes iterating on many devices much faster."
+            ],
+            "title": "Locating the source of a mysterious beep",
+            "topic": "AI / ML",
+            "url": "https://simonwillison.net/2026/Nov/9/mysterious-beeps/",
+            "why": "A fun, concrete example of an agent building a multi-device acoustic triangulation tool from a research paper."
+        },
+        {
+            "category": "Other",
+            "level": "Senior",
+            "popularity": "Hacker News · 42 points",
+            "practice": [
+                "Take a short function by hand, write it in SSA with numbered instructions, and compute each value's interval on paper.",
+                "Read a description of linear scan register allocation and compare its steps to the intervals in this post.",
+                "Inspect disassembly of a small function from a compiler you control at two optimisation levels and note where values are spilled to the stack.",
+                "Design on paper how to handle a value that is live across a branch, and where an edge move would be needed."
+            ],
+            "questions": [
+                {
+                    "answer": "A start position, where the value is defined, and an end position, the last place it is used.",
+                    "question": "What does a lifetime interval contain?"
+                },
+                {
+                    "answer": "The first time a value is seen going backwards is its last use, so the end is fixed immediately and the start is updated as the definition is found.",
+                    "question": "Why traverse in reverse?"
+                },
+                {
+                    "answer": "Blocks take parameters and terminators pass values to them, so values flow between blocks explicitly.",
+                    "question": "How does this IR avoid phi nodes?"
+                },
+                {
+                    "answer": "Values living on the stack must be loaded into a register before use and stored through a temporary, so the VM sets aside two registers for that.",
+                    "question": "Why reserve scratch registers?"
+                }
+            ],
+            "source": "xnacly.me",
+            "summary": "The author is adding register allocation to two backends of the purple-garden language: a register-based bytecode VM and an x86 JIT compiler. Register allocation maps unlimited virtual registers onto limited hardware registers and stack slots, and liveness analysis is its first step. The post walks through it using a small tail-recursive function.\n\nThe intermediate representation is in SSA form, with each value assigned once. It has no phi nodes. Values stay inside their block, and data moves between blocks through block parameters and terminators. Positions are numbered linearly. The analysis visits terminators' uses first, then instructions in reverse, then block parameters, so each value gets a lifetime interval where the end is set at the first sighting in reverse order and the start is updated each time.\n\nThe intervals feed a prepass that gives each value a machine register or a stack slot. Stack values are loaded or stored through reserved scratch registers, and the VM keeps 30 registers for allocation after reserving two. The same IR and analysis feed both backends. The allocator itself and edge-move resolution between blocks are left for a follow-up.",
+            "tags": [
+                "compilers",
+                "register-allocation",
+                "SSA"
+            ],
+            "takeaways": [
+                "Liveness analysis computes, for each value, the interval between its definition and last use.",
+                "Walking the program backwards makes the last use the first thing you see.",
+                "Block parameters can replace phi nodes while keeping SSA properties.",
+                "Keeping values block-local simplifies analysis because cross-block flow is explicit.",
+                "Spilled values need reserved scratch registers for loads and stores.",
+                "One IR with shared liveness can serve both an interpreter VM and a JIT.",
+                "Resolving moves along block edges is a separate, harder step than computing intervals."
+            ],
+            "title": "An ode to livelyness analysis; SSA to registers",
+            "topic": "Other",
+            "url": "https://xnacly.me/posts/2026/an-ode-to-livelyness-analysis/",
+            "why": "A clear walkthrough of liveness intervals on an SSA IR feeding both a VM and a JIT backend."
+        },
+        {
+            "category": "Systems & Performance",
+            "level": "Senior",
+            "popularity": "Lobsters · 18 points",
+            "practice": [
+                "Read about branch misprediction and write down why random versus sorted input changes a loop's speed.",
+                "Using a profiler on your own machine, measure a simple partition loop on random and already-sorted data and compare.",
+                "Study how a sorting network of four or eight elements is built and trace it by hand on a few inputs.",
+                "Compare compiled output of the same small function under two compilers in your own environment and note differences in branches."
+            ],
+            "questions": [
+                {
+                    "answer": "Comparison outcomes are unpredictable, so branches would be mispredicted often; computing updates arithmetically avoids pipeline flushes.",
+                    "question": "Why is branchless partitioning faster on random input?"
+                },
+                {
+                    "answer": "Sorting networks, which are fixed sequences of compare-and-swap operations with no data-dependent branching.",
+                    "question": "What is used for small partitions?"
+                },
+                {
+                    "answer": "Medians of sampled groups with some randomness, plus a heapsort fallback for uneven partitions.",
+                    "question": "What protects against bad pivots?"
+                },
+                {
+                    "answer": "They come from two machines, and GCC may not generate efficient code for the branchless form that Clang produces on ARM.",
+                    "question": "Name one caveat of the results."
+                }
+            ],
+            "source": "tiki.li",
+            "summary": "The post presents blqsort, a C++ quicksort that combines branchless partitioning, sorting networks for small partitions, and robust pivot selection. Branchless partitioning uses comparison results to update pointers and counters instead of jumping, which avoids pipeline flushes on random data where branches are unpredictable. Partitions of up to 16 elements are sorted with fixed compare-and-swap sequences. Pivots come from medians of sampled groups with some randomness, uneven splits fall back to heapsort, and duplicates are grouped.\n\nOn the author's benchmark of 50 million random values, single-threaded, blqsort took 0.67s on an M1 and 1.33s on an i5 for doubles, against 1.33s and 4.97s for std::sort. It also beat a ClickHouse port of ipnsort. A multithreaded version is reportedly about three times faster again on the M1.\n\nThe caveats are significant. Results come from two machines, and compiler behaviour varies: Clang on ARM produces good code for the branchless form while GCC does not. Types that are not trivially copyable, such as strings, use a different variant. The gains are strongest on random data, and SIMD methods win on small primitives.",
+            "tags": [
+                "sorting",
+                "branch-prediction",
+                "C++"
+            ],
+            "takeaways": [
+                "On random data, mispredicted branches dominate sorting cost, so removing branches pays off.",
+                "Sorting networks avoid data-dependent control flow for tiny partitions.",
+                "Pivot quality affects balance; sampling medians gives more even splits.",
+                "A heapsort fallback bounds the worst case on adversarial or unlucky inputs.",
+                "Compiler and architecture change whether branchless source actually compiles to branchless code.",
+                "Benchmarks from two machines are a starting point, not proof of general speed.",
+                "Branchless tricks can hurt when data is predictable.",
+                "Non-trivially-copyable types need different strategies."
+            ],
+            "title": "A C++ Quicksort Faster Than std::sort",
+            "topic": "Engineering",
+            "url": "https://tiki.li/blog/about_blqsort",
+            "why": "Explains concretely why branchless partitioning and sorting networks beat std::sort, with honest caveats."
+        },
+        {
+            "category": "DevOps & Infra",
+            "level": "Middle",
+            "popularity": "Lobsters · 32 points",
+            "practice": [
+                "Write a threat model for a home server with an encrypted disk, listing theft, server compromise, and network loss scenarios.",
+                "In a virtual machine you own, practise setting up full-disk encryption and document where the passphrase is entered at boot.",
+                "Study how early-boot environments fetch network resources, and list what must be available before a remote key fetch can work.",
+                "Design on paper a key backup and recovery plan for an encrypted volume and test the recovery steps in a VM."
+            ],
+            "questions": [
+                {
+                    "answer": "Letting encrypted headless machines reboot unattended without storing the key where a thief could find it.",
+                    "question": "What problem does ZKeys address?"
+                },
+                {
+                    "answer": "The client stops sending keepalives when offline, and the service locks the key after a long silence.",
+                    "question": "How does the key get locked after theft?"
+                },
+                {
+                    "answer": "So a compromised server alone cannot reconstruct it; the client holds the other half.",
+                    "question": "Why split the passphrase?"
+                },
+                {
+                    "answer": "A thief who keeps the machine on the network can keep sending keepalives, and boot depends on the service being reachable.",
+                    "question": "What is a key limitation?"
+                }
+            ],
+            "source": "jmmv.dev (Julio Merino)",
+            "summary": "Headless machines with encrypted disks need a passphrase at boot. Storing the key locally defeats the point, since a thief taking the whole machine takes the key too. The author built ZKeys, a managed service that holds the passphrase off-site and releases it to client machines under controlled conditions.\n\nA client fetches its key at boot and mounts the volume. It then sends periodic keepalives, and if they stop for long enough the service locks the key. The server stores only half of the passphrase, encrypted at rest with a password the client supplies, and the client holds the other half. The client is written in Rust with integrations for FreeBSD rc.d and Fedora systemd and dracut.\n\nThe threat model is theft of the machine: once it is unplugged and offline, keepalives stop and the key locks without the owner needing to react. The tradeoffs are plain: users need independent key backups, boot depends on the service, there is no availability promise, and a thief who keeps the machine online could keep it alive.",
+            "tags": [
+                "disk-encryption",
+                "threat-modeling",
+                "key-management"
+            ],
+            "takeaways": [
+                "Local key storage on an encrypted headless box protects little against whole-machine theft.",
+                "A dead-man's-switch (keepalives) removes reliance on the owner noticing a theft.",
+                "Splitting a secret between server and client means neither side alone can unlock the disk.",
+                "Encrypting the server-held half with a client-supplied password limits damage from server compromise.",
+                "Remote unlock adds a dependency: if the service is down, boot stops.",
+                "Always keep an independent backup of disk keys.",
+                "Integrating with init and early-boot systems is the hardest part to test automatically.",
+                "A threat model should say what it does not cover, such as a thief keeping the machine online."
+            ],
+            "title": "Unattended reboots with encrypted disks",
+            "topic": "Engineering",
+            "url": "https://jmmv.dev/2026/11/zkeys-intro.html",
+            "why": "A compact threat-model case study on balancing full-disk encryption with unattended reboots."
+        }
+    ]
+}
