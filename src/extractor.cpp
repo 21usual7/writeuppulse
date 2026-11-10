@@ -13,6 +13,18 @@ Extractor::Extractor(Database &database, LlmClient &llm, QObject *parent)
     : QObject(parent), m_database(database), m_llm(llm) {
     m_pause.setSingleShot(true);
     connect(&m_pause, &QTimer::timeout, this, &Extractor::next);
+    m_pace.setSingleShot(true);
+    connect(&m_pace, &QTimer::timeout, this, &Extractor::next);
+    connect(&m_power, &QTimer::timeout, this, [this] {
+        if (m_reply && !LlmClient::onAcPower(powerSupply)) {
+            m_yielding = true;
+            m_reply->abort();
+        } else if (!m_reply && m_queue.isEmpty()) {
+            m_power.stop();
+        } else {
+            next();
+        }
+    });
     connect(&m_llm, &LlmClient::statusChanged, this, &Extractor::next);
     // A question to the tutor would wait minutes behind an extraction, so
     // the extraction stops and starts over once the reader is done.
@@ -30,6 +42,8 @@ Extractor::Extractor(Database &database, LlmClient &llm, QObject *parent)
 }
 
 void Extractor::enqueue(const QVariantList &items) {
+    if (!m_reply && m_queue.isEmpty())
+        m_batch = 0;
     for (const auto &value : items) {
         const QVariantMap item = value.toMap();
         const QString url = Store::canonicalUrl(item.value("url").toString());
@@ -38,6 +52,7 @@ void Extractor::enqueue(const QVariantList &items) {
             continue;
         m_queued.insert(url);
         m_queue << item;
+        ++m_batch;
     }
     next();
 }
@@ -188,9 +203,13 @@ QJsonArray Extractor::messages(const QVariantMap &item, QString *source, QString
 }
 
 void Extractor::next() {
-    if (m_reply || m_queue.isEmpty() || m_llm.status() != "ready" || !m_llm.idle() || m_pause.isActive())
+    if (!m_queue.isEmpty() && !m_power.isActive())
+        m_power.start(powerCheckMs);
+    if (m_reply || m_queue.isEmpty() || m_llm.status() != "ready" || !m_llm.idle() || m_pause.isActive()
+        || m_pace.isActive() || !LlmClient::onAcPower(powerSupply))
         return;
     m_current = m_queue.takeFirst();
+    m_started.start();
     m_buffer.clear();
     m_text.clear();
     m_error.clear();
@@ -247,5 +266,9 @@ void Extractor::finish() {
     else
         m_database.saveConcepts(url, "failed", {}, m_source, m_llm.model(), m_error);
     emit extracted(url);
-    next();
+    const qint64 wait = spreadMs / qMax(1, m_batch) - m_started.elapsed();
+    if (wait > 0 && !m_queue.isEmpty())
+        m_pace.start(int(wait));
+    else
+        next();
 }

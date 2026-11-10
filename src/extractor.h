@@ -2,6 +2,7 @@
 
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QElapsedTimer>
 #include <QObject>
 #include <QPointer>
 #include <QSet>
@@ -48,6 +49,15 @@ public:
     bool waitForPages = true;
     // How long the queue waits after the reader's last question.
     int pauseMs = 60 * 1000;
+    // A batch of writeups is spread over this long, so the model doesn't keep
+    // the machine busy for an hour at a stretch: each one starts at least
+    // spreadMs / (writeups in the batch) after the one before.
+    int spreadMs = 2 * 60 * 60 * 1000;
+    // Nothing runs on battery, even where Ollama itself keeps running: a
+    // running extraction stops when the charger is pulled, and the queue
+    // looks again this often.
+    QString powerSupply = "/sys/class/power_supply";
+    int powerCheckMs = 60 * 1000;
 
 signals:
     // Concepts were saved or given up on; url is canonical.
@@ -69,5 +79,7 @@ private:
     QByteArray m_buffer;
     QString m_text, m_error;
     bool m_yielding = false;
-    QTimer m_pause;
+    QTimer m_pause, m_pace, m_power;
+    QElapsedTimer m_started;
+    int m_batch = 0;
 };

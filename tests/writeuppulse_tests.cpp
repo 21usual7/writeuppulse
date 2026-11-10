@@ -975,6 +975,10 @@ private slots:
         LlmClient llm(QUrl(QString("http://127.0.0.1:%1").arg(server.serverPort())));
         Extractor extractor(database, llm);
         extractor.pauseMs = 50;
+        extractor.spreadMs = 0;
+        QTemporaryDir power;
+        extractor.powerSupply = power.path();
+        extractor.powerCheckMs = 50;
         QSignalSpy extracted(&extractor, &Extractor::extracted);
         const QVariantMap item{{"url", "https://example.com/heap"}, {"title", "Heaps"}, {"summary", "About heaps."}};
         const QVariantMap waiting{{"url", "https://example.com/later"}, {"title", "Later"}, {"summary", "Not yet."}};
@@ -1020,6 +1024,42 @@ private slots:
         release();
         QTRY_COMPARE(extracted.count(), 2);
         QVERIFY(!database.wantsConcepts("https://example.com/later"));
+
+        // A batch is spread out: two writeups over 1.6 s start 0.8 s apart.
+        extractor.spreadMs = 1600;
+        auto other = [](const QString &name) {
+            return QVariantMap{{"url", "https://example.com/" + name}, {"title", name}, {"summary", "About " + name + "."}};
+        };
+        extractor.enqueue({other("one"), other("two")});
+        QTRY_COMPARE(extractions.size(), 4);
+        release();
+        QTRY_COMPARE(extracted.count(), 3);
+        QTest::qWait(300);
+        QCOMPARE(extractions.size(), 4);
+        QTRY_COMPARE(extractions.size(), 5);
+        release();
+        QTRY_COMPARE(extracted.count(), 4);
+
+        // On battery nothing starts, and a running extraction stops and waits.
+        extractor.spreadMs = 0;
+        auto supply = [&](const QString &name, const QByteArray &type, const QByteArray &online) {
+            QDir(power.path()).mkpath(name);
+            write(power.path() + "/" + name + "/type", type + "\n");
+            write(power.path() + "/" + name + "/online", online + "\n");
+        };
+        supply("BAT0", "Battery", "0");
+        supply("AC", "Mains", "1");
+        extractor.enqueue({other("three")});
+        QTRY_COMPARE(extractions.size(), 6);
+        supply("AC", "Mains", "0");
+        QTRY_VERIFY(!extractor.busy());
+        QTest::qWait(200);
+        QCOMPARE(extractions.size(), 6);
+        QCOMPARE(extracted.count(), 4);
+        supply("AC", "Mains", "1");
+        QTRY_COMPARE(extractions.size(), 7);
+        release();
+        QTRY_COMPARE(extracted.count(), 5);
         QSettings("writeuppulse", "writeuppulse").clear();
     }
 

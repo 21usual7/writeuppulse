@@ -220,7 +220,12 @@ the QML window.
   downloads on it waits until the `Archive` has tried the page. A tutor question
   aborts the running extraction, which restarts `pauseMs` (60 s) after the last
   answer; a refused connection (Ollama stopped on unplugging) requeues without
-  counting. Stored by `Database::saveConcepts` (version 3): `concepts` (id =
+  counting. A batch is spread over `spreadMs` (2 h, the user's choice: the model
+  shouldn't hold the machine for an hour at a stretch): each writeup starts at least
+  `spreadMs / batch size` after the previous one started. Nothing starts off AC power
+  (`LlmClient::onAcPower(powerSupply)`), even where Ollama keeps running on battery,
+  and a running extraction is stopped and requeued within `powerCheckMs` (60 s) of
+  unplugging. Stored by `Database::saveConcepts` (version 3): `concepts` (id =
   `Extractor::id(name)`), `aliases` (every name and alias → the concept that first had
   it, so "XSS" in one writeup joins "Cross-site scripting" from another), `mentions`
   (url, concept), `edges` (url, source, target, type, passage, weight, model; `type`
