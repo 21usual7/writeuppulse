@@ -169,7 +169,7 @@ Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`
 | --- | --- |
 | ↑ ↓ (K J) | Previous or next writeup |
 | ← → | Older or newer day; in focus mode, previous or next step |
-| 1 – 5 | Summary, takeaways, questions, practice, ask the tutor |
+| 1 – 6 | Summary, takeaways, questions, practice, ask the tutor, notes |
 | Enter | Study the writeup step by step |
 | Space | In focus mode, reveal the next answer or go on |
 | O | Open the article in the browser |
