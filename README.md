@@ -78,6 +78,15 @@ revealing an answer, say whether you knew it; Statistics counts the answers you 
 
 ![Focus mode, checking yourself](docs/focus.png)
 
+**Concepts** (G) is a map of what your library teaches. While Ollama is running,
+the local model reads each saved writeup in the background (a few minutes each on
+a CPU) and lists the concepts, techniques, tools, vulnerabilities, and technologies
+in it; two concepts are related when one passage of the article names both. Search
+the map, pick a concept to see the writeups that mention it in date order and its
+related concepts with the passages that relate them, and open a writeup from there.
+It is the model's reading, not a set of facts, and the window says so. Without
+Ollama the map stays empty and says what it needs; everything else works.
+
 WriteupPulse is for understanding, not attacking: the agent is told never to write
 code, commands, payloads, or exploits, and the app cuts out any code block that
 slips through.
@@ -132,6 +141,7 @@ Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`
 | U | Show only unread |
 | Ctrl+F or / | Search all saved writeups |
 | S | Statistics |
+| G | Concepts the local model found |
 | P | Settings and directions |
 | E | Export the day or week as Markdown |
 | R | Fetch today's writeups now |

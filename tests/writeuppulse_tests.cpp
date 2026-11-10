@@ -839,6 +839,86 @@ private slots:
         QVERIFY(!database.wantsConcepts("https://example.com/c"));
     }
 
+    void backendShowsTheGraphOfTheLibrary()
+    {
+        QTemporaryDir dir;
+        Store store(dir.path());
+        QString error;
+        QVERIFY(store.saveDigest(sampleDigest("2026-11-08", "https://example.com/a"), &error));
+        QVERIFY(store.saveDigest(sampleDigest("2026-11-09", "https://www.example.com/b/"), &error));
+        auto concept_ = [](const QString &name, const QStringList &aliases = {}) {
+            return QJsonObject{{"name", name}, {"kind", "vulnerability"}, {"aliases", QJsonArray::fromStringList(aliases)}};
+        };
+        {
+            Database database(dir.path());
+            const QStringList pages{"Intro.", "XSS rewrites the DOM."};
+            QVERIFY(database.savePage("https://example.com/a", "ok", pages, {}));
+            QVERIFY(database.saveConcepts("https://example.com/a", "ok", Extractor::validate(QJsonObject{{"concepts", QJsonArray{
+                concept_("Cross-site scripting", {"XSS"}), concept_("DOM")}}}, pages, true), "page", "tiny"));
+            QVERIFY(database.saveConcepts("https://example.com/b", "ok", Extractor::validate(QJsonObject{{"concepts", QJsonArray{
+                concept_("XSS"), concept_("DOM")}}}, {"XSS and the DOM."}, false), "summary", "tiny"));
+            // A writeup no longer in the library takes its concepts with it.
+            QVERIFY(database.saveConcepts("https://example.com/gone", "ok", Extractor::validate(QJsonObject{{"concepts", QJsonArray{
+                concept_("Clickjacking")}}}, {}, true), "page", "tiny"));
+        }
+        Backend backend(dir.path(), false);
+        const QVariantMap graph = backend.graph();
+        QCOMPARE(graph.value("total").toInt(), 2);
+        QCOMPARE(graph.value("done").toInt(), 2);
+        const QVariantList nodes = graph.value("nodes").toList();
+        QCOMPARE(nodes.size(), 2);
+        for (const auto &node : nodes) {
+            QCOMPARE(node.toMap().value("urls").toList().size(), 2);
+            QVERIFY(node.toMap().value("x").toDouble() >= 0 && node.toMap().value("x").toDouble() <= 1);
+        }
+        // Both writeups relate the pair once each.
+        const QVariantList edges = graph.value("edges").toList();
+        QCOMPARE(edges.size(), 1);
+        QCOMPARE(edges.first().toMap().value("writeups").toInt(), 2);
+        QCOMPARE(edges.first().toMap().value("weight").toInt(), 2);
+
+        const QVariantMap xss = backend.conceptInfo("cross-site-scripting");
+        QCOMPARE(xss.value("aliases").toStringList(), QStringList({"xss"}));
+        QCOMPARE(xss.value("models").toStringList(), QStringList({"tiny"}));
+        const QVariantList writeups = xss.value("writeups").toList();
+        QCOMPARE(writeups.size(), 2);
+        QCOMPARE(writeups.first().toMap().value("date").toString(), QString("2026-11-08"));
+        const QVariantMap dom = xss.value("neighbours").toList().first().toMap();
+        QCOMPARE(dom.value("id").toString(), QString("dom"));
+        QCOMPARE(dom.value("weight").toInt(), 2);
+        const QVariantList evidence = dom.value("evidence").toList();
+        QCOMPARE(evidence.size(), 2);
+        QCOMPARE(evidence.first().toMap().value("text").toString(), QString("XSS rewrites the DOM."));
+        QCOMPARE(evidence.first().toMap().value("title").toString(), QString("A writeup"));
+        QVERIFY(evidence.last().toMap().value("text").toString().isEmpty());
+        QVERIFY(backend.conceptInfo("clickjacking").isEmpty());
+    }
+
+    void layoutKeepsRelatedConceptsTogether()
+    {
+        QJsonArray nodes, edges;
+        for (int i = 0; i < 8; ++i)
+            nodes.append(QJsonObject{{"id", QString::number(i)}});
+        // Two groups of four, each related all round, nothing between them.
+        for (int group : {0, 4})
+            for (int i = group; i < group + 4; ++i)
+                for (int j = i + 1; j < group + 4; ++j)
+                    edges.append(QJsonObject{{"from", QString::number(i)}, {"to", QString::number(j)}, {"weight", 1}});
+        QJsonArray first = nodes, second = nodes;
+        Backend::layout(first, edges);
+        Backend::layout(second, edges);
+        QCOMPARE(first, second);
+        auto distance = [&](int a, int b) {
+            const QJsonObject p = first[a].toObject(), q = first[b].toObject();
+            return std::hypot(p.value("x").toDouble() - q.value("x").toDouble(), p.value("y").toDouble() - q.value("y").toDouble());
+        };
+        double inside = 0, across = 0;
+        for (int i = 0; i < 8; ++i)
+            for (int j = i + 1; j < 8; ++j)
+                (i / 4 == j / 4 ? inside : across) += distance(i, j);
+        QVERIFY2(inside / 12 < across / 16 * 0.6, qPrintable(QString("%1 vs %2").arg(inside / 12).arg(across / 16)));
+    }
+
     void extractorWaitsForTheReader()
     {
         // A stand-in for Ollama that holds extraction requests until released.

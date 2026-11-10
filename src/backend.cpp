@@ -7,6 +7,8 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLockFile>
+#include <QPointF>
+#include <QtMath>
 #include <QProcess>
 #include <QSaveFile>
 #include <QSettings>
@@ -147,6 +149,7 @@ void Backend::setSaveTexts(bool save) {
 
 void Backend::setLlm(LlmClient *llm) {
     m_extractor = std::make_unique<Extractor>(m_database, *llm);
+    connect(m_extractor.get(), &Extractor::extracted, this, &Backend::graphOutdated);
     extract();
 }
 
@@ -156,6 +159,121 @@ void Backend::extract() {
         return;
     m_extractor->waitForPages = m_systemd && m_saveTexts;
     m_extractor->enqueue(m_library);
+}
+
+QSet<QString> Backend::libraryUrls() const {
+    QSet<QString> urls;
+    for (const auto &value : m_library)
+        urls.insert(Store::canonicalUrl(value.toMap().value("url").toString()));
+    return urls;
+}
+
+void Backend::graphOutdated() {
+    m_graphOutdated = true;
+    emit graphChanged();
+}
+
+QVariantMap Backend::graph() {
+    if (m_graphOutdated) {
+        m_graphOutdated = false;
+        QJsonObject graph = m_database.graph(libraryUrls());
+        QJsonArray nodes = graph.value("nodes").toArray();
+        layout(nodes, graph.value("edges").toArray());
+        graph.insert("nodes", nodes);
+        graph.insert("total", int(libraryUrls().size()));
+        m_graph = graph.toVariantMap();
+    }
+    return m_graph;
+}
+
+QVariantMap Backend::conceptInfo(const QString &id) const {
+    QJsonObject info = m_database.conceptInfo(id, libraryUrls());
+    if (info.isEmpty())
+        return {};
+    QHash<QString, QVariantMap> items;
+    for (const auto &value : m_library)
+        items.insert(Store::canonicalUrl(value.toMap().value("url").toString()), value.toMap());
+    QVariantList writeups;
+    for (const auto &url : info.value("urls").toArray())
+        writeups << items.value(url.toString());
+    std::sort(writeups.begin(), writeups.end(), [](const QVariant &a, const QVariant &b) {
+        return a.toMap().value("date").toString() < b.toMap().value("date").toString();
+    });
+    QVariantMap result = info.toVariantMap();
+    result.insert("writeups", writeups);
+    QVariantList neighbours;
+    for (const auto &value : result.value("neighbours").toList()) {
+        QVariantMap neighbour = value.toMap();
+        QVariantList evidence;
+        for (const auto &piece : neighbour.value("evidence").toList()) {
+            QVariantMap map = piece.toMap();
+            map.insert("title", items.value(map.value("url").toString()).value("title"));
+            evidence << map;
+        }
+        neighbour.insert("evidence", evidence);
+        neighbours << neighbour;
+    }
+    result.insert("neighbours", neighbours);
+    return result;
+}
+
+// Fruchterman–Reingold with a pull towards the middle, so writeups that share
+// nothing don't drift off the edge; then scaled to fill [0, 1].
+void Backend::layout(QJsonArray &nodes, const QJsonArray &edges) {
+    const int n = nodes.size();
+    if (n == 0)
+        return;
+    QHash<QString, int> index;
+    for (int i = 0; i < n; ++i)
+        index.insert(nodes[i].toObject().value("id").toString(), i);
+    QList<QPointF> at(n), push(n);
+    // A sunflower spiral: spread out, and the same for the same nodes.
+    for (int i = 0; i < n; ++i) {
+        const double r = qSqrt(i + 0.5) / qSqrt(n), angle = i * 2.39996;
+        at[i] = {r * qCos(angle), r * qSin(angle)};
+    }
+    const double k = 1.0 / qSqrt(n);
+    double heat = 0.1;
+    for (int round = 0; round < 300; ++round, heat *= 0.985) {
+        for (int i = 0; i < n; ++i)
+            push[i] = -at[i] * qSqrt(QPointF::dotProduct(at[i], at[i])) * 2.0;
+        for (int i = 0; i < n; ++i)
+            for (int j = i + 1; j < n; ++j) {
+                QPointF d = at[i] - at[j];
+                const double length = qMax(1e-4, qSqrt(QPointF::dotProduct(d, d)));
+                d *= k * k / (length * length);
+                push[i] += d;
+                push[j] -= d;
+            }
+        for (const auto &value : edges) {
+            const QJsonObject edge = value.toObject();
+            const int a = index.value(edge.value("from").toString(), -1), b = index.value(edge.value("to").toString(), -1);
+            if (a < 0 || b < 0)
+                continue;
+            QPointF d = at[a] - at[b];
+            const double length = qSqrt(QPointF::dotProduct(d, d));
+            d *= length / k * qMin(3.0, 1.0 + qLn(edge.value("weight").toInt(1)));
+            push[a] -= d;
+            push[b] += d;
+        }
+        for (int i = 0; i < n; ++i) {
+            const double length = qSqrt(QPointF::dotProduct(push[i], push[i]));
+            if (length > 0)
+                at[i] += push[i] / length * qMin(length, heat);
+        }
+    }
+    double left = at[0].x(), right = left, top = at[0].y(), bottom = top;
+    for (const auto &p : at) {
+        left = qMin(left, p.x()), right = qMax(right, p.x());
+        top = qMin(top, p.y()), bottom = qMax(bottom, p.y());
+    }
+    const double scale = qMax(1e-6, qMax(right - left, bottom - top));
+    for (int i = 0; i < n; ++i) {
+        QJsonObject node = nodes[i].toObject();
+        node.insert("x", (at[i].x() - left) / scale + (1 - (right - left) / scale) / 2);
+        node.insert("y", (at[i].y() - top) / scale + (1 - (bottom - top) / scale) / 2);
+        nodes.replace(i, node);
+    }
 }
 
 // Newest first, so today's writeups are searchable before older ones.
@@ -448,6 +566,7 @@ void Backend::reload() {
             setProblem(error);
         archive();
         extract();
+        graphOutdated();
         rebuildNeeded = true;
         // The statistics read the categories of the days.
         emit progressChanged();
@@ -458,6 +577,8 @@ void Backend::reload() {
     if (dataVersion != m_dataVersion) {
         m_dataVersion = dataVersion;
         m_progress.load();
+        // Another window's model may have found concepts.
+        graphOutdated();
         ++m_progressRevision;
         emit progressChanged();
         rebuildNeeded = true;

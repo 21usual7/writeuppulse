@@ -22,6 +22,15 @@ QtObject {
     readonly property string serif: "Noto Serif"
     readonly property int radius: 8
 
+    // Concept kinds on the map, in the topics' family of colours.
+    function kindColor(kind) {
+        return kind === "technique" ? "#e2a46b"
+             : kind === "tool" ? "#9d8cf2"
+             : kind === "vulnerability" ? "#e57b8c"
+             : kind === "technology" ? "#6fa8dc"
+             : "#4fc1b0"
+    }
+
     function topicColor(topic) {
         return topic === "Security" ? "#e57b8c"
              : topic === "AI / ML" ? "#9d8cf2"

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QHash>
+#include <QSet>
 #include <QJsonObject>
 #include <QSqlDatabase>
 #include <QString>
@@ -70,6 +71,17 @@ public:
     // for one writeup.
     QJsonObject knowledge(const QString &url) const;
     QString conceptsStatus(const QString &url) const;
+    // The concepts of these writeups (canonical URLs, so a removed day's
+    // concepts drop out), each with the writeups naming it, and their
+    // relations summed over those writeups: {"nodes": [{id, name, kind, urls}],
+    // "edges": [{from, to, weight, writeups}], "done", "failed"}, the last two
+    // counting the writeups whose extraction finished or was given up on.
+    QJsonObject graph(const QSet<QString> &urls) const;
+    // One concept among these writeups: {id, name, kind, aliases, urls,
+    // models, neighbours: [{id, name, kind, weight, evidence: [{url, passage,
+    // weight, text}]}]}, strongest neighbour first, text being the passage
+    // (empty for a summary). Empty when no writeup names it.
+    QJsonObject conceptInfo(const QString &id, const QSet<QString> &urls) const;
 
 private:
     QSqlDatabase connection() const;

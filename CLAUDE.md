@@ -16,7 +16,7 @@ build new features locally — SQLite, the local Ollama model, the article pages
 
 ## Status (2026-11-10)
 
-Roadmap stages done, each with tests (38 passing) and docs:
+Roadmap stages done, each with tests (40 passing) and docs:
 
 - **0 (bugs):** start limits in `[Unit]` (packaged and local unit), statistics take
   the category from the day, progress keyed by `Store::canonicalUrl`.
@@ -28,7 +28,9 @@ Roadmap stages done, each with tests (38 passing) and docs:
   covers them; Settings switch "Save article texts for search".
 - **4 (concepts):** `LlmClient` shared by `Tutor` and `Extractor`; the local model
   lists concepts, the app relates the ones named in the same passage (database
-  version 3). Nothing in the window shows them yet.
+  version 3).
+- **5 (graph view):** the Concepts view (G, rail ◈): map, search, inspector with
+  the timeline of writeups and neighbours with their passages.
 
 On this machine `~/.local/bin/writeuppulse` is still the stage-3 binary: the database
 is at version 2, every saved writeup has its page text (`pages` status `ok`), and no
@@ -36,10 +38,8 @@ concepts are extracted yet. Installing the new binary migrates it to version 3 a
 starts extraction in the window whenever Ollama is up (~1.5–4 min of CPU per writeup). Nothing is pushed; the
 last release is still 0.3.0, so cutting 0.4.0 would need the user's go-ahead.
 
-**Next: stage 5**, the graph view: concept search, a node inspector with its writeups
-and neighbours (edges by weight, with the passage), a timeline, and a note for feed
-readers without Ollama instead of an empty graph. Concepts are model-extracted: say
-so. See `docs/ROADMAP.md`.
+**Next: stage 6**, the learning engine: tutor modes, teach-back and knowledge checks
+with structured grading, history in the database. See `docs/ROADMAP.md`.
 
 ## Commands
 
@@ -228,7 +228,23 @@ the QML window.
   attempts). Summary concepts are redone once the page is saved; failures retry after
   6 h up to 3 times, and a failure after a good run keeps the good one. On this
   machine's CPU a writeup takes ~2–4 min at ~6 tokens/s (Ollama 0.40 drops the 680M
-  iGPU unless `OLLAMA_IGPU_ENABLE=1`). Show the concepts as model-extracted (stage 5).
+  iGPU unless `OLLAMA_IGPU_ENABLE=1`).
+- **Concept map:** `Database::graph(urls)` sums every writeup's edges per pair
+  (either direction) and `Database::conceptInfo(id, urls)` gives one concept with
+  aliases, models, and neighbours with evidence (passage text, empty for a summary);
+  both take the library's canonical URLs, so concepts of removed days drop out.
+  `Backend::graph` (property, `graphChanged` after each extraction, library change,
+  or another window's commit) adds positions from `Backend::layout`
+  (Fruchterman–Reingold from a sunflower start, deterministic, gravity so separate
+  writeups stay on screen, scaled to a [0, 1] square) and is computed lazily: only
+  `GraphView`, behind a `Loader` active in the `graph` view, reads it. Layout is
+  O(n²·300) on the GUI thread (~0.1 s for 300 concepts, ~0.3 s for 600); move it off the thread
+  if libraries grow to thousands. `Backend::conceptInfo` adds the library items
+  (oldest first) and titles. `GraphView.qml` draws edges on a `Canvas` and nodes as
+  items in a scaled `world` (drag pans, wheel zooms; sizes and labels divide by the
+  scale); `win.openWriteup(item)` jumps to the writeup's day, clearing topic and level
+  filters (and "unread only") if they hide it. It always says the concepts are the
+  model's reading.
 - **Look:** the app has its own palette on purpose (the user chose it over following the
   Omarchy theme): colours, fonts, and radius live in the `Style` QML singleton
   (`src/Style.qml`, registered by `src/qmldir`). Layout is a reader — icon rail, list

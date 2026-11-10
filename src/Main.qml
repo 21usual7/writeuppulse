@@ -63,6 +63,21 @@ ApplicationWindow {
         backend.view = view
         focusVisible = false
     }
+    // From the concept map to the writeup in its day, out from under any
+    // filter that would hide it.
+    function openWriteup(item) {
+        show("day")
+        backend.date = item.date
+        let at = backend.items.findIndex(it => it.url === item.url)
+        if (at < 0) {
+            backend.categoryFilter = []
+            backend.levelFilter = ""
+            backend.hideRead = false
+            at = backend.items.findIndex(it => it.url === item.url)
+        }
+        current = Math.max(0, at)
+        list.positionViewAtIndex(current, ListView.Contain)
+    }
     // Topic pills narrow the list to that topic's directions.
     function topicOn(topic) {
         const own = backend.categoriesOf(topic)
@@ -169,6 +184,7 @@ ApplicationWindow {
     Shortcut { sequence: "F"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.toggleStar(win.current) }
     Shortcut { sequence: "U"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: backend.hideRead = !backend.hideRead }
     Shortcut { sequence: "S"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.show(backend.view === "stats" ? "day" : "stats") }
+    Shortcut { sequence: "G"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.show(backend.view === "graph" ? "day" : "graph") }
     Shortcut { sequence: "P"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.settingsVisible = !win.settingsVisible }
     Shortcut { sequence: "E"; context: Qt.ApplicationShortcut; enabled: !win.typing && backend.dates.length > 0; onActivated: moreMenu.popup(moreButton, 0, moreButton.height) }
     Shortcut { sequence: "Return"; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible && win.item !== null; onActivated: win.focusVisible = true }
@@ -222,7 +238,8 @@ ApplicationWindow {
                         model: [
                             ["☰", "day", qsTr("Days")],
                             ["★", "favorites", qsTr("Favorites")],
-                            ["∑", "stats", qsTr("Statistics")]
+                            ["∑", "stats", qsTr("Statistics")],
+                            ["◈", "graph", qsTr("Concepts")]
                         ]
                         Rectangle {
                             required property var modelData
@@ -265,7 +282,7 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 Layout.preferredWidth: Math.min(400, win.width * 0.34)
                 color: Style.pane
-                visible: backend.view !== "stats" || win.searching
+                visible: (backend.view !== "stats" && backend.view !== "graph") || win.searching
                 Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Style.line }
 
                 ColumnLayout {
@@ -517,7 +534,7 @@ ApplicationWindow {
                 ReaderPane {
                     id: reader
                     anchors.fill: parent
-                    visible: backend.view !== "stats" || win.searching
+                    visible: (backend.view !== "stats" && backend.view !== "graph") || win.searching
                     item: win.item
                     progress: win.progressOf(win.current)
                     onOpenArticle: win.openArticle(win.current)
@@ -540,6 +557,12 @@ ApplicationWindow {
                 StatsView {
                     anchors.fill: parent
                     visible: backend.view === "stats" && !win.searching
+                }
+                // Only while shown: reading the graph lays it out.
+                Loader {
+                    anchors.fill: parent
+                    active: backend.view === "graph" && !win.searching
+                    sourceComponent: GraphView { onWriteupChosen: item => win.openWriteup(item) }
                 }
             }
         }
@@ -796,6 +819,7 @@ ApplicationWindow {
                         ["U", qsTr("Show only unread")],
                         ["Ctrl+F  /", qsTr("Search all writeups")],
                         ["S", qsTr("Statistics")],
+                        ["G", qsTr("Concepts the local model found")],
                         ["P", qsTr("Settings and directions")],
                         ["E", qsTr("Export the day or week as Markdown")],
                         ["R", qsTr("Fetch today's writeups now")],

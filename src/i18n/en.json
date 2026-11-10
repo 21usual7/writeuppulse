@@ -10,5 +10,9 @@
   "%n hidden by filters": {
     "one": "%n hidden by filters",
     "other": "%n hidden by filters"
+  },
+  "%n passages": {
+    "one": "%n passage",
+    "other": "%n passages"
   }
 }

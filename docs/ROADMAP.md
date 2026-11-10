@@ -170,6 +170,16 @@ Modules, one class per role like the current code:
   Names and aliases merge concepts across writeups. It runs only while the
   model is ready and steps aside while the reader asks the tutor.
 
+- 2026-11-10, stage 5: the Concepts view (G, `GraphView.qml`): a force
+  layout of the library's concepts (laid out in C++ by `Backend::layout`,
+  drawn with a Canvas and items, no new dependency), concept search, an
+  inspector with the writeups naming the concept in date order (the
+  timeline), its neighbours by shared passages with each passage, and a jump
+  to the writeup. Graph queries live in `Database` (`graph`, `conceptInfo`)
+  rather than a separate `Knowledge` class: they are plain SQL over the
+  version-3 tables. Every view of it says the concepts are the model's; with
+  no model, it says what's missing instead of an empty map.
+
 ## 7–9. Roadmap
 
 | # | Stage | Size | Needs |

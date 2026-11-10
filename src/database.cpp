@@ -6,11 +6,13 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QMap>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QStringList>
 #include <QVariant>
 
+#include "extractor.h"
 #include "store.h"
 
 Database::Database(const QString &directory)
@@ -451,4 +453,112 @@ QString Database::conceptsStatus(const QString &url) const {
     query.prepare("SELECT status FROM extractions WHERE url = ?");
     query.addBindValue(url);
     return query.exec() && query.next() ? query.value(0).toString() : QString();
+}
+
+QJsonObject Database::graph(const QSet<QString> &urls) const {
+    QSqlQuery query(connection());
+    QMap<QString, QJsonObject> nodes;
+    QHash<QString, QStringList> named;
+    if (query.exec("SELECT m.url, c.id, c.name, c.kind FROM mentions m JOIN concepts c ON c.id = m.concept ORDER BY c.name"))
+        while (query.next()) {
+            if (!urls.contains(query.value(0).toString()))
+                continue;
+            const QString id = query.value(1).toString();
+            nodes.insert(id, {{"id", id}, {"name", query.value(2).toString()}, {"kind", query.value(3).toString()}});
+            named[id] << query.value(0).toString();
+        }
+    // A pair is one relation whichever way round a writeup stored it.
+    QMap<QPair<QString, QString>, QPair<int, QSet<QString>>> pairs;
+    if (query.exec("SELECT url, source, target, weight FROM edges"))
+        while (query.next()) {
+            const QString url = query.value(0).toString(), a = query.value(1).toString(), b = query.value(2).toString();
+            if (!urls.contains(url) || !nodes.contains(a) || !nodes.contains(b))
+                continue;
+            auto &pair = pairs[a < b ? qMakePair(a, b) : qMakePair(b, a)];
+            pair.first += query.value(3).toInt();
+            pair.second.insert(url);
+        }
+    QJsonArray nodeList, edges;
+    for (auto it = nodes.begin(); it != nodes.end(); ++it) {
+        it->insert("urls", QJsonArray::fromStringList(named.value(it.key())));
+        nodeList.append(*it);
+    }
+    for (auto it = pairs.begin(); it != pairs.end(); ++it)
+        edges.append(QJsonObject{{"from", it.key().first}, {"to", it.key().second}, {"weight", it.value().first},
+                                 {"writeups", int(it.value().second.size())}});
+    int done = 0, failed = 0;
+    if (query.exec("SELECT url, status, attempts FROM extractions"))
+        while (query.next())
+            if (urls.contains(query.value(0).toString())) {
+                done += query.value(1).toString() == "ok";
+                failed += query.value(1).toString() != "ok" && query.value(2).toInt() >= 3;
+            }
+    return {{"nodes", nodeList}, {"edges", edges}, {"done", done}, {"failed", failed}};
+}
+
+QJsonObject Database::conceptInfo(const QString &id, const QSet<QString> &urls) const {
+    QSqlQuery query(connection());
+    query.prepare("SELECT name, kind FROM concepts WHERE id = ?");
+    query.addBindValue(id);
+    if (!query.exec() || !query.next())
+        return {};
+    QJsonObject result{{"id", id}, {"name", query.value(0).toString()}, {"kind", query.value(1).toString()}};
+    QStringList aliases, named, models;
+    query.prepare("SELECT alias FROM aliases WHERE concept = ? ORDER BY alias");
+    query.addBindValue(id);
+    if (query.exec())
+        while (query.next())
+            // The name's own key is kept as an alias too; it isn't another name.
+            if (Extractor::id(query.value(0).toString()) != id)
+                aliases << query.value(0).toString();
+    query.prepare("SELECT m.url, x.model FROM mentions m LEFT JOIN extractions x ON x.url = m.url WHERE m.concept = ?");
+    query.addBindValue(id);
+    if (query.exec())
+        while (query.next())
+            if (urls.contains(query.value(0).toString())) {
+                named << query.value(0).toString();
+                if (!query.value(1).toString().isEmpty() && !models.contains(query.value(1).toString()))
+                    models << query.value(1).toString();
+            }
+    if (named.isEmpty())
+        return {};
+    QHash<QString, QJsonObject> neighbours;
+    QHash<QString, QStringList> pages;
+    query.prepare("SELECT e.url, e.source, e.target, e.passage, e.weight, c.name, c.kind FROM edges e"
+                  " JOIN concepts c ON c.id = CASE WHEN e.source = ? THEN e.target ELSE e.source END"
+                  " WHERE e.source = ? OR e.target = ? ORDER BY e.rowid");
+    for (int i = 0; i < 3; ++i)
+        query.addBindValue(id);
+    if (query.exec())
+        while (query.next()) {
+            const QString url = query.value(0).toString();
+            if (!urls.contains(url))
+                continue;
+            const QString other = query.value(1).toString() == id ? query.value(2).toString() : query.value(1).toString();
+            QJsonObject &neighbour = neighbours[other];
+            if (neighbour.isEmpty())
+                neighbour = {{"id", other}, {"name", query.value(5).toString()}, {"kind", query.value(6).toString()},
+                             {"weight", 0}, {"evidence", QJsonArray()}};
+            const int passage = query.value(3).toInt(), weight = query.value(4).toInt();
+            if (!pages.contains(url))
+                pages.insert(url, passages(url));
+            neighbour["weight"] = neighbour.value("weight").toInt() + weight;
+            QJsonArray evidence = neighbour.value("evidence").toArray();
+            evidence.append(QJsonObject{{"url", url}, {"passage", passage}, {"weight", weight},
+                                        {"text", passage >= 0 ? pages.value(url).value(passage) : QString()}});
+            neighbour["evidence"] = evidence;
+        }
+    QList<QJsonObject> sorted = neighbours.values();
+    std::sort(sorted.begin(), sorted.end(), [](const QJsonObject &a, const QJsonObject &b) {
+        const int wa = a.value("weight").toInt(), wb = b.value("weight").toInt();
+        return wa != wb ? wa > wb : a.value("name").toString() < b.value("name").toString();
+    });
+    QJsonArray list;
+    for (const auto &neighbour : sorted)
+        list.append(neighbour);
+    result.insert("aliases", QJsonArray::fromStringList(aliases));
+    result.insert("urls", QJsonArray::fromStringList(named));
+    result.insert("models", QJsonArray::fromStringList(models));
+    result.insert("neighbours", list);
+    return result;
 }

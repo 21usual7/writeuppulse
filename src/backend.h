@@ -53,6 +53,7 @@ class Backend : public QObject {
     Q_PROPERTY(QStringList preferredCategories READ preferredCategories WRITE setPreferredCategories NOTIFY preferencesChanged)
     Q_PROPERTY(QString notice READ notice NOTIFY noticeChanged)
     Q_PROPERTY(bool saveTexts READ saveTexts WRITE setSaveTexts NOTIFY preferencesChanged)
+    Q_PROPERTY(QVariantMap graph READ graph NOTIFY graphChanged)
 
 public:
     explicit Backend(const QString &directory = {}, bool systemd = true, QObject *parent = nullptr);
@@ -125,6 +126,16 @@ public:
     // result is "knew", "missed", or empty to take the answer back.
     Q_INVOKABLE void setCheck(const QVariantMap &item, const QString &question, const QString &result);
 
+    // The concepts of the library and their relations, laid out: nodes with
+    // x and y in [0, 1]. Worked out when first read after a change.
+    QVariantMap graph();
+    // One concept (see Database::conceptInfo) with its writeups as library items,
+    // oldest first, and each piece of evidence with its writeup's title.
+    Q_INVOKABLE QVariantMap conceptInfo(const QString &id) const;
+    // Places nodes (from Database::graph) so related ones sit together:
+    // a force layout from a fixed start, so the same graph looks the same.
+    static void layout(QJsonArray &nodes, const QJsonArray &edges);
+
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void setTimerEnabled(bool enabled);
     Q_INVOKABLE void olderDay() { step(1); }
@@ -143,6 +154,7 @@ signals:
     void progressChanged();
     void preferencesChanged();
     void noticeChanged();
+    void graphChanged();
 
 private:
     void reload();
@@ -158,6 +170,8 @@ private:
     void setNotice(const QString &notice);
     void archive();
     void extract();
+    QSet<QString> libraryUrls() const;
+    void graphOutdated();
 
     Store m_store;
     Database m_database;
@@ -165,6 +179,8 @@ private:
     Archive m_archive;
     std::unique_ptr<Extractor> m_extractor;
     bool m_saveTexts = true;
+    QVariantMap m_graph;
+    bool m_graphOutdated = true;
     int m_progressRevision = 0;
     int m_dataVersion = -1;
     // Canonical URL → the category its day has now, for the statistics.
