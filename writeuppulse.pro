@@ -18,6 +18,7 @@ HEADERS += \
     src/filepicker.h \
     src/portalfilepicker.h \
     src/progress.h \
+    src/references.h \
     src/store.h \
     src/syncer.h \
     src/tutor.h \
@@ -34,6 +35,7 @@ SOURCES += \
     src/llmclient.cpp \
     src/portalfilepicker.cpp \
     src/progress.cpp \
+    src/references.cpp \
     src/store.cpp \
     src/syncer.cpp \
     src/tutor.cpp \

@@ -84,14 +84,24 @@ days, one you didn't returns tomorrow, and up to five new ones join daily, from
 writeups you marked read first. Reveal with Space, answer with Y or N. A day of
 review keeps the streak going.
 
-**Concepts** (G) is a map of what your library teaches. While Ollama is running,
+Under each summary, **Terms in this writeup** lists the MITRE ATT&CK techniques, CWE
+weaknesses, CAPEC attack patterns, and OWASP Top 10 2025 categories the writeup (and
+its saved page) names, each with its official definition and a link to read more:
+a glossary for beginners, and the standard vocabulary for everyone.
+
+**Concepts** (G) is a map of what your library teaches. By default it shows those
+references: every entry your writeups name, related when one passage names two of
+them or when the catalogs relate them (a weakness to its attack patterns, a pattern
+to ATT&CK techniques, an OWASP category to its weaknesses). It is ready at once on
+every install. Switch it to the local model to see the model's concepts instead. While Ollama is running,
 the local model reads each saved writeup in the background (a few minutes each on
 a CPU) and lists the concepts, techniques, tools, vulnerabilities, and technologies
 in it; two concepts are related when one passage of the article names both. Search
 the map, pick a concept to see the writeups that mention it in date order and its
 related concepts with the passages that relate them, and open a writeup from there.
 It is the model's reading, not a set of facts, and the window says so. Without
-Ollama the map stays empty and says what it needs; everything else works.
+Ollama that map stays empty and says what it needs; everything else works. The
+model reads one writeup at a time, spread over two hours, and only on AC power.
 
 WriteupPulse is for understanding, not attacking: the agent is told never to write
 code, commands, payloads, or exploits, and the app cuts out any code block that
@@ -169,3 +179,14 @@ cost and without your progress) to the `pages` branch and pushes it.
 bin/build    # build/writeuppulse
 bin/test     # Qt Test, offscreen
 ```
+
+## Reference data
+
+`src/references/references.json` is built by `bin/references` from MITRE ATT&CK
+(Enterprise), CWE, and CAPEC, © The MITRE Corporation, reproduced and distributed with
+its permission under their terms of use
+([ATT&CK](https://attack.mitre.org/resources/legal-and-branding/terms-of-use/),
+[CWE](https://cwe.mitre.org/about/termsofuse.html),
+[CAPEC](https://capec.mitre.org/about/termsofuse.html)), and the OWASP Top 10 2025
+categories as CWE maps them (OWASP Top 10 © the OWASP Foundation, CC BY-SA 4.0).
+Run `bin/references` to refresh them to the latest releases.

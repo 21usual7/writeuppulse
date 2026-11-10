@@ -27,9 +27,15 @@ Flickable {
     signal practiceToggled(int index, bool done)
     signal questionJudged(string question, string result)
     signal tagsEdited(var tags)
+    signal referenceShown(string id)
+
+    // The ATT&CK, CWE, CAPEC, and OWASP entries this writeup names, and the one opened.
+    readonly property var references: item ? backend.references(item.url) : []
+    property string term: ""
 
     onItemChanged: {
         tab = 0
+        term = ""
         contentY = 0
         if (item) tutor.open(item, -1)
     }
@@ -210,6 +216,95 @@ Flickable {
             color: Style.ink
             font.family: Style.sans
             font.pixelSize: 16
+        }
+
+        // Glossary: the catalog terms the writeup uses, each with its definition.
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: 28
+            visible: pane.tab === 0 && pane.references.length > 0
+            spacing: 10
+            Text {
+                text: qsTr("Terms in this writeup")
+                color: Style.muted
+                font.family: Style.sans
+                font.pixelSize: 13
+                font.weight: Font.DemiBold
+            }
+            Flow {
+                Layout.fillWidth: true
+                spacing: 6
+                Repeater {
+                    model: pane.references.slice(0, 12)
+                    Pill {
+                        required property var modelData
+                        text: modelData.name.length > 42 ? modelData.id : modelData.name
+                        tint: Style.kindColor(modelData.kind)
+                        on: pane.term === modelData.id
+                        onClicked: pane.term = on ? "" : modelData.id
+                    }
+                }
+            }
+            Rectangle {
+                id: definition
+                readonly property var entry: pane.references.find(r => r.id === pane.term) || null
+                Layout.fillWidth: true
+                visible: entry !== null
+                implicitHeight: definitionColumn.implicitHeight + 32
+                radius: 12
+                color: Style.raised
+                ColumnLayout {
+                    id: definitionColumn
+                    x: 16; y: 16
+                    width: parent.width - 32
+                    spacing: 8
+                    Text {
+                        Layout.fillWidth: true
+                        text: definition.entry ? definition.entry.name : ""
+                        textFormat: Text.PlainText
+                        wrapMode: Text.Wrap
+                        color: Style.ink
+                        font.family: Style.sans
+                        font.pixelSize: 15
+                        font.weight: Font.DemiBold
+                    }
+                    Text {
+                        text: definition.entry ? definition.entry.id : ""
+                        color: definition.entry ? Style.kindColor(definition.entry.kind) : Style.faint
+                        font.family: Style.sans
+                        font.pixelSize: 12
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: definition.entry ? definition.entry.text : ""
+                        textFormat: Text.PlainText
+                        wrapMode: Text.Wrap
+                        lineHeight: 1.45
+                        color: Style.ink
+                        font.family: Style.serif
+                        font.pixelSize: 14
+                    }
+                    Row {
+                        spacing: 18
+                        Text {
+                            text: (definition.entry && definition.entry.kind === "owasp" ? qsTr("Read at OWASP") : qsTr("Read at MITRE")) + " ↗"
+                            color: readHover.hovered ? Style.ink : Style.accent
+                            font.family: Style.sans
+                            font.pixelSize: 13
+                            HoverHandler { id: readHover; cursorShape: Qt.PointingHandCursor }
+                            TapHandler { onTapped: Qt.openUrlExternally(definition.entry.link) }
+                        }
+                        Text {
+                            text: qsTr("Show on the map")
+                            color: mapHover.hovered ? Style.ink : Style.accent
+                            font.family: Style.sans
+                            font.pixelSize: 13
+                            HoverHandler { id: mapHover; cursorShape: Qt.PointingHandCursor }
+                            TapHandler { onTapped: pane.referenceShown(definition.entry.id) }
+                        }
+                    }
+                }
+            }
         }
 
         // Takeaways

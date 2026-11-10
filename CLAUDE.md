@@ -36,7 +36,7 @@ After stage 5 the user changed the plan (2026-11-10): the local model is too slo
 tutor, so stage 6 (tutor modes) is dropped; stages 4–5 stay, extraction spread over 2 h.
 New plan, in order, each done → noted here: **review** (spaced repetition, done),
 **open references** (MITRE ATT&CK, CWE, CAPEC, OWASP Top 10 as JSON in the repo:
-glossary for beginners, a model-free concept graph), **level tracks** (my level in
+glossary for beginners, a model-free concept graph; done), **level tracks** (my level in
 Settings, a Junior and a Senior pick a day, security first), **open labs** (curated
 category/CWE → Juice Shop, WebGoat, DVWA, pwn.college…), **notes** (per writeup, export
 to an Obsidian vault / Markdown folder and Notion), **Help and Get started**, then the
@@ -175,6 +175,26 @@ the QML window.
   with a badge; Space reveals, Y knew, N didn't), which shows the first card: answering
   through `setCheck` drops it from today's list. Answers from focus mode and the Check
   yourself tab feed the same history. The streak counts review days too.
+- **References:** `bin/references` (Python, stdlib) downloads MITRE ATT&CK Enterprise
+  (STIX), CWE, CAPEC and writes `src/references/references.json` (~1.1 MB, in the qrc;
+  commit it, the app never downloads it): per entry id (`T1059.001`, `CWE-79`,
+  `CAPEC-63`, `A01:2025`), kind (`technique`, `weakness`, `pattern`, `owasp`), a
+  readable name (CWE's common name when its own is long; the official one in `title`),
+  a ~400-char description, the official link, match `terms`, and the catalogs'
+  `related` ids (CWE parent, CWE↔CAPEC, CAPEC→ATT&CK, OWASP 2025 grouping→CWE from CWE
+  view 1450, sub-technique→technique). A term belongs to one entry (ATT&CK, then CWE,
+  then CAPEC). `GENERIC` drops names that mean something else in most texts (PHP, ISN,
+  Windows, MFA…); tune it against real pages (`passages` of the user's db) when adding
+  catalogs. `References` (`src/references.cpp`, a singleton read from the qrc) matches
+  whole words, longest term first; single-word abbreviations (XSS, AiTM) only in their
+  capitals; apostrophes dropped ("isn't" ≠ ISN). Note "Stored XSS" is CAPEC-592, not
+  CWE-79: longest match wins. `Backend::scan` caches per canonical URL (title + summary
+  + takeaways as text 0, then each passage), dropped on `Archive::saved` and library
+  reloads. `Backend::references(url)` feeds "Terms in this writeup" under the summary
+  (definition, link, "Show on the map"). `graphSource` (QSettings, default
+  `references`) switches `graph`/`conceptInfo` between `referenceGraph`/`referenceInfo`
+  (same shapes plus `text`, `link`, `title`, `catalog`) and the model's tables.
+  Attribution text is in the JSON's `notice`, the README, and the map's footer: keep it.
 - **Preferences and export:** the Settings popup (P) writes `categories` (empty = all)
   and `preferred` to `QSettings`; `Fetcher::prompt` reads them, and `Backend::rebuild`
   puts preferred directions first in a day. Export goes through `FilePicker`

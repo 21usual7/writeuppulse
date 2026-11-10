@@ -198,5 +198,21 @@
   "Next questions: %1": "Наступні питання: %1",
   "Nothing to review yet. Questions from writeups you read come back here the next day.": "Повторювати поки нічого. Питання з прочитаних розборів з'являться тут наступного дня.",
   "A question you knew comes back later each time: in 1, 3, 7, 16, then 35 days. One you didn't comes back tomorrow. Up to five new questions join a day, from writeups you marked read first.": "Питання, на яке ви відповіли, щоразу повертається пізніше: через 1, 3, 7, 16, потім 35 днів. Те, якого не знали, повернеться завтра. На день додається до п'яти нових питань, спершу з розборів, позначених прочитаними.",
-  "Review today's questions (Space, Y, N)": "Повторити питання на сьогодні (Space, Y, N)"
+  "Review today's questions (Space, Y, N)": "Повторити питання на сьогодні (Space, Y, N)",
+  "ATT&CK technique": "техніка ATT&CK",
+  "CWE weakness": "слабкість CWE",
+  "CAPEC attack pattern": "шаблон атаки CAPEC",
+  "OWASP Top 10 2025": "OWASP Top 10 2025",
+  "None of your writeups names an ATT&CK technique, a CWE weakness, a CAPEC attack pattern, or an OWASP Top 10 category yet.": "Жоден ваш розбір поки не називає техніку ATT&CK, слабкість CWE, шаблон атаки CAPEC чи категорію OWASP Top 10.",
+  "From references: ATT&CK, CWE, CAPEC, OWASP": "З довідників: ATT&CK, CWE, CAPEC, OWASP",
+  "From the local model": "З локальної моделі",
+  "Entries: %1  ·  relations: %2  ·  writeups: %3": "Записів: %1  ·  зв'язків: %2  ·  розборів: %3",
+  "Read at OWASP": "Читати на сайті OWASP",
+  "Read at MITRE": "Читати на сайті MITRE",
+  "Found by name in the writeups' text; a mention isn't always what a writeup is about. Two entries are related when a passage names both or the catalog relates them.": "Знайдено за назвою в тексті розборів; згадка не завжди означає, що розбір про це. Два записи пов'язані, коли один фрагмент називає обидва або їх пов'язує сам довідник.",
+  "In the catalog": "У довіднику",
+  "Definitions from MITRE ATT&CK, CWE, CAPEC (© MITRE) and the OWASP Top 10 2025 (CC BY-SA 4.0), matched by name in your writeups.": "Визначення з MITRE ATT&CK, CWE, CAPEC (© MITRE) та OWASP Top 10 2025 (CC BY-SA 4.0), знайдені за назвою у ваших розборах.",
+  "Officially: %1": "Офіційно: %1",
+  "Terms in this writeup": "Терміни в цьому розборі",
+  "Show on the map": "Показати на карті"
 }

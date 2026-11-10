@@ -25,6 +25,8 @@ ApplicationWindow {
     property bool settingsVisible: false
     property bool focusVisible: false
     property int current: 0
+    // A node the Concepts view opens on, then clears.
+    property string graphFocus: ""
     // Single-key shortcuts stay quiet while the user types in a field.
     readonly property bool typing: activeFocusItem !== null && activeFocusItem.cursorPosition !== undefined
     readonly property bool searching: backend.query.trim().length > 0
@@ -559,6 +561,7 @@ ApplicationWindow {
                     onPracticeToggled: (step, done) => backend.setPracticeDone(win.item.url, step, done)
                     onQuestionJudged: (question, result) => backend.setCheck(win.item, question, result)
                     onTagsEdited: tags => backend.setTags(win.item.url, tags)
+                    onReferenceShown: id => { backend.graphSource = "references"; win.graphFocus = id; win.show("graph") }
                 }
                 Text {
                     anchors.centerIn: parent

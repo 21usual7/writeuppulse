@@ -13,6 +13,7 @@
 #include "extractor.h"
 #include "filepicker.h"
 #include "progress.h"
+#include "references.h"
 #include "store.h"
 
 // What the window shows: the saved days, the writeups of the current view
@@ -54,6 +55,7 @@ class Backend : public QObject {
     Q_PROPERTY(QString notice READ notice NOTIFY noticeChanged)
     Q_PROPERTY(bool saveTexts READ saveTexts WRITE setSaveTexts NOTIFY preferencesChanged)
     Q_PROPERTY(QVariantMap graph READ graph NOTIFY graphChanged)
+    Q_PROPERTY(QString graphSource READ graphSource WRITE setGraphSource NOTIFY graphChanged)
     Q_PROPERTY(QVariantMap review READ review NOTIFY progressChanged)
 
 public:
@@ -131,11 +133,23 @@ public:
     Q_INVOKABLE void setCheck(const QVariantMap &item, const QString &question, const QString &result);
 
     // The concepts of the library and their relations, laid out: nodes with
-    // x and y in [0, 1]. Worked out when first read after a change.
+    // x and y in [0, 1]. Worked out when first read after a change. From
+    // graphSource: "references" (the ATT&CK, CWE, CAPEC, and OWASP entries
+    // the writeups name, related when a passage names both or a catalog
+    // relates them; instant, on every install) or "model" (the local model's
+    // concepts). Kept in settings.
     QVariantMap graph();
-    // One concept (see Database::conceptInfo) with its writeups as library items,
-    // oldest first, and each piece of evidence with its writeup's title.
+    QString graphSource() const { return m_graphSource; }
+    void setGraphSource(const QString &source);
+    // One node of the graph: for the model, Database::conceptInfo; for the
+    // references, the entry with the same fields plus text, link, and
+    // catalog (its related entries, inLibrary when a writeup names them).
+    // Writeups come as library items, oldest first, and each piece of
+    // evidence with its writeup's title.
     Q_INVOKABLE QVariantMap conceptInfo(const QString &id) const;
+    // The catalog entries one writeup names, most named first: {id, kind,
+    // name, text, link, count}.
+    Q_INVOKABLE QVariantList references(const QString &url) const;
     // Places nodes (from Database::graph) so related ones sit together:
     // a force layout from a fixed start, so the same graph looks the same.
     static void layout(QJsonArray &nodes, const QJsonArray &edges);
@@ -175,6 +189,16 @@ private:
     void archive();
     void extract();
     QSet<QString> libraryUrls() const;
+    // The texts the references are looked for in: the writeup's own fields,
+    // then each passage of its page; and what each of them names.
+    struct Scan {
+        QList<References::Hit> hits;
+        QList<QStringList> named;
+        QStringList texts;
+    };
+    const Scan &scan(const QVariantMap &item) const;
+    QJsonObject referenceGraph() const;
+    QVariantMap referenceInfo(const QString &id) const;
     void graphOutdated();
 
     Store m_store;
@@ -184,6 +208,8 @@ private:
     std::unique_ptr<Extractor> m_extractor;
     bool m_saveTexts = true;
     QVariantMap m_graph;
+    QString m_graphSource = "references";
+    mutable QHash<QString, Scan> m_scans;
     bool m_graphOutdated = true;
     int m_progressRevision = 0;
     int m_dataVersion = -1;

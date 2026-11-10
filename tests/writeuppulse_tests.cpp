@@ -17,6 +17,7 @@
 #include "filepicker.h"
 #include "llmclient.h"
 #include "progress.h"
+#include "references.h"
 #include "store.h"
 #include "syncer.h"
 #include "translator.h"
@@ -893,6 +894,85 @@ private slots:
         QVERIFY(questions(progress.review(library, today)).contains("read 0?"));
     }
 
+    void referencesFindCatalogEntries()
+    {
+        const References &references = References::instance();
+        QVERIFY(!references.isEmpty());
+        QCOMPARE(references.entry("CWE-79").value("kind").toString(), QString("weakness"));
+        QVERIFY(references.entry("A01:2025").value("related").toArray().size() > 5);
+        QVERIFY(references.notice().contains("MITRE"));
+
+        auto ids = [&](const QStringList &texts) {
+            QStringList list;
+            for (const auto &hit : references.find(texts))
+                list << hit.id;
+            std::sort(list.begin(), list.end());
+            return list;
+        };
+        // Names, other names, IDs, any case and hyphenation; the longest name wins.
+        QCOMPARE(ids({"An XSS, then a use-after-free and CWE-918."}), QStringList({"CWE-416", "CWE-79", "CWE-918"}));
+        QCOMPARE(ids({"A stored XSS."}), QStringList({"CAPEC-592"}));
+        QCOMPARE(ids({"Blind SQL injection in the login form."}), QStringList({"CAPEC-7"}));
+        QVERIFY(ids({"Server-side request forgery via the PDF renderer."}).contains("CWE-918"));
+        // ATT&CK comes first when catalogs share a name.
+        QCOMPARE(ids({"Kerberoasting service accounts"}), QStringList({"T1558.003"}));
+        // Abbreviations only in their capitals; words that only look like one stay words.
+        QVERIFY(ids({"xss is lowercase here, and it isn't an ISN probe"}).isEmpty());
+
+        QList<QStringList> named;
+        const auto hits = references.find({"Phishing led to XSS.", "Nothing.", "More XSS."}, &named);
+        QCOMPARE(named.size(), 3);
+        QVERIFY(named[1].isEmpty());
+        const auto xss = std::find_if(hits.begin(), hits.end(), [](const auto &hit) { return hit.id == "CWE-79"; });
+        QVERIFY(xss != hits.end());
+        QCOMPARE(xss->count, 2);
+        QCOMPARE(xss->first, 0);
+        QCOMPARE(hits.first().id, QString("CWE-79"));
+    }
+
+    void backendRelatesTheReferencesOfTheLibrary()
+    {
+        QTemporaryDir dir;
+        Store store(dir.path());
+        QString error;
+        auto digest = [](const QString &date, const QString &name, const QString &summary) {
+            return QJsonObject{{"date", date}, {"items", QJsonArray{QJsonObject{
+                {"title", name}, {"url", "https://example.com/" + name}, {"summary", summary}}}}};
+        };
+        QVERIFY(store.saveDigest(digest("2026-11-08", "a", "An XSS."), &error));
+        QVERIFY(store.saveDigest(digest("2026-11-09", "b", "Another way in."), &error));
+        {
+            Database database(dir.path());
+            QVERIFY(database.savePage("https://example.com/b", "ok", {"Intro.", "Phishing mail carried an XSS payload."}, {}));
+        }
+        Backend backend(dir.path(), false);
+        backend.setGraphSource("references");
+        const QVariantMap graph = backend.graph();
+        QCOMPARE(graph.value("done").toInt(), 2);
+        QStringList nodes;
+        for (const auto &node : graph.value("nodes").toList())
+            nodes << node.toMap().value("id").toString();
+        QVERIFY(nodes.contains("CWE-79"));
+        QVERIFY(nodes.contains("T1566"));
+        QCOMPARE(graph.value("edges").toList().size(), 1);
+
+        const QVariantList found = backend.references("https://example.com/b");
+        QVERIFY(found.size() >= 2);
+        QVERIFY(!found.first().toMap().value("text").toString().isEmpty());
+        QVERIFY(found.first().toMap().value("link").toString().startsWith("https://"));
+
+        const QVariantMap xss = backend.conceptInfo("CWE-79");
+        QCOMPARE(xss.value("writeups").toList().size(), 2);
+        QCOMPARE(xss.value("writeups").toList().first().toMap().value("title").toString(), QString("a"));
+        QVERIFY(xss.value("aliases").toStringList().contains("XSS"));
+        const QVariantMap phishing = xss.value("neighbours").toList().first().toMap();
+        QCOMPARE(phishing.value("id").toString(), QString("T1566"));
+        QCOMPARE(phishing.value("evidence").toList().first().toMap().value("passage").toInt(), 1);
+        QVERIFY(phishing.value("evidence").toList().first().toMap().value("text").toString().startsWith("Phishing mail"));
+        QVERIFY(!xss.value("catalog").toList().isEmpty());
+        QVERIFY(!xss.value("link").toString().isEmpty());
+    }
+
     void backendShowsTheGraphOfTheLibrary()
     {
         QTemporaryDir dir;
@@ -916,6 +996,7 @@ private slots:
                 concept_("Clickjacking")}}}, {}, true), "page", "tiny"));
         }
         Backend backend(dir.path(), false);
+        backend.setGraphSource("model");
         const QVariantMap graph = backend.graph();
         QCOMPARE(graph.value("total").toInt(), 2);
         QCOMPARE(graph.value("done").toInt(), 2);

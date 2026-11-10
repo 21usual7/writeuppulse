@@ -32,10 +32,15 @@ Backend::Backend(const QString &directory, bool systemd, QObject *parent)
     m_searchCategories = settings.value("categories").toStringList();
     m_preferredCategories = settings.value("preferred").toStringList();
     m_saveTexts = settings.value("saveTexts", true).toBool();
-    // A newly saved page can change what a search finds.
-    connect(&m_archive, &Archive::saved, this, [this] {
+    m_graphSource = settings.value("graphSource", "references").toString() == "model" ? "model" : "references";
+    // A newly saved page can change what a search finds and which
+    // references the writeup names.
+    connect(&m_archive, &Archive::saved, this, [this](const QString &url) {
         if (!m_query.trimmed().isEmpty())
             rebuild();
+        m_scans.remove(url);
+        if (m_graphSource == "references")
+            graphOutdated();
         extract();
     });
     m_noticeTimer.setSingleShot(true);
@@ -173,10 +178,18 @@ void Backend::graphOutdated() {
     emit graphChanged();
 }
 
+void Backend::setGraphSource(const QString &source) {
+    if (source == m_graphSource || (source != "model" && source != "references"))
+        return;
+    m_graphSource = source;
+    QSettings("writeuppulse", "writeuppulse").setValue("graphSource", source);
+    graphOutdated();
+}
+
 QVariantMap Backend::graph() {
     if (m_graphOutdated) {
         m_graphOutdated = false;
-        QJsonObject graph = m_database.graph(libraryUrls());
+        QJsonObject graph = m_graphSource == "references" ? referenceGraph() : m_database.graph(libraryUrls());
         QJsonArray nodes = graph.value("nodes").toArray();
         layout(nodes, graph.value("edges").toArray());
         graph.insert("nodes", nodes);
@@ -187,6 +200,8 @@ QVariantMap Backend::graph() {
 }
 
 QVariantMap Backend::conceptInfo(const QString &id) const {
+    if (m_graphSource == "references")
+        return referenceInfo(id);
     QJsonObject info = m_database.conceptInfo(id, libraryUrls());
     if (info.isEmpty())
         return {};
@@ -215,6 +230,159 @@ QVariantMap Backend::conceptInfo(const QString &id) const {
     }
     result.insert("neighbours", neighbours);
     return result;
+}
+
+const Backend::Scan &Backend::scan(const QVariantMap &item) const {
+    const QString url = Store::canonicalUrl(item.value("url").toString());
+    auto it = m_scans.find(url);
+    if (it == m_scans.end()) {
+        Scan scan;
+        QStringList own{item.value("title").toString(), item.value("summary").toString()};
+        for (const auto &takeaway : item.value("takeaways").toList())
+            own << takeaway.toString();
+        scan.texts << own.join('\n') << m_database.passages(url);
+        scan.hits = References::instance().find(scan.texts, &scan.named);
+        it = m_scans.insert(url, scan);
+    }
+    return *it;
+}
+
+QVariantList Backend::references(const QString &url) const {
+    const QString key = Store::canonicalUrl(url);
+    QVariantList list;
+    for (const auto &value : m_library)
+        if (Store::canonicalUrl(value.toMap().value("url").toString()) == key) {
+            for (const auto &hit : scan(value.toMap()).hits) {
+                const QJsonObject entry = References::instance().entry(hit.id);
+                list << QVariantMap{{"id", hit.id}, {"kind", entry.value("kind").toString()},
+                                    {"name", entry.value("name").toString()}, {"text", entry.value("text").toString()},
+                                    {"link", entry.value("url").toString()}, {"count", hit.count}};
+            }
+            break;
+        }
+    return list;
+}
+
+// Nodes are the entries the library names; two are related when a passage
+// names both (a passage naming more than six is an overview and relates
+// nothing, as with the model's concepts) or when a catalog relates them.
+QJsonObject Backend::referenceGraph() const {
+    const References &references = References::instance();
+    QMap<QString, QStringList> named;
+    QMap<QPair<QString, QString>, QPair<int, QSet<QString>>> pairs;
+    QSet<QString> urls;
+    for (const auto &value : m_library) {
+        const QString url = Store::canonicalUrl(value.toMap().value("url").toString());
+        if (urls.contains(url))
+            continue;
+        urls.insert(url);
+        const Scan &found = scan(value.toMap());
+        for (const auto &hit : found.hits)
+            named[hit.id] << url;
+        for (const auto &ids : found.named) {
+            if (ids.size() > 6)
+                continue;
+            for (int i = 0; i < ids.size(); ++i)
+                for (int j = i + 1; j < ids.size(); ++j) {
+                    auto &pair = pairs[ids[i] < ids[j] ? qMakePair(ids[i], ids[j]) : qMakePair(ids[j], ids[i])];
+                    ++pair.first;
+                    pair.second.insert(url);
+                }
+        }
+    }
+    QJsonArray nodes, edges;
+    for (auto it = named.begin(); it != named.end(); ++it) {
+        const QJsonObject entry = references.entry(it.key());
+        nodes.append(QJsonObject{{"id", it.key()}, {"name", entry.value("name").toString()},
+                                 {"kind", entry.value("kind").toString()}, {"urls", QJsonArray::fromStringList(it.value())}});
+        for (const auto &related : entry.value("related").toArray()) {
+            const QString other = related.toString();
+            const auto key = it.key() < other ? qMakePair(it.key(), other) : qMakePair(other, it.key());
+            if (named.contains(other) && !pairs.contains(key))
+                pairs.insert(key, {1, {}});
+        }
+    }
+    for (auto it = pairs.begin(); it != pairs.end(); ++it)
+        edges.append(QJsonObject{{"from", it.key().first}, {"to", it.key().second}, {"weight", it.value().first},
+                                 {"writeups", int(it.value().second.size())}});
+    return {{"nodes", nodes}, {"edges", edges}, {"done", int(urls.size())}, {"failed", 0}};
+}
+
+QVariantMap Backend::referenceInfo(const QString &id) const {
+    const References &references = References::instance();
+    const QJsonObject entry = references.entry(id);
+    if (entry.isEmpty())
+        return {};
+    QVariantList writeups;
+    QHash<QString, QVariantMap> neighbours;
+    QSet<QString> urls, inLibrary;
+    for (const auto &value : m_library) {
+        const QVariantMap item = value.toMap();
+        const QString url = Store::canonicalUrl(item.value("url").toString());
+        if (urls.contains(url))
+            continue;
+        urls.insert(url);
+        const Scan &found = scan(item);
+        for (const auto &hit : found.hits)
+            inLibrary.insert(hit.id);
+        bool names = false;
+        for (int t = 0; t < found.named.size(); ++t) {
+            const QStringList &ids = found.named.at(t);
+            if (!ids.contains(id))
+                continue;
+            names = true;
+            if (ids.size() > 6)
+                continue;
+            for (const auto &other : ids) {
+                if (other == id)
+                    continue;
+                QVariantMap &neighbour = neighbours[other];
+                if (neighbour.isEmpty()) {
+                    const QJsonObject e = references.entry(other);
+                    neighbour = {{"id", other}, {"name", e.value("name").toString()}, {"kind", e.value("kind").toString()},
+                                 {"weight", 0}, {"evidence", QVariantList()}};
+                }
+                neighbour["weight"] = neighbour.value("weight").toInt() + 1;
+                QVariantList evidence = neighbour.value("evidence").toList();
+                evidence << QVariantMap{{"url", url}, {"title", item.value("title")}, {"passage", t - 1},
+                                        {"text", t > 0 ? found.texts.at(t) : QString()}};
+                neighbour["evidence"] = evidence;
+            }
+        }
+        if (names)
+            writeups << item;
+    }
+    std::sort(writeups.begin(), writeups.end(), [](const QVariant &a, const QVariant &b) {
+        return a.toMap().value("date").toString() < b.toMap().value("date").toString();
+    });
+    QVariantList sorted = QVariantList(neighbours.begin(), neighbours.end());
+    std::sort(sorted.begin(), sorted.end(), [](const QVariant &a, const QVariant &b) {
+        const int wa = a.toMap().value("weight").toInt(), wb = b.toMap().value("weight").toInt();
+        return wa != wb ? wa > wb : a.toMap().value("name").toString() < b.toMap().value("name").toString();
+    });
+    QVariantList catalog;
+    for (const auto &related : entry.value("related").toArray()) {
+        const QJsonObject e = references.entry(related.toString());
+        catalog << QVariantMap{{"id", related.toString()}, {"name", e.value("name").toString()},
+                               {"kind", e.value("kind").toString()}, {"inLibrary", inLibrary.contains(related.toString())}};
+    }
+    // Entries that relate to this one from their side (a technique's
+    // sub-techniques, the patterns that name a weakness) count too, when the
+    // library names them.
+    for (const auto &other : inLibrary) {
+        const QJsonObject e = references.entry(other);
+        if (other != id && e.value("related").toArray().contains(id)
+            && std::none_of(catalog.begin(), catalog.end(), [&](const QVariant &c) { return c.toMap().value("id") == other; }))
+            catalog << QVariantMap{{"id", other}, {"name", e.value("name").toString()}, {"kind", e.value("kind").toString()},
+                                   {"inLibrary", true}};
+    }
+    QStringList aliases;
+    for (const auto &term : entry.value("terms").toArray())
+        if (term.toString() != entry.value("name").toString() && term.toString() != id)
+            aliases << term.toString();
+    return {{"id", id}, {"name", entry.value("name").toString()}, {"kind", entry.value("kind").toString()},
+            {"title", entry.value("title").toString()}, {"text", entry.value("text").toString()}, {"link", entry.value("url").toString()}, {"aliases", aliases},
+            {"writeups", writeups}, {"neighbours", sorted}, {"catalog", catalog}};
 }
 
 // Fruchterman–Reingold with a pull towards the middle, so writeups that share
@@ -566,6 +734,7 @@ void Backend::reload() {
             setProblem(error);
         archive();
         extract();
+        m_scans.clear();
         graphOutdated();
         rebuildNeeded = true;
         // The statistics read the categories of the days.

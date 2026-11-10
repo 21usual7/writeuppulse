@@ -198,5 +198,21 @@
   "Next questions: %1": "Следующие вопросы: %1",
   "Nothing to review yet. Questions from writeups you read come back here the next day.": "Повторять пока нечего. Вопросы из прочитанных разборов появятся здесь на следующий день.",
   "A question you knew comes back later each time: in 1, 3, 7, 16, then 35 days. One you didn't comes back tomorrow. Up to five new questions join a day, from writeups you marked read first.": "Вопрос, на который вы ответили, возвращается каждый раз позже: через 1, 3, 7, 16, потом 35 дней. Тот, что не знали, вернётся завтра. В день добавляется до пяти новых вопросов, сначала из разборов, отмеченных прочитанными.",
-  "Review today's questions (Space, Y, N)": "Повторить вопросы на сегодня (Space, Y, N)"
+  "Review today's questions (Space, Y, N)": "Повторить вопросы на сегодня (Space, Y, N)",
+  "ATT&CK technique": "техника ATT&CK",
+  "CWE weakness": "слабость CWE",
+  "CAPEC attack pattern": "шаблон атаки CAPEC",
+  "OWASP Top 10 2025": "OWASP Top 10 2025",
+  "None of your writeups names an ATT&CK technique, a CWE weakness, a CAPEC attack pattern, or an OWASP Top 10 category yet.": "Ни один ваш разбор пока не называет технику ATT&CK, слабость CWE, шаблон атаки CAPEC или категорию OWASP Top 10.",
+  "From references: ATT&CK, CWE, CAPEC, OWASP": "Из справочников: ATT&CK, CWE, CAPEC, OWASP",
+  "From the local model": "Из локальной модели",
+  "Entries: %1  ·  relations: %2  ·  writeups: %3": "Записей: %1  ·  связей: %2  ·  разборов: %3",
+  "Read at OWASP": "Читать на сайте OWASP",
+  "Read at MITRE": "Читать на сайте MITRE",
+  "Found by name in the writeups' text; a mention isn't always what a writeup is about. Two entries are related when a passage names both or the catalog relates them.": "Найдено по названию в тексте разборов; упоминание не всегда означает, что разбор об этом. Две записи связаны, когда один фрагмент называет обе или их связывает сам справочник.",
+  "In the catalog": "В справочнике",
+  "Definitions from MITRE ATT&CK, CWE, CAPEC (© MITRE) and the OWASP Top 10 2025 (CC BY-SA 4.0), matched by name in your writeups.": "Определения из MITRE ATT&CK, CWE, CAPEC (© MITRE) и OWASP Top 10 2025 (CC BY-SA 4.0), найденные по названию в ваших разборах.",
+  "Officially: %1": "Официально: %1",
+  "Terms in this writeup": "Термины в этом разборе",
+  "Show on the map": "Показать на карте"
 }

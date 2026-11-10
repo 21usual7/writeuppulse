@@ -2,16 +2,21 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// The concepts the local model found in the library, related when one passage
-// names both: a map to pan and zoom, a search, and an inspector with the
-// concept's writeups in time order and its neighbours with the passage that
-// relates them. All of it is the model's reading, and says so.
+// A map of what the library teaches, from one of two sources: the ATT&CK
+// techniques, CWE weaknesses, CAPEC attack patterns, and OWASP Top 10
+// categories the writeups name (instant, on every install), or the concepts
+// the local model found. Two nodes are related when one passage names both
+// (or, for references, when a catalog relates them). A map to pan and zoom,
+// a search, and an inspector with the node's writeups in time order and its
+// neighbours with the passage that relates them. It says where it all came
+// from.
 Item {
     id: view
 
     signal writeupChosen(var item)
 
     readonly property var graph: backend.graph
+    readonly property bool catalog: backend.graphSource === "references"
     readonly property var nodes: graph.nodes || []
     readonly property var edges: graph.edges || []
     property string selected: ""
@@ -47,9 +52,14 @@ Item {
     }
 
     onGraphChanged: if (selected && !nodes.some(n => n.id === selected)) selected = ""
+    // Another view asked for one node (a term in the reader).
+    Component.onCompleted: if (win.graphFocus) { const id = win.graphFocus; win.graphFocus = ""; Qt.callLater(() => choose(id)) }
 
     function kindName(kind) {
         translator.language
+        if (catalog)
+            return kind === "technique" ? qsTr("ATT&CK technique") : kind === "weakness" ? qsTr("CWE weakness")
+                 : kind === "pattern" ? qsTr("CAPEC attack pattern") : qsTr("OWASP Top 10 2025")
         return kind === "technique" ? qsTr("technique") : kind === "tool" ? qsTr("tool")
              : kind === "vulnerability" ? qsTr("vulnerability") : kind === "technology" ? qsTr("technology") : qsTr("concept")
     }
@@ -61,6 +71,8 @@ Item {
     function emptyText() {
         translator.language
         if (!graph.total) return qsTr("No writeups yet, so there is nothing to map.")
+        if (catalog)
+            return qsTr("None of your writeups names an ATT&CK technique, a CWE weakness, a CAPEC attack pattern, or an OWASP Top 10 category yet.")
         if (tutor.status === "battery")
             return qsTr("The local model is off while the laptop runs on battery. The map fills in once it is plugged in.")
         if (tutor.status === "missing")
@@ -102,11 +114,29 @@ Item {
                     font.pixelSize: 28
                     font.weight: Font.DemiBold
                 }
+                Row {
+                    spacing: 8
+                    topPadding: 4
+                    bottomPadding: 4
+                    Pill {
+                        text: qsTr("From references: ATT&CK, CWE, CAPEC, OWASP")
+                        on: view.catalog
+                        onClicked: { view.selected = ""; backend.graphSource = "references" }
+                    }
+                    Pill {
+                        text: qsTr("From the local model")
+                        on: !view.catalog
+                        onClicked: { view.selected = ""; backend.graphSource = "model" }
+                    }
+                }
                 Text {
                     visible: view.nodes.length > 0
                     text: {
                         translator.language
                         const n = (x) => x.toLocaleString(Qt.locale(), 'f', 0)
+                        if (view.catalog)
+                            return qsTr("Entries: %1  ·  relations: %2  ·  writeups: %3").arg(n(view.nodes.length))
+                                   .arg(n(view.edges.length)).arg(n(view.graph.total || 0))
                         return qsTr("Concepts: %1  ·  relations: %2  ·  writeups read by the model: %3 of %4").arg(n(view.nodes.length))
                                .arg(n(view.edges.length)).arg(n(view.graph.done || 0)).arg(n(view.graph.total || 0))
                     }
@@ -254,7 +284,7 @@ Item {
                 spacing: 16
                 visible: view.nodes.length > 0
                 Repeater {
-                    model: ["concept", "technique", "tool", "vulnerability", "technology"]
+                    model: view.catalog ? ["technique", "weakness", "pattern", "owasp"] : ["concept", "technique", "tool", "vulnerability", "technology"]
                     Row {
                         required property string modelData
                         spacing: 6
@@ -364,8 +394,8 @@ Item {
                         Text {
                             Layout.fillWidth: true
                             text: {
-                                const parts = [view.kindName(view.info.kind)]
-                                if ((view.info.aliases || []).length) parts.push(qsTr("also %1").arg(view.info.aliases.join(", ")))
+                                const parts = [view.catalog ? view.info.id + "  ·  " + view.kindName(view.info.kind) : view.kindName(view.info.kind)]
+                                if ((view.info.aliases || []).length) parts.push(qsTr("also %1").arg(view.info.aliases.slice(0, 4).join(", ")))
                                 return parts.join("  ·  ")
                             }
                             textFormat: Text.PlainText
@@ -376,6 +406,47 @@ Item {
                         }
                         Text {
                             Layout.fillWidth: true
+                            visible: !!view.info.title
+                            text: qsTr("Officially: %1").arg(view.info.title || "")
+                            textFormat: Text.PlainText
+                            wrapMode: Text.Wrap
+                            color: Style.muted
+                            font.family: Style.sans
+                            font.pixelSize: 12
+                        }
+                        // The catalog's own definition, and where to read the rest.
+                        Text {
+                            Layout.fillWidth: true
+                            visible: !!view.info.text
+                            text: view.info.text || ""
+                            textFormat: Text.PlainText
+                            wrapMode: Text.Wrap
+                            lineHeight: 1.4
+                            color: Style.ink
+                            font.family: Style.serif
+                            font.pixelSize: 14
+                        }
+                        Text {
+                            visible: !!view.info.link
+                            text: (view.info.kind === "owasp" ? qsTr("Read at OWASP") : qsTr("Read at MITRE")) + " ↗"
+                            color: linkHover.hovered ? Style.ink : Style.accent
+                            font.family: Style.sans
+                            font.pixelSize: 13
+                            HoverHandler { id: linkHover; cursorShape: Qt.PointingHandCursor }
+                            TapHandler { onTapped: Qt.openUrlExternally(view.info.link) }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            visible: view.catalog
+                            text: qsTr("Found by name in the writeups' text; a mention isn't always what a writeup is about. Two entries are related when a passage names both or the catalog relates them.")
+                            wrapMode: Text.Wrap
+                            color: Style.faint
+                            font.family: Style.sans
+                            font.pixelSize: 12
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            visible: !view.catalog
                             text: qsTr("Found by the local model %1, which can be wrong. Two concepts are related when a passage names both.")
                                   .arg((view.info.models || []).join(", "))
                             wrapMode: Text.Wrap
@@ -515,6 +586,37 @@ Item {
                                 }
                             }
                         }
+                        Text {
+                            Layout.topMargin: 8
+                            visible: (view.info.catalog || []).length > 0
+                            text: qsTr("In the catalog")
+                            color: Style.ink
+                            font.family: Style.sans
+                            font.pixelSize: 15
+                            font.weight: Font.DemiBold
+                        }
+                        // Entries the catalogs relate to this one; the ones a writeup names are on the map.
+                        Repeater {
+                            model: (view.info.catalog || []).slice().sort((a, b) => b.inLibrary - a.inLibrary).slice(0, 14)
+                            RowLayout {
+                                required property var modelData
+                                Layout.fillWidth: true
+                                spacing: 8
+                                Rectangle { width: 9; height: 9; radius: 5; color: Style.kindColor(modelData.kind); opacity: modelData.inLibrary ? 1 : 0.4 }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: modelData.name
+                                    textFormat: Text.PlainText
+                                    elide: Text.ElideRight
+                                    color: !modelData.inLibrary ? Style.faint : catHover.hovered ? Style.accent : Style.ink
+                                    font.family: Style.sans
+                                    font.pixelSize: 13
+                                    HoverHandler { id: catHover; cursorShape: modelData.inLibrary ? Qt.PointingHandCursor : Qt.ArrowCursor }
+                                    TapHandler { onTapped: if (modelData.inLibrary) view.choose(modelData.id) }
+                                }
+                                Text { text: modelData.id; color: Style.faint; font.family: Style.sans; font.pixelSize: 11 }
+                            }
+                        }
                         Item { Layout.preferredHeight: 10 }
                     }
                 }
@@ -522,7 +624,8 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     visible: !view.selected && view.nodes.length > 0
-                    text: qsTr("Concepts and relations are the local model's reading of your writeups, not facts.")
+                    text: view.catalog ? qsTr("Definitions from MITRE ATT&CK, CWE, CAPEC (© MITRE) and the OWASP Top 10 2025 (CC BY-SA 4.0), matched by name in your writeups.")
+                                       : qsTr("Concepts and relations are the local model's reading of your writeups, not facts.")
                     wrapMode: Text.Wrap
                     color: Style.faint
                     font.family: Style.sans
