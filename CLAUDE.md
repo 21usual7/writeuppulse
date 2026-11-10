@@ -32,11 +32,11 @@ Roadmap stages done, each with tests (40 passing) and docs:
 - **5 (graph view):** the Concepts view (G, rail ◈): map, search, inspector with
   the timeline of writeups and neighbours with their passages.
 
-On this machine `~/.local/bin/writeuppulse` is still the stage-3 binary: the database
-is at version 2, every saved writeup has its page text (`pages` status `ok`), and no
-concepts are extracted yet. Installing the new binary migrates it to version 3 and
-starts extraction in the window whenever Ollama is up (~1.5–4 min of CPU per writeup). Nothing is pushed; the
-last release is still 0.3.0, so cutting 0.4.0 would need the user's go-ahead.
+On this machine `~/.local/bin/writeuppulse` is the stage-5 binary (installed
+2026-11-10): the first window it opens migrates the database to version 3 and starts
+extracting concepts from the 10 saved pages while Ollama is up (~2–4 min of CPU each),
+so the Concepts view fills in over about half an hour of an open window. Nothing is
+pushed; the last release is still 0.3.0, so cutting 0.4.0 would need the user's go-ahead.
 
 **Next: stage 6**, the learning engine: tutor modes, teach-back and knowledge checks
 with structured grading, history in the database. See `docs/ROADMAP.md`.
