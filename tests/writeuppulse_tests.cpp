@@ -11,6 +11,7 @@
 
 #include "archive.h"
 #include "backend.h"
+#include "cloudsync.h"
 #include "database.h"
 #include "extractor.h"
 #include "fetcher.h"
@@ -1122,6 +1123,138 @@ private slots:
         // Two summary paragraphs, and a long note in pieces of 2000 characters.
         const QJsonObject last = children.last().toObject();
         QCOMPARE(last.value("paragraph").toObject().value("rich_text").toArray().size(), 2);
+    }
+
+    void cloudSyncKeepsComputersTheSame()
+    {
+        // The key, and what it encrypts.
+        const QString key = CloudSync::newKey();
+        QVERIFY(CloudSync::validKey(key));
+        QVERIFY(!CloudSync::validKey(key + "x"));
+        QVERIFY(!CloudSync::validKey("wp1-short"));
+        const QByteArray cipher = CloudSync::derive(key, "writeuppulse cipher");
+        QCOMPARE(cipher.size(), 32);
+        QVERIFY(cipher != CloudSync::derive(key, "writeuppulse row"));
+        bool ok = false;
+        QByteArray sealed = CloudSync::seal(cipher, "my note");
+        QVERIFY(!sealed.contains("my note"));
+        QCOMPARE(CloudSync::open(cipher, sealed, &ok), QByteArray("my note"));
+        QVERIFY(ok);
+        sealed[14] = char(sealed[14] ^ 1);
+        CloudSync::open(cipher, sealed, &ok);
+        QVERIFY(!ok);
+        CloudSync::open(CloudSync::derive(CloudSync::newKey(), "writeuppulse cipher"), CloudSync::seal(cipher, "x"), &ok);
+        QVERIFY(!ok);
+
+        // A stand-in for cloud/worker.js with its rules: rows per account,
+        // a newer change wins, numbered in order; WRITEUPPULSE_CLOUD_TEST runs
+        // the same test against a real one (`wrangler dev`).
+        struct Row { QString id, data; qint64 updated, seq; };
+        QHash<QString, QList<Row>> accounts;
+        QByteArrayList bodies;
+        QTcpServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        connect(&server, &QTcpServer::newConnection, this, [&] {
+            QTcpSocket *socket = server.nextPendingConnection();
+            auto request = std::make_shared<QByteArray>();
+            connect(socket, &QTcpSocket::readyRead, socket, [&, socket, request] {
+                *request += socket->readAll();
+                const qsizetype head = request->indexOf("\r\n\r\n");
+                if (head < 0)
+                    return;
+                const QByteArray length = request->mid(request->toLower().indexOf("content-length:") + 15).split('\r').value(0).trimmed();
+                if (request->size() - head - 4 < length.toInt())
+                    return;
+                const QByteArray body = request->mid(head + 4);
+                bodies << body;
+                const QByteArray user = request->mid(request->indexOf("Authorization: Bearer ") + 22, 64);
+                QList<Row> &rows = accounts[QString::fromLatin1(user)];
+                const QJsonObject in = QJsonDocument::fromJson(body).object();
+                for (const auto &value : in.value("rows").toArray()) {
+                    const QJsonObject row = value.toObject();
+                    qint64 next = 0;
+                    for (const Row &r : rows) next = qMax(next, r.seq);
+                    auto at = std::find_if(rows.begin(), rows.end(), [&](const Row &r) { return r.id == row.value("id").toString(); });
+                    const Row fresh{row.value("id").toString(), row.value("data").toString(), row.value("updated").toInteger(), next + 1};
+                    if (at == rows.end())
+                        rows << fresh;
+                    else if (fresh.updated > at->updated)
+                        *at = fresh;
+                }
+                QJsonArray out;
+                for (const Row &r : rows)
+                    if (r.seq > in.value("since").toInteger())
+                        out.append(QJsonObject{{"id", r.id}, {"data", r.data}, {"updated", r.updated}, {"seq", r.seq}});
+                const QByteArray reply = QJsonDocument(QJsonObject{{"rows", out}, {"more", false}}).toJson(QJsonDocument::Compact);
+                socket->write("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: "
+                              + QByteArray::number(reply.size()) + "\r\n\r\n" + reply);
+                socket->disconnectFromHost();
+            });
+        });
+        const QUrl service(qEnvironmentVariable("WRITEUPPULSE_CLOUD_TEST", QString("http://127.0.0.1:%1/").arg(server.serverPort())));
+
+        QTemporaryDir a, b;
+        Database first(a.path()), second(b.path());
+        const QString url = "https://example.com/heap";
+        QVERIFY(first.saveEntry(url, {{"read", "2026-11-10"}, {"category", "Pwn"}}));
+        QVERIFY(first.saveNote(url, "tcache first"));
+        QVERIFY(first.addCheck(url, "Why tcache?", "knew"));
+        QVERIFY(second.saveEntry("https://example.com/other", {{"favorite", true}}));
+        CloudSync one(first), two(second);
+        one.server = service;
+        two.server = service;
+        auto run = [](CloudSync &sync) {
+            QSignalSpy finished(&sync, &CloudSync::finished);
+            sync.sync();
+            if (!finished.wait(15000))
+                return -1;
+            return finished.first().at(0).toBool() ? finished.first().at(2).toInt() : -1;
+        };
+        // Joining sends what each computer already had.
+        QVERIFY(first.shareAll());
+        QVERIFY(second.shareAll());
+        one.setKey(key);
+        two.setKey(key);
+        QCOMPARE(run(one), 0);
+        QCOMPARE(first.pendingCount(), 0);
+        QCOMPARE(run(two), 3);
+        QCOMPARE(run(one), 1);
+        for (Database *db : {&first, &second}) {
+            const QJsonObject entries = db->entries();
+            QCOMPARE(entries.value(url).toObject().value("read").toString(), QString("2026-11-10"));
+            QCOMPARE(entries.value(url).toObject().value("checks").toObject().value("Why tcache?").toString(), QString("knew"));
+            QVERIFY(entries.value("https://example.com/other").toObject().value("favorite").toBool());
+            QCOMPARE(db->note(url), QString("tcache first"));
+        }
+        // The later change wins, whichever computer syncs first.
+        QVERIFY(second.saveNote(url, "older"));
+        QTest::qWait(5);
+        QVERIFY(first.saveNote(url, "newer"));
+        QVERIFY(first.addCheck(url, "Why tcache?", "missed"));
+        QCOMPARE(run(one), 0);
+        QCOMPARE(run(two), 2);
+        QCOMPARE(run(one), 0);
+        QCOMPARE(first.note(url), QString("newer"));
+        QCOMPARE(second.note(url), QString("newer"));
+        QCOMPARE(second.entries().value(url).toObject().value("checks").toObject().value("Why tcache?").toString(), QString("missed"));
+        // Unmarking reaches the other computer too.
+        QVERIFY(second.saveEntry("https://example.com/other", {}));
+        QCOMPARE(run(two), 0);
+        QCOMPARE(run(one), 1);
+        QVERIFY(!first.entries().contains("https://example.com/other"));
+        // The service saw no URL, note, or question.
+        if (!qEnvironmentVariableIsSet("WRITEUPPULSE_CLOUD_TEST")) {
+            QVERIFY(!bodies.isEmpty());
+            for (const QByteArray &body : bodies)
+                QVERIFY(!body.contains("example.com") && !body.contains("tcache") && !body.contains("Why"));
+        }
+        // Another key is another account: nothing comes back.
+        CloudSync stranger(second);
+        stranger.server = service;
+        stranger.setKey(CloudSync::newKey());
+        QCOMPARE(run(stranger), 0);
+        one.setKey({});
+        two.setKey({});
     }
 
     void backendShowsTheGraphOfTheLibrary()

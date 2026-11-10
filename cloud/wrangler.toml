@@ -1,0 +1,13 @@
+# The sync service for WriteupPulse (src/cloudsync.cpp). Deploy:
+#   npx wrangler@4 d1 create writeuppulse-sync   (once; put its id below)
+#   npx wrangler@4 d1 execute writeuppulse-sync --remote --file schema.sql
+#   npx wrangler@4 deploy
+name = "writeuppulse-sync"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "writeuppulse-sync"
+database_id = "74ee68c8-a973-4749-a919-25fd91f7b711"

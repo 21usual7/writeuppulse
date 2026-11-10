@@ -10,6 +10,9 @@
 #include <QPointF>
 #include <QtMath>
 #include <QProcess>
+#include <QClipboard>
+#include <QLocale>
+#include <QGuiApplication>
 #include <QSaveFile>
 #include <QSettings>
 #include <QStandardPaths>
@@ -85,6 +88,63 @@ Backend::Backend(const QString &directory, bool systemd, QObject *parent)
         m_syncTimer.start();
         syncIfStale();
     }
+
+    // Changes go up within a minute; other computers' come down on open and
+    // every ten minutes.
+    connect(&m_cloud, &CloudSync::finished, this, [this](bool ok, const QString &message, int received) {
+        if (ok)
+            m_cloudLast = QDateTime::currentDateTime();
+        m_cloudStatus = ok ? tr("Synced %1").arg(QLocale().toString(m_cloudLast.time(), QLocale::ShortFormat))
+                           : tr("Sync failed: %1").arg(message);
+        if (received > 0)
+            progressReloaded();
+        emit cloudChanged();
+    });
+    if (m_systemd) {
+        m_cloudTimer.setInterval(60 * 1000);
+        connect(&m_cloudTimer, &QTimer::timeout, this, [this] {
+            if (!m_cloud.key().isEmpty() && (m_database.pendingCount() > 0 || !m_cloudLast.isValid()
+                                             || m_cloudLast.secsTo(QDateTime::currentDateTime()) > 10 * 60))
+                cloudSyncNow();
+        });
+        m_cloudTimer.start();
+        if (!m_cloud.key().isEmpty())
+            QTimer::singleShot(1500, this, [this] { cloudSyncNow(); });
+    }
+}
+
+void Backend::cloudStart() {
+    cloudJoin(CloudSync::newKey());
+}
+
+bool Backend::cloudJoin(const QString &key) {
+    const QString trimmed = key.trimmed();
+    if (!CloudSync::validKey(trimmed))
+        return false;
+    m_database.shareAll();
+    m_cloud.setKey(trimmed);
+    m_cloudStatus.clear();
+    cloudSyncNow();
+    return true;
+}
+
+void Backend::cloudStop() {
+    m_cloud.setKey({});
+    m_cloudStatus.clear();
+    emit cloudChanged();
+}
+
+void Backend::copyText(const QString &text) {
+    QGuiApplication::clipboard()->setText(text);
+    setNotice(tr("Copied"));
+}
+
+void Backend::progressReloaded() {
+    m_progress.load();
+    graphOutdated();
+    ++m_progressRevision;
+    emit progressChanged();
+    rebuild();
 }
 
 void Backend::syncIfStale() {

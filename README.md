@@ -134,6 +134,15 @@ overwrites it. To keep notes in Notion, create an integration at
 notion.so/my-integrations, share a page with it, and paste its token and the page's
 link into Settings; "Send to Notion" then adds the writeup and your note as a page.
 
+**Sync between computers** (Settings) keeps progress, answers, and notes the same on
+your machines. "Turn on sync" makes a key (`wp1-…`); paste it on the other computer.
+Everything is encrypted on your computer with AES-256-GCM under a key derived from
+it, and row ids are HMACs, so the service (`cloud/worker.js`, a Cloudflare Worker with
+D1) stores only ciphertext: no URLs, notes, or questions. The window syncs on open,
+within a minute of a change, and every ten minutes; the later change wins. Writeups,
+search, and the map stay local. To run your own service, see `cloud/wrangler.toml`
+and point `WRITEUPPULSE_CLOUD` at it.
+
 The first start walks through **Get started**: what the app is, your level and
 language, how a day of learning goes, and what stays on your computer. **Help** (?)
 has the same and more, every shortcut, and a way back to Get started.

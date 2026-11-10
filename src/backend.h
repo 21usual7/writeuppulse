@@ -13,6 +13,7 @@
 #include "database.h"
 #include "extractor.h"
 #include "filepicker.h"
+#include "cloudsync.h"
 #include "notes.h"
 #include "progress.h"
 #include "references.h"
@@ -59,6 +60,9 @@ class Backend : public QObject {
     Q_PROPERTY(QString myLevel READ myLevel WRITE setMyLevel NOTIFY preferencesChanged)
     Q_PROPERTY(QString notesFolder READ notesFolder WRITE setNotesFolder NOTIFY preferencesChanged)
     Q_PROPERTY(QString notionToken READ notionToken WRITE setNotionToken NOTIFY preferencesChanged)
+    Q_PROPERTY(QString cloudKey READ cloudKey NOTIFY cloudChanged)
+    Q_PROPERTY(bool cloudBusy READ cloudBusy NOTIFY cloudChanged)
+    Q_PROPERTY(QString cloudStatus READ cloudStatus NOTIFY cloudChanged)
     Q_PROPERTY(QString notionParent READ notionParent WRITE setNotionParent NOTIFY preferencesChanged)
     Q_PROPERTY(bool sending READ sending NOTIFY sendingChanged)
     Q_PROPERTY(bool onboarded READ onboarded WRITE setOnboarded NOTIFY preferencesChanged)
@@ -194,6 +198,16 @@ public:
 
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void setTimerEnabled(bool enabled);
+    // Sync between computers (CloudSync): a new key here, or another
+    // computer's key typed in; both send everything this one has.
+    QString cloudKey() const { return m_cloud.key(); }
+    bool cloudBusy() const { return m_cloud.busy(); }
+    QString cloudStatus() const { return m_cloudStatus; }
+    Q_INVOKABLE void cloudStart();
+    Q_INVOKABLE bool cloudJoin(const QString &key);
+    Q_INVOKABLE void cloudStop();
+    Q_INVOKABLE void cloudSyncNow() { m_cloud.sync(); emit cloudChanged(); }
+    Q_INVOKABLE void copyText(const QString &text);
     Q_INVOKABLE void olderDay() { step(1); }
     Q_INVOKABLE void newerDay() { step(-1); }
 
@@ -212,6 +226,7 @@ signals:
     void noticeChanged();
     void graphChanged();
     void sendingChanged();
+    void cloudChanged();
 
 private:
     void reload();
@@ -242,6 +257,11 @@ private:
 
     Store m_store;
     Database m_database;
+    CloudSync m_cloud{m_database};
+    QTimer m_cloudTimer;
+    QDateTime m_cloudLast;
+    QString m_cloudStatus;
+    void progressReloaded();
     Progress m_progress;
     Archive m_archive;
     std::unique_ptr<Extractor> m_extractor;

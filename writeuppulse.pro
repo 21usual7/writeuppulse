@@ -10,6 +10,7 @@ DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 HEADERS += \
     src/archive.h \
     src/backend.h \
+    src/cloudsync.h \
     src/cli.h \
     src/database.h \
     src/extractor.h \
@@ -29,6 +30,7 @@ SOURCES += \
     src/main.cpp \
     src/archive.cpp \
     src/backend.cpp \
+    src/cloudsync.cpp \
     src/cli.cpp \
     src/database.cpp \
     src/extractor.cpp \
@@ -42,5 +44,8 @@ SOURCES += \
     src/syncer.cpp \
     src/tutor.cpp \
     src/translator.cpp
+
+# AES-GCM for the sync rows (CloudSync).
+LIBS += -lcrypto
 
 RESOURCES += src/resources.qrc

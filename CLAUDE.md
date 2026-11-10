@@ -16,7 +16,7 @@ build new features locally — SQLite, the local Ollama model, the article pages
 
 ## Status (2026-11-10)
 
-Roadmap stages done, each with tests (46 passing) and docs:
+Roadmap stages done, each with tests (47 passing) and docs:
 
 - **0 (bugs):** start limits in `[Unit]` (packaged and local unit), statistics take
   the category from the day, progress keyed by `Store::canonicalUrl`.
@@ -55,8 +55,9 @@ fields. README screenshots retaken except `docs/focus.png` (old palette and icon
 its made-up data isn't in the repo).
 
 **Next:** nothing planned beyond the list above; see `docs/ROADMAP.md`. Open ideas:
-retake `docs/focus.png`; the database in a free cloud (not started; the analysis is
-`docs/ROADMAP.md` §11). GPU: the drop-in `/etc/systemd/system/ollama.service.d/igpu.conf`
+retake `docs/focus.png`. Sync between computers is done (2026-11-10, see Cloud sync;
+`docs/ROADMAP.md` §11); not yet: syncing on window close, the Notion page id, and
+rate limits on the Worker beyond its per-account cap. GPU: the drop-in `/etc/systemd/system/ollama.service.d/igpu.conf`
 (`OLLAMA_IGPU_ENABLE=1`) exists since 2026-11-10 12:46 but needs `daemon-reload` and a
 restart of `ollama` to apply; then measure tokens/s against the CPU's ~6.
 
@@ -230,6 +231,27 @@ the QML window.
   link or ID): bookmark, headings, paragraphs (2000-char pieces), ≤ 100 blocks. The
   token is in QSettings (plain, ~/.config), as the Settings text says; only the user's
   own action sends anything.
+- **Cloud sync:** `CloudSync` (`src/cloudsync.cpp`, owned by `Backend`) and the service
+  `cloud/worker.js` (Cloudflare Worker + D1 `writeuppulse-sync`, deployed 2026-11-10 at
+  <https://writeuppulse-sync.21usual7.workers.dev>, the default; `WRITEUPPULSE_CLOUD`
+  overrides it). Key `wp1-` + 32 random bytes base64url, in QSettings `cloudKey` (plain,
+  like the Notion token) with the pull cursor `cloudCursor`. From it, by HMAC-SHA256
+  labels: the bearer token (the Worker files rows under its SHA-256), the row id key
+  (id = HMAC(kind + "\n" + key)), and the AES-256-GCM key (OpenSSL `-lcrypto`; nonce |
+  ciphertext | tag). The service never sees a URL, note, or question. Locally (database
+  version 5) `sync` (kind `progress`/`note`/`event`, key, changed ms, sent) is touched
+  by `saveEntry`, `saveNote`, `addCheck`; events got a random `uid`; `applyRemote`
+  takes a row only if newer than ours (last write wins; answers are only added) and
+  checks are ordered by `at, id` so another computer's fall in place. `shareAll` marks
+  everything on joining (time 0, so any real change wins). One `POST /sync` sends ≤ 400
+  rows and returns rows after the cursor (≤ 1000, `more`). The window syncs 1.5 s after
+  open, then each minute if something is pending or 10 min passed; a received row
+  reloads progress like another window's commit. Worker limits: 4 MB body, 500 rows
+  in, 64 KB per row, 50 000 rows per account. Deploy: `cd cloud && npx wrangler@4
+  deploy` (wrangler is logged in on this machine; schema changes go to `schema.sql`
+  and `d1 execute --remote`). The test `cloudSyncKeepsComputersTheSame` uses a stand-in
+  with the Worker's rules; `WRITEUPPULSE_CLOUD_TEST=<url>` runs it against `wrangler dev
+  --local` or the real one (then delete its rows).
 - **Labs:** `src/labs/labs.json` (qrc) is a hand-picked list of legal practice places
   (name, own project URL, `open` = open source and self-hosted vs free online,
   directions, levels, `about` in en/ru/uk). `Backend::labs(category, level)` gives up to

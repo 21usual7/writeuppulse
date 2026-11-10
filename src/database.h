@@ -24,7 +24,7 @@ public:
     Database(const Database &) = delete;
     Database &operator=(const Database &) = delete;
 
-    static constexpr int version = 4;
+    static constexpr int version = 5;
 
     QString path() const { return m_path; }
     // Empty when the file opened and is at the current version.
@@ -47,6 +47,18 @@ public:
     QString note(const QString &url) const;
     bool saveNote(const QString &url, const QString &text);
     QString notionPage(const QString &url) const;
+
+    // Sync between the user's computers (CloudSync). Every change to progress,
+    // a note, or a new answer is marked in `sync` with the time it was made;
+    // `outgoing` lists the unsent ones as {kind, key, changed, value},
+    // `markSent` clears them unless they changed again, and `applyRemote` takes
+    // another computer's row when it is newer than ours (answers by their uid).
+    QJsonArray outgoing(int limit) const;
+    int pendingCount() const;
+    void markSent(const QJsonArray &rows);
+    bool applyRemote(const QString &kind, const QString &key, qint64 changed, const QJsonObject &value);
+    // Marks everything for sending, for a new sync key.
+    bool shareAll();
     bool setNotionPage(const QString &url, const QString &page);
 
     // Brings the index in line with the days on disk: changed days again,

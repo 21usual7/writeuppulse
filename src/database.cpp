@@ -9,6 +9,7 @@
 #include <QMap>
 #include <QSqlError>
 #include <QSqlQuery>
+#include <QUuid>
 #include <QStringList>
 #include <QVariant>
 
@@ -99,6 +100,15 @@ bool Database::migrate(const QString &directory) {
             ok = ok && run(sql);
     if (ok && current < 4)
         ok = run("CREATE TABLE notes (url TEXT PRIMARY KEY, text TEXT NOT NULL DEFAULT '', notion TEXT, at TEXT NOT NULL)");
+    // Answers get an id of their own so another computer's copy is the same row.
+    if (ok && current < 5)
+        for (const char *sql : {
+                 "ALTER TABLE events ADD COLUMN uid TEXT",
+                 "UPDATE events SET uid = lower(hex(randomblob(16))) WHERE uid IS NULL",
+                 "CREATE UNIQUE INDEX events_by_uid ON events (uid)",
+                 "CREATE TABLE sync (kind TEXT NOT NULL, key TEXT NOT NULL, changed INTEGER NOT NULL,"
+                 " sent INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (kind, key))"})
+            ok = ok && run(sql);
     ok = ok && (current == version || run(QString("PRAGMA user_version = %1").arg(version))) && run("COMMIT");
     if (!ok)
         QSqlQuery(connection()).exec("ROLLBACK");
@@ -152,7 +162,7 @@ QJsonObject Database::entries() const {
         items.insert(query.value(0).toString(), entry);
     }
     // Answers in order, so the latest one for a question wins.
-    query.exec("SELECT url, subject, result FROM events WHERE kind = 'check' ORDER BY id");
+    query.exec("SELECT url, subject, result FROM events WHERE kind = 'check' ORDER BY at, id");
     while (query.next()) {
         const QString url = query.value(0).toString();
         QJsonObject entry = items.value(url).toObject();
@@ -173,7 +183,18 @@ QJsonObject Database::entries() const {
     return items;
 }
 
+static void touch(const QSqlDatabase &db, const QString &kind, const QString &key) {
+    QSqlQuery query(db);
+    query.prepare("INSERT INTO sync (kind, key, changed, sent) VALUES (?, ?, ?, 0)"
+                  " ON CONFLICT (kind, key) DO UPDATE SET changed = excluded.changed, sent = 0");
+    query.addBindValue(kind);
+    query.addBindValue(key);
+    query.addBindValue(QDateTime::currentMSecsSinceEpoch());
+    query.exec();
+}
+
 bool Database::saveEntry(const QString &url, const QJsonObject &entry) {
+    touch(connection(), "progress", url);
     QSqlQuery query(connection());
     const QJsonArray tags = entry.value("tags").toArray(), done = entry.value("done").toArray();
     if (!entry.contains("read") && !entry.contains("lab") && !entry.value("favorite").toBool() && tags.isEmpty()
@@ -195,9 +216,11 @@ bool Database::saveEntry(const QString &url, const QJsonObject &entry) {
 }
 
 bool Database::addCheck(const QString &url, const QString &question, const QString &result) {
+    const QString uid = QUuid::createUuid().toString(QUuid::Id128);
+    touch(connection(), "event", uid);
     QSqlQuery query(connection());
-    query.prepare("INSERT INTO events (url, kind, subject, result, at) VALUES (?, 'check', ?, ?, ?)");
-    for (const QString &value : {url, question, result, QDateTime::currentDateTime().toString(Qt::ISODate)})
+    query.prepare("INSERT INTO events (url, kind, subject, result, at, uid) VALUES (?, 'check', ?, ?, ?, ?)");
+    for (const QString &value : {url, question, result, QDateTime::currentDateTime().toString(Qt::ISODate), uid})
         query.addBindValue(value);
     return query.exec();
 }
@@ -205,7 +228,7 @@ bool Database::addCheck(const QString &url, const QString &question, const QStri
 QJsonArray Database::checks() const {
     QJsonArray list;
     QSqlQuery query(connection());
-    if (query.exec("SELECT url, subject, result, at FROM events WHERE kind = 'check' ORDER BY id"))
+    if (query.exec("SELECT url, subject, result, at FROM events WHERE kind = 'check' ORDER BY at, id"))
         while (query.next())
             list.append(QJsonObject{{"url", query.value(0).toString()}, {"question", query.value(1).toString()},
                                     {"result", query.value(2).toString()}, {"at", query.value(3).toString()}});
@@ -221,6 +244,7 @@ QString Database::note(const QString &url) const {
 
 // A note emptied but sent to Notion keeps its row for the page id.
 bool Database::saveNote(const QString &url, const QString &text) {
+    touch(connection(), "note", url);
     QSqlQuery query(connection());
     query.prepare(text.isEmpty() ? "DELETE FROM notes WHERE url = ? AND notion IS NULL"
                                  : "INSERT INTO notes (url, text, at) VALUES (?, ?, ?)"
@@ -238,6 +262,90 @@ bool Database::saveNote(const QString &url, const QString &text) {
         return query.exec();
     }
     return true;
+}
+
+QJsonArray Database::outgoing(int limit) const {
+    QJsonArray rows;
+    const QJsonObject entries = this->entries();
+    QSqlQuery query(connection()), event(connection());
+    query.prepare("SELECT kind, key, changed FROM sync WHERE sent = 0 ORDER BY changed LIMIT ?");
+    query.addBindValue(limit);
+    query.exec();
+    while (query.next()) {
+        const QString kind = query.value(0).toString(), key = query.value(1).toString();
+        QJsonObject value;
+        if (kind == "progress") {
+            value = entries.value(key).toObject();
+            value.remove("checks");
+        } else if (kind == "note") {
+            value.insert("text", note(key));
+        } else {
+            event.prepare("SELECT url, subject, result, at FROM events WHERE uid = ?");
+            event.addBindValue(key);
+            if (!event.exec() || !event.next())
+                continue;
+            value = {{"url", event.value(0).toString()}, {"question", event.value(1).toString()},
+                     {"result", event.value(2).toString()}, {"at", event.value(3).toString()}};
+        }
+        rows.append(QJsonObject{{"kind", kind}, {"key", key}, {"changed", query.value(2).toLongLong()}, {"value", value}});
+    }
+    return rows;
+}
+
+int Database::pendingCount() const {
+    QSqlQuery query(connection());
+    return query.exec("SELECT count(*) FROM sync WHERE sent = 0") && query.next() ? query.value(0).toInt() : 0;
+}
+
+void Database::markSent(const QJsonArray &rows) {
+    QSqlQuery query(connection());
+    query.prepare("UPDATE sync SET sent = 1 WHERE kind = ? AND key = ? AND changed = ?");
+    for (const auto &value : rows) {
+        const QJsonObject row = value.toObject();
+        query.addBindValue(row.value("kind").toString());
+        query.addBindValue(row.value("key").toString());
+        query.addBindValue(row.value("changed").toInteger());
+        query.exec();
+    }
+}
+
+bool Database::applyRemote(const QString &kind, const QString &key, qint64 changed, const QJsonObject &value) {
+    QSqlQuery query(connection());
+    query.prepare("SELECT changed FROM sync WHERE kind = ? AND key = ?");
+    query.addBindValue(kind);
+    query.addBindValue(key);
+    if (query.exec() && query.next() && query.value(0).toLongLong() >= changed)
+        return false;
+    bool ok = false;
+    if (kind == "progress") {
+        ok = saveEntry(key, value);
+    } else if (kind == "note") {
+        ok = saveNote(key, value.value("text").toString());
+    } else if (kind == "event") {
+        query.prepare("INSERT OR IGNORE INTO events (url, kind, subject, result, at, uid) VALUES (?, 'check', ?, ?, ?, ?)");
+        for (const char *field : {"url", "question", "result", "at"})
+            query.addBindValue(value.value(field).toString());
+        query.addBindValue(key);
+        ok = query.exec();
+    }
+    if (!ok)
+        return false;
+    // Ours now as of that time, and nothing to send back.
+    query.prepare("INSERT INTO sync (kind, key, changed, sent) VALUES (?, ?, ?, 1)"
+                  " ON CONFLICT (kind, key) DO UPDATE SET changed = excluded.changed, sent = 1");
+    query.addBindValue(kind);
+    query.addBindValue(key);
+    query.addBindValue(changed);
+    return query.exec();
+}
+
+// Rows never changed since the update keep time 0: any real change wins over them.
+bool Database::shareAll() {
+    QSqlQuery query(connection());
+    return query.exec("INSERT OR IGNORE INTO sync (kind, key, changed) SELECT 'progress', url, 0 FROM progress")
+        && query.exec("INSERT OR IGNORE INTO sync (kind, key, changed) SELECT 'note', url, 0 FROM notes WHERE text != ''")
+        && query.exec("INSERT OR IGNORE INTO sync (kind, key, changed) SELECT 'event', uid, 0 FROM events WHERE kind = 'check'")
+        && query.exec("UPDATE sync SET sent = 0");
 }
 
 QString Database::notionPage(const QString &url) const {

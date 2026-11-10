@@ -842,6 +842,65 @@ ApplicationWindow {
                     }
 
                     Rectangle { Layout.fillWidth: true; Layout.topMargin: 6; height: 1; color: Style.line }
+                    Text { text: qsTr("Sync between computers"); color: Style.ink; font.family: Style.sans; font.pixelSize: 17; font.weight: Font.DemiBold }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        visible: backend.cloudKey === ""
+                        ActionButton { text: qsTr("Turn on sync"); primary: true; onClicked: backend.cloudStart() }
+                        TextField {
+                            id: joinField
+                            Layout.fillWidth: true
+                            placeholderText: qsTr("Or paste the key from your other computer")
+                            color: Style.ink
+                            font.family: Style.sans
+                            font.pixelSize: 13
+                            onTextEdited: joinError.visible = false
+                        }
+                        ActionButton {
+                            text: qsTr("Connect")
+                            enabled: joinField.text.trim().length > 0
+                            onClicked: { joinError.visible = !backend.cloudJoin(joinField.text); if (!joinError.visible) joinField.text = "" }
+                        }
+                    }
+                    Text { id: joinError; visible: false; text: qsTr("That isn't a sync key: it starts with wp1- and has 47 characters."); color: Style.danger; font.family: Style.sans; font.pixelSize: 12 }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        visible: backend.cloudKey !== ""
+                        Text { text: qsTr("Sync key"); color: Style.muted; font.family: Style.sans; font.pixelSize: 14 }
+                        TextField {
+                            Layout.fillWidth: true
+                            readOnly: true
+                            text: backend.cloudKey
+                            echoMode: TextInput.Password
+                            color: Style.ink
+                            font.family: Style.sans
+                            font.pixelSize: 13
+                        }
+                        ActionButton { text: qsTr("Copy"); onClicked: backend.copyText(backend.cloudKey) }
+                        ActionButton { text: qsTr("Sync now"); enabled: !backend.cloudBusy; onClicked: backend.cloudSyncNow() }
+                        ActionButton { text: qsTr("Turn off"); onClicked: backend.cloudStop() }
+                    }
+                    Text {
+                        visible: backend.cloudKey !== "" && text.length > 0
+                        text: backend.cloudBusy ? qsTr("Syncing…") : backend.cloudStatus
+                        color: Style.muted
+                        font.family: Style.sans
+                        font.pixelSize: 12
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        wrapMode: Text.Wrap
+                        text: backend.cloudKey === ""
+                              ? qsTr("Keeps your progress, answers, and notes the same on your computers. They are encrypted here with your sync key before they leave, so the sync service stores only ciphertext. Writeups, search, and the map stay on each computer.")
+                              : qsTr("On your other computer, paste this key in Settings, Sync between computers. Anyone with the key can read and change what you sync: keep it like a password. Turning sync off keeps everything here.")
+                        color: Style.faint
+                        font.family: Style.sans
+                        font.pixelSize: 12
+                    }
+
+                    Rectangle { Layout.fillWidth: true; Layout.topMargin: 6; height: 1; color: Style.line }
                     Text { text: qsTr("Directions"); color: Style.ink; font.family: Style.sans; font.pixelSize: 17; font.weight: Font.DemiBold }
                     Text {
                         Layout.fillWidth: true

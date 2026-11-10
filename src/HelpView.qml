@@ -112,7 +112,7 @@ Flickable {
 
         Heading { text: qsTr("What stays on your computer") }
         Para {
-            text: qsTr("Your progress, answers, notes, and saved article texts live in a local database. The window downloads each writeup's page from its own site, and new days from the WriteupPulse site. Nothing goes anywhere else unless you send a note to Notion or run the agent with your own Claude Code.")
+            text: qsTr("Your progress, answers, notes, and saved article texts live in a local database. The window downloads each writeup's page from its own site, and new days from the WriteupPulse site. Nothing goes anywhere else unless you send a note to Notion, turn on sync between computers (encrypted with your key first), or run the agent with your own Claude Code.")
         }
 
         Heading { text: qsTr("Shortcuts") }

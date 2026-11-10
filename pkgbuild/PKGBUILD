@@ -4,7 +4,7 @@ pkgrel=1
 pkgdesc='Learn every day from popular technical writeups, summarized by Claude'
 arch=('x86_64' 'aarch64')
 license=('MIT')
-depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'systemd')
+depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'systemd' 'openssl')
 optdepends=('ollama: local tutor for questions and practice reviews (Ask tab)'
             'claude-code: run your own agent instead of reading the site')
 makedepends=('gcc' 'make')

@@ -229,9 +229,9 @@ still load, and a CLAUDE.md update.
   QML `Dashboard.qml`, `LibraryView.qml`, `GraphView.qml`,
   `LearningView.qml`.
 
-## 11. Idea: the database in a free cloud (not started)
+## 11. The database in a free cloud (done 2026-11-10)
 
-Asked 2026-11-10; nothing built. Goal it would serve: the same progress, answers,
+Built as below with Cloudflare Workers + D1 and a sync key; see CLAUDE.md, Cloud sync. Goal it would serve: the same progress, answers,
 review and notes on several machines (and maybe on the site).
 
 - **Don't move the SQLite file.** `library.db` holds an index anyone can rebuild
