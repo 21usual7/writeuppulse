@@ -12,6 +12,7 @@
         <file alias="FocusView.qml">FocusView.qml</file>
         <file alias="StatsView.qml">StatsView.qml</file>
         <file alias="GraphView.qml">GraphView.qml</file>
+        <file alias="ReviewView.qml">ReviewView.qml</file>
         <file alias="TutorChat.qml">TutorChat.qml</file>
         <file alias="skill/SKILL.md">skill/SKILL.md</file>
         <file alias="i18n/en.json">i18n/en.json</file>

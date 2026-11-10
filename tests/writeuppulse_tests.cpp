@@ -839,6 +839,60 @@ private slots:
         QVERIFY(!database.wantsConcepts("https://example.com/c"));
     }
 
+    void reviewSpacesTheQuestions()
+    {
+        QTemporaryDir dir;
+        Database database(dir.path());
+        Progress progress(database);
+        auto writeup = [](const QString &name, const QString &date, int questions) {
+            QVariantList list;
+            for (int i = 0; i < questions; ++i)
+                list << QVariantMap{{"question", QString("%1 %2?").arg(name).arg(i)}, {"answer", "Yes."}};
+            return QVariantMap{{"url", "https://example.com/" + name}, {"date", date}, {"title", name}, {"questions", list}};
+        };
+        const QDate today = QDate::currentDate();
+        const QString yesterday = today.addDays(-1).toString(Qt::ISODate);
+        // Newest first, like the window's library.
+        const QVariantList library{writeup("today", today.toString(Qt::ISODate), 2), writeup("old", yesterday, 4),
+                                   writeup("read", yesterday, 3)};
+        auto questions = [](const QVariantMap &review) {
+            QStringList list;
+            for (const auto &card : review.value("cards").toList())
+                list << card.toMap().value("question").toString();
+            return list;
+        };
+
+        // New questions: the read writeup's first, then earlier days', never today's unread ones, five a day.
+        QVERIFY(progress.setRead("https://example.com/read", "Web", true, today.addDays(-1)));
+        QCOMPARE(questions(progress.review(library, today)),
+                 QStringList({"read 0?", "read 1?", "read 2?", "old 0?", "old 1?"}));
+        QCOMPARE(progress.review(library, today, 2).value("cards").toList().size(), 2);
+
+        // Answering one takes it out of today and counts against today's new ones.
+        QVERIFY(progress.setCheck("https://example.com/read", "Web", "read 0?", "knew"));
+        QVERIFY(progress.setCheck("https://example.com/read", "Web", "read 1?", "missed"));
+        QVariantMap review = progress.review(library, today);
+        QCOMPARE(questions(review), QStringList({"read 2?", "old 0?", "old 1?"}));
+        QCOMPARE(review.value("reviewedToday").toInt(), 2);
+        // A day of review keeps the streak going without reading anything new.
+        QCOMPARE(progress.streak(), 2);
+        QCOMPARE(review.value("nextDue").toString(), today.addDays(1).toString(Qt::ISODate));
+
+        // Both come back tomorrow, in box 1.
+        review = progress.review(library, today.addDays(1));
+        QCOMPARE(questions(review).mid(0, 2), QStringList({"read 0?", "read 1?"}));
+        QCOMPARE(review.value("cards").toList().first().toMap().value("box").toInt(), 1);
+
+        // Known again, it waits three days in box 2; taking an answer back undoes it.
+        QSqlQuery query(QSqlDatabase::database(QSqlDatabase::connectionNames().first()));
+        QVERIFY(query.exec(QString("UPDATE events SET at = '%1T09:00:00'").arg(today.addDays(-1).toString(Qt::ISODate))));
+        QVERIFY(progress.setCheck("https://example.com/read", "Web", "read 0?", "knew"));
+        QVERIFY(!questions(progress.review(library, today.addDays(2))).contains("read 0?"));
+        QVERIFY(questions(progress.review(library, today.addDays(3))).contains("read 0?"));
+        QVERIFY(progress.setCheck("https://example.com/read", "Web", "read 0?", ""));
+        QVERIFY(questions(progress.review(library, today)).contains("read 0?"));
+    }
+
     void backendShowsTheGraphOfTheLibrary()
     {
         QTemporaryDir dir;

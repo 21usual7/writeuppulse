@@ -32,6 +32,16 @@ Roadmap stages done, each with tests (40 passing) and docs:
 - **5 (graph view):** the Concepts view (G, rail ◈): map, search, inspector with
   the timeline of writeups and neighbours with their passages.
 
+After stage 5 the user changed the plan (2026-11-10): the local model is too slow for a
+tutor, so stage 6 (tutor modes) is dropped; stages 4–5 stay, extraction spread over 2 h.
+New plan, in order, each done → noted here: **review** (spaced repetition, done),
+**open references** (MITRE ATT&CK, CWE, CAPEC, OWASP Top 10 as JSON in the repo:
+glossary for beginners, a model-free concept graph), **level tracks** (my level in
+Settings, a Junior and a Senior pick a day, security first), **open labs** (curated
+category/CWE → Juice Shop, WebGoat, DVWA, pwn.college…), **notes** (per writeup, export
+to an Obsidian vault / Markdown folder and Notion), **Help and Get started**, then the
+same review/glossary/levels/RSS on the **site**.
+
 On this machine `~/.local/bin/writeuppulse` is the stage-5 binary (installed
 2026-11-10): the first window it opens migrates the database to version 3 and starts
 extracting concepts from the 10 saved pages while Ollama is up (~2–4 min of CPU each),
@@ -156,6 +166,15 @@ the QML window.
   app is for learning, not attacking: the prompt forbids code/commands/payloads/PoCs,
   the schema has no code field, and `normalize` strips fenced code blocks. Old digests
   lack these fields and must still render.
+- **Review:** `Progress::review(library, today, newPerDay = 5)` is computed from the
+  `events` history (no table of its own): every answer pushes a Leitner state, an empty
+  result pops one; box 1–5, back after 1/3/7/16/35 days from the last answer, "missed"
+  → box 1. New questions (never answered) join up to 5 a day, counting the ones first
+  answered today, from writeups marked read, then earlier days' (never today's unread).
+  `Backend::review` (property on `progressChanged`) feeds `ReviewView.qml` (V, rail ↻
+  with a badge; Space reveals, Y knew, N didn't), which shows the first card: answering
+  through `setCheck` drops it from today's list. Answers from focus mode and the Check
+  yourself tab feed the same history. The streak counts review days too.
 - **Preferences and export:** the Settings popup (P) writes `categories` (empty = all)
   and `preferred` to `QSettings`; `Fetcher::prompt` reads them, and `Backend::rebuild`
   puts preferred directions first in a day. Export goes through `FilePicker`

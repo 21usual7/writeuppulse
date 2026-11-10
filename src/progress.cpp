@@ -1,5 +1,6 @@
 #include "progress.h"
 
+#include <QDateTime>
 #include <QJsonArray>
 #include <QSet>
 
@@ -119,6 +120,10 @@ int Progress::streak(const QDate &today) const {
     for (const auto &value : m_items)
         if (value.toObject().contains("read"))
             days.insert(QDate::fromString(value.toObject().value("read").toString(), Qt::ISODate));
+    // A day spent on review counts as much as one spent reading.
+    for (const auto &value : m_database.checks())
+        if (!value.toObject().value("result").toString().isEmpty())
+            days.insert(QDateTime::fromString(value.toObject().value("at").toString(), Qt::ISODate).date());
     QDate day = days.contains(today) ? today : today.addDays(-1);
     int count = 0;
     while (days.contains(day)) {
@@ -165,4 +170,84 @@ QStringList Progress::tags() const {
                 all << tag.toString();
     all.sort(Qt::CaseInsensitive);
     return all;
+}
+
+QVariantMap Progress::review(const QVariantList &library, const QDate &today, int newPerDay) const {
+    static const int intervals[] = {0, 1, 3, 7, 16, 35};
+    struct State { int box = 0; QDate last, first; };
+    // Each answer pushes a state; taking it back pops one.
+    QHash<QString, QList<State>> history;
+    QSet<QString> answeredToday;
+    for (const auto &value : m_database.checks()) {
+        const QJsonObject check = value.toObject();
+        const QString key = check.value("url").toString() + "\n" + check.value("question").toString();
+        QList<State> &states = history[key];
+        const QString result = check.value("result").toString();
+        const QDate at = QDateTime::fromString(check.value("at").toString(), Qt::ISODate).date();
+        if (result.isEmpty()) {
+            if (!states.isEmpty())
+                states.removeLast();
+            continue;
+        }
+        State state = states.isEmpty() ? State() : states.last();
+        state.box = result == "knew" ? qMin(5, state.box + 1) : 1;
+        state.last = at;
+        if (!state.first.isValid())
+            state.first = at;
+        states << state;
+        if (at == today)
+            answeredToday.insert(key);
+    }
+
+    QList<QPair<qint64, QVariantMap>> due;
+    QList<QVariantMap> fresh, freshRead;
+    int introduced = 0;
+    QDate nextDue;
+    QSet<QString> seen;
+    for (const auto &value : library) {
+        const QVariantMap item = value.toMap();
+        const QString url = Store::canonicalUrl(item.value("url").toString());
+        const bool read = entry(url).contains("read");
+        for (const auto &q : item.value("questions").toList()) {
+            const QString question = q.toMap().value("question").toString();
+            const QString key = url + "\n" + question;
+            if (question.isEmpty() || q.toMap().value("answer").toString().isEmpty() || seen.contains(key))
+                continue;
+            seen.insert(key);
+            QVariantMap card = item;
+            card.insert("question", question);
+            card.insert("answer", q.toMap().value("answer"));
+            const QList<State> states = history.value(key);
+            if (states.isEmpty()) {
+                card.insert("box", 0);
+                card.insert("fresh", true);
+                if (read)
+                    freshRead << card;
+                else if (item.value("date").toString() < today.toString(Qt::ISODate))
+                    fresh << card;
+                continue;
+            }
+            const State state = states.last();
+            introduced += state.first == today;
+            const QDate when = state.last.addDays(intervals[state.box]);
+            card.insert("box", state.box);
+            card.insert("fresh", false);
+            if (when <= today)
+                due << qMakePair(when.daysTo(today), card);
+            else if (!nextDue.isValid() || when < nextDue)
+                nextDue = when;
+        }
+    }
+    std::stable_sort(due.begin(), due.end(), [](const auto &a, const auto &b) {
+        return a.first != b.first ? a.first > b.first : a.second.value("box").toInt() < b.second.value("box").toInt();
+    });
+    // The library is newest first already.
+    QVariantList cards;
+    for (const auto &pair : due)
+        cards << pair.second;
+    for (const auto &card : freshRead + fresh)
+        if (introduced++ < newPerDay)
+            cards << card;
+    return {{"cards", cards}, {"reviewedToday", int(answeredToday.size())},
+            {"nextDue", nextDue.isValid() ? nextDue.toString(Qt::ISODate) : QString()}};
 }

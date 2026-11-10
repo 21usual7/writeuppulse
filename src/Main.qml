@@ -113,6 +113,7 @@ ApplicationWindow {
         const days = Math.round((today - day) / 86400000)
         if (days === 0) return qsTr("Today")
         if (days === 1) return qsTr("Yesterday")
+        if (days === -1) return qsTr("Tomorrow")
         return day.toLocaleDateString(Qt.locale(), "ddd d MMM")
     }
     function longDay(text) {
@@ -184,6 +185,7 @@ ApplicationWindow {
     Shortcut { sequence: "F"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.toggleStar(win.current) }
     Shortcut { sequence: "U"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: backend.hideRead = !backend.hideRead }
     Shortcut { sequence: "S"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.show(backend.view === "stats" ? "day" : "stats") }
+    Shortcut { sequence: "V"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.show(backend.view === "review" ? "day" : "review") }
     Shortcut { sequence: "G"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.show(backend.view === "graph" ? "day" : "graph") }
     Shortcut { sequence: "P"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.settingsVisible = !win.settingsVisible }
     Shortcut { sequence: "E"; context: Qt.ApplicationShortcut; enabled: !win.typing && backend.dates.length > 0; onActivated: moreMenu.popup(moreButton, 0, moreButton.height) }
@@ -238,6 +240,7 @@ ApplicationWindow {
                         model: [
                             ["☰", "day", qsTr("Days")],
                             ["★", "favorites", qsTr("Favorites")],
+                            ["↻", "review", qsTr("Review")],
                             ["∑", "stats", qsTr("Statistics")],
                             ["◈", "graph", qsTr("Concepts")]
                         ]
@@ -247,6 +250,17 @@ ApplicationWindow {
                             width: 40; height: 40; radius: 10
                             color: on ? Style.raised : railHover.hovered ? Style.pane : "transparent"
                             Text { anchors.centerIn: parent; text: modelData[0]; color: parent.on ? Style.ink : Style.faint; font.pixelSize: 18 }
+                            // How many questions wait for today's review.
+                            Rectangle {
+                                readonly property int count: modelData[1] === "review" ? (backend.review.cards || []).length : 0
+                                visible: count > 0
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: -2
+                                width: Math.max(16, badge.implicitWidth + 8); height: 16; radius: 8
+                                color: Style.accent
+                                Text { id: badge; anchors.centerIn: parent; text: parent.count; color: Style.accentInk; font.family: Style.sans; font.pixelSize: 10; font.bold: true }
+                            }
                             HoverHandler { id: railHover; cursorShape: Qt.PointingHandCursor }
                             TapHandler { onTapped: win.show(modelData[1]) }
                             ToolTip.visible: railHover.hovered
@@ -282,7 +296,7 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 Layout.preferredWidth: Math.min(400, win.width * 0.34)
                 color: Style.pane
-                visible: (backend.view !== "stats" && backend.view !== "graph") || win.searching
+                visible: ["stats", "graph", "review"].indexOf(backend.view) < 0 || win.searching
                 Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Style.line }
 
                 ColumnLayout {
@@ -534,7 +548,7 @@ ApplicationWindow {
                 ReaderPane {
                     id: reader
                     anchors.fill: parent
-                    visible: (backend.view !== "stats" && backend.view !== "graph") || win.searching
+                    visible: ["stats", "graph", "review"].indexOf(backend.view) < 0 || win.searching
                     item: win.item
                     progress: win.progressOf(win.current)
                     onOpenArticle: win.openArticle(win.current)
@@ -557,6 +571,11 @@ ApplicationWindow {
                 StatsView {
                     anchors.fill: parent
                     visible: backend.view === "stats" && !win.searching
+                }
+                Loader {
+                    anchors.fill: parent
+                    active: backend.view === "review" && !win.searching
+                    sourceComponent: ReviewView { onWriteupChosen: item => win.openWriteup(item) }
                 }
                 // Only while shown: reading the graph lays it out.
                 Loader {
@@ -818,6 +837,7 @@ ApplicationWindow {
                         ["F", qsTr("Add to or remove from favorites")],
                         ["U", qsTr("Show only unread")],
                         ["Ctrl+F  /", qsTr("Search all writeups")],
+                        ["V", qsTr("Review today's questions (Space, Y, N)")],
                         ["S", qsTr("Statistics")],
                         ["G", qsTr("Concepts the local model found")],
                         ["P", qsTr("Settings and directions")],

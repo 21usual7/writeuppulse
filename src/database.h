@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QHash>
+#include <QJsonArray>
 #include <QSet>
 #include <QJsonObject>
 #include <QSqlDatabase>
@@ -38,6 +39,8 @@ public:
     bool saveEntry(const QString &url, const QJsonObject &entry);
     // Every answer is kept; an empty result takes an earlier one back.
     bool addCheck(const QString &url, const QString &question, const QString &result);
+    // Every self-check answer, oldest first: {url, question, result, at}.
+    QJsonArray checks() const;
 
     // Brings the index in line with the days on disk: changed days again,
     // removed days out.

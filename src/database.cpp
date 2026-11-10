@@ -200,6 +200,16 @@ bool Database::addCheck(const QString &url, const QString &question, const QStri
     return query.exec();
 }
 
+QJsonArray Database::checks() const {
+    QJsonArray list;
+    QSqlQuery query(connection());
+    if (query.exec("SELECT url, subject, result, at FROM events WHERE kind = 'check' ORDER BY id"))
+        while (query.next())
+            list.append(QJsonObject{{"url", query.value(0).toString()}, {"question", query.value(1).toString()},
+                                    {"result", query.value(2).toString()}, {"at", query.value(3).toString()}});
+    return list;
+}
+
 static QString stamp(const QString &path) {
     const QFileInfo info(path);
     return QString("%1:%2").arg(info.lastModified().toMSecsSinceEpoch()).arg(info.size());

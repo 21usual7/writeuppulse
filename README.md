@@ -78,6 +78,12 @@ revealing an answer, say whether you knew it; Statistics counts the answers you 
 
 ![Focus mode, checking yourself](docs/focus.png)
 
+**Review** (V) brings back the self-check questions of earlier writeups, a few a
+day, spaced out like flash cards: one you knew returns after 1, 3, 7, 16, then 35
+days, one you didn't returns tomorrow, and up to five new ones join daily, from
+writeups you marked read first. Reveal with Space, answer with Y or N. A day of
+review keeps the streak going.
+
 **Concepts** (G) is a map of what your library teaches. While Ollama is running,
 the local model reads each saved writeup in the background (a few minutes each on
 a CPU) and lists the concepts, techniques, tools, vulnerabilities, and technologies
@@ -140,6 +146,7 @@ Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`
 | F | Add to or remove from favorites |
 | U | Show only unread |
 | Ctrl+F or / | Search all saved writeups |
+| V | Review today's questions (Space, Y, N) |
 | S | Statistics |
 | G | Concepts the local model found |
 | P | Settings and directions |

@@ -54,6 +54,7 @@ class Backend : public QObject {
     Q_PROPERTY(QString notice READ notice NOTIFY noticeChanged)
     Q_PROPERTY(bool saveTexts READ saveTexts WRITE setSaveTexts NOTIFY preferencesChanged)
     Q_PROPERTY(QVariantMap graph READ graph NOTIFY graphChanged)
+    Q_PROPERTY(QVariantMap review READ review NOTIFY progressChanged)
 
 public:
     explicit Backend(const QString &directory = {}, bool systemd = true, QObject *parent = nullptr);
@@ -114,6 +115,9 @@ public:
     int streak() const { return m_progress.streak(); }
     QVariantMap stats() const { return m_progress.stats(m_categories).toVariantMap(); }
     QStringList tags() const { return m_progress.tags(); }
+    // Today's questions to go over (see Progress::review); answering one
+    // with setCheck moves it out of today's list.
+    QVariantMap review() const { return m_progress.review(m_library); }
 
     // QML reads a writeup's state through state(url) in bindings that also
     // read progressRevision, so they re-evaluate after every change.
