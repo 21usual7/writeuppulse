@@ -44,8 +44,9 @@ the same review/glossary/levels/RSS on the **site** (done).
 
 On this machine `~/.local/bin/writeuppulse` is the build from the end of 2026-11-10
 (references, review, notes, site publishing with terms/labs/feed); the database moves to
-version 4 the first time a window from it opens. Nothing is pushed; the last release is
-still 0.3.0, so cutting 0.4.0 would need the user's go-ahead. The morning run publishes
+version 4 the first time a window from it opens. Everything through this list is pushed to
+`master` (2026-11-10); the last release is still 0.3.0, so cutting 0.4.0 would need the
+user's go-ahead. The morning run publishes
 `site/` from committed `master` with this binary, so the site gets the new features then.
 
 **Next:** nothing planned beyond the list above; see `docs/ROADMAP.md`. Open ideas:
