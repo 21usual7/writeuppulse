@@ -129,6 +129,10 @@ overwrites it. To keep notes in Notion, create an integration at
 notion.so/my-integrations, share a page with it, and paste its token and the page's
 link into Settings; "Send to Notion" then adds the writeup and your note as a page.
 
+The first start walks through **Get started**: what the app is, your level and
+language, how a day of learning goes, and what stays on your computer. **Help** (?)
+has the same and more, every shortcut, and a way back to Get started.
+
 Pick your level in Settings (Junior, Middle, or Senior): each day lists the
 writeups at your level first, and review starts new questions from them. Every day
 has at least one piece a beginner can follow and one deep dive, security first.
@@ -176,12 +180,12 @@ Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`
 | Ctrl+F or / | Search all saved writeups |
 | V | Review today's questions (Space, Y, N) |
 | S | Statistics |
-| G | Concepts the local model found |
+| G | Map of concepts |
 | P | Settings and directions |
 | E | Export the day or week as Markdown |
 | R | Fetch today's writeups now |
 | Esc | Back to the list |
-| ? | Show or hide shortcuts |
+| ? | Show or hide help |
 | Q | Quit |
 
 ## Public site

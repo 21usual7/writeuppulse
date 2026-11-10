@@ -5,6 +5,7 @@
 #include <QDateTime>
 #include <QFileSystemWatcher>
 #include <QObject>
+#include <QSettings>
 #include <QTimer>
 #include <QVariantList>
 
@@ -60,6 +61,7 @@ class Backend : public QObject {
     Q_PROPERTY(QString notionToken READ notionToken WRITE setNotionToken NOTIFY preferencesChanged)
     Q_PROPERTY(QString notionParent READ notionParent WRITE setNotionParent NOTIFY preferencesChanged)
     Q_PROPERTY(bool sending READ sending NOTIFY sendingChanged)
+    Q_PROPERTY(bool onboarded READ onboarded WRITE setOnboarded NOTIFY preferencesChanged)
     Q_PROPERTY(QVariantMap graph READ graph NOTIFY graphChanged)
     Q_PROPERTY(QString graphSource READ graphSource WRITE setGraphSource NOTIFY graphChanged)
     Q_PROPERTY(QVariantMap review READ review NOTIFY progressChanged)
@@ -175,6 +177,12 @@ public:
     QString notionParent() const { return m_notionParent; }
     void setNotionParent(const QString &parent);
     bool sending() const { return m_notes.busy(); }
+    // Whether Get started was gone through (or skipped) once.
+    bool onboarded() const { return QSettings("writeuppulse", "writeuppulse").value("onboarded", false).toBool(); }
+    void setOnboarded(bool done) {
+        QSettings("writeuppulse", "writeuppulse").setValue("onboarded", done);
+        emit preferencesChanged();
+    }
 
     // Up to three legal places to practice a direction (src/labs/labs.json):
     // labs for this level first, then open-source ones. {name, url, open,

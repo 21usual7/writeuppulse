@@ -39,8 +39,8 @@ New plan, in order, each done → noted here: **review** (spaced repetition, don
 glossary for beginners, a model-free concept graph; done), **level tracks** (my level in
 Settings, a Junior and a Senior pick a day, security first; done), **open labs** (curated
 category/CWE → Juice Shop, WebGoat, DVWA, pwn.college…; done), **notes** (per writeup, export
-to an Obsidian vault / Markdown folder and Notion; done), **Help and Get started**, then the
-same review/glossary/levels/RSS on the **site**.
+to an Obsidian vault / Markdown folder and Notion; done), **Help and Get started** (done), then
+the same review/glossary/levels/RSS on the **site**.
 
 On this machine `~/.local/bin/writeuppulse` is the stage-5 binary (installed
 2026-11-10): the first window it opens migrates the database to version 3 and starts
@@ -316,6 +316,14 @@ the QML window.
   scale); `win.openWriteup(item)` jumps to the writeup's day, clearing topic and level
   filters (and "unread only") if they hide it. It always says the concepts are the
   model's reading.
+- **Help and Get started:** `HelpView.qml` (in the `?` popup) is the full help: a day's
+  routine, the views, the tabs, the no-attack rule, what stays local, every shortcut;
+  keep its shortcut table in step with `Main.qml`'s Shortcuts and the README.
+  `GetStarted.qml` is a 4-step overlay (what it is; level and language; a day; sources
+  and privacy) shown while QSettings `onboarded` is false, and again from Help ("Get
+  started again", `win.startAgain`). While it shows, `win.typing` is true so the
+  single-key shortcuts stay off. A scratch harness needs `onboarded=true` in its conf
+  or every screenshot shows it.
 - **Look:** the app has its own palette on purpose (the user chose it over following the
   Omarchy theme): colours, fonts, and radius live in the `Style` QML singleton
   (`src/Style.qml`, registered by `src/qmldir`). Layout is a reader — icon rail, list

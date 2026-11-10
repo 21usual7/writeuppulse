@@ -29,7 +29,10 @@ ApplicationWindow {
     // A node the Concepts view opens on, then clears.
     property string graphFocus: ""
     // Single-key shortcuts stay quiet while the user types in a field.
-    readonly property bool typing: activeFocusItem !== null && activeFocusItem.cursorPosition !== undefined
+    // (and stay out of the way while Get started is open).
+    readonly property bool typing: (activeFocusItem !== null && activeFocusItem.cursorPosition !== undefined) || startVisible
+    property bool startAgain: false
+    readonly property bool startVisible: !backend.onboarded || startAgain
     readonly property bool searching: backend.query.trim().length > 0
     readonly property var item: valid(current) ? backend.items[current] : null
 
@@ -278,7 +281,7 @@ ApplicationWindow {
                     anchors.bottomMargin: 18
                     spacing: 10
                     Repeater {
-                        model: [["⚙", qsTr("Settings and directions")], ["?", qsTr("Shortcuts")]]
+                        model: [["⚙", qsTr("Settings and directions")], ["?", qsTr("Help and shortcuts")]]
                         Rectangle {
                             required property var modelData
                             required property int index
@@ -589,6 +592,14 @@ ApplicationWindow {
                     sourceComponent: GraphView { onWriteupChosen: item => win.openWriteup(item) }
                 }
             }
+        }
+
+        GetStarted {
+            anchors.fill: parent
+            z: 10
+            visible: win.startVisible
+            onVisibleChanged: if (visible) { step = 0; forceActiveFocus() }
+            onFinished: { backend.onboarded = true; win.startAgain = false }
         }
 
         FocusView {
@@ -906,45 +917,10 @@ ApplicationWindow {
             background: Rectangle { radius: 16; color: Style.pane; border.color: Style.line }
             Overlay.modal: Rectangle { color: "#b0000000" }
 
-            GridLayout {
-                columns: 2
-                columnSpacing: 28
-                rowSpacing: 10
-                Repeater {
-                    model: [
-                        ["↑ ↓", qsTr("Previous or next writeup")],
-                        ["← →", qsTr("Older or newer day")],
-                        ["1 – 6", qsTr("Summary, takeaways, questions, practice, ask, notes")],
-                        ["Enter", qsTr("Study the writeup step by step")],
-                        ["O", qsTr("Open the article in the browser")],
-                        ["M", qsTr("Mark as read")],
-                        ["B", qsTr("Mark as done in a lab")],
-                        ["F", qsTr("Add to or remove from favorites")],
-                        ["U", qsTr("Show only unread")],
-                        ["Ctrl+F  /", qsTr("Search all writeups")],
-                        ["V", qsTr("Review today's questions (Space, Y, N)")],
-                        ["S", qsTr("Statistics")],
-                        ["G", qsTr("Concepts the local model found")],
-                        ["P", qsTr("Settings and directions")],
-                        ["E", qsTr("Export the day or week as Markdown")],
-                        ["R", qsTr("Fetch today's writeups now")],
-                        ["?", qsTr("Show or hide shortcuts")],
-                        ["Q", qsTr("Quit")]
-                    ]
-                    delegate: Repeater {
-                        required property var modelData
-                        model: modelData
-                        Text {
-                            required property string modelData
-                            required property int index
-                            text: modelData
-                            color: index === 0 ? Style.accent : Style.ink
-                            font.family: index === 0 ? "JetBrains Mono" : Style.sans
-                            font.pixelSize: 13
-                            font.bold: index === 0
-                        }
-                    }
-                }
+            HelpView {
+                implicitWidth: Math.min(win.width - 140, 760)
+                implicitHeight: Math.min(win.height - 120, 760)
+                onGetStarted: { win.helpVisible = false; win.startAgain = true }
             }
         }
     }

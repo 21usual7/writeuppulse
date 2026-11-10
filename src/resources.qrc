@@ -13,6 +13,8 @@
         <file alias="StatsView.qml">StatsView.qml</file>
         <file alias="GraphView.qml">GraphView.qml</file>
         <file alias="ReviewView.qml">ReviewView.qml</file>
+        <file alias="HelpView.qml">HelpView.qml</file>
+        <file alias="GetStarted.qml">GetStarted.qml</file>
         <file alias="TutorChat.qml">TutorChat.qml</file>
         <file alias="labs/labs.json">labs/labs.json</file>
         <file alias="references/references.json">references/references.json</file>
