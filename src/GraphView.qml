@@ -325,7 +325,7 @@ Item {
                     clip: true
                     model: view.matches
                     spacing: 2
-                    ScrollBar.vertical: ScrollBar {}
+                    ScrollBar.vertical: Bar {}
                     delegate: Rectangle {
                         required property var modelData
                         width: ListView.view.width
@@ -366,7 +366,7 @@ Item {
                     contentHeight: inspector.implicitHeight
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
-                    ScrollBar.vertical: ScrollBar {}
+                    ScrollBar.vertical: Bar {}
 
                     ColumnLayout {
                         id: inspector

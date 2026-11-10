@@ -36,7 +36,7 @@ Item {
         contentHeight: column.implicitHeight + 80
         clip: true
         boundsBehavior: Flickable.StopAtBounds
-        ScrollBar.vertical: ScrollBar {}
+        ScrollBar.vertical: Bar {}
 
         ColumnLayout {
             id: column

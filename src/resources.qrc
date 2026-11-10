@@ -16,6 +16,9 @@
         <file alias="HelpView.qml">HelpView.qml</file>
         <file alias="GetStarted.qml">GetStarted.qml</file>
         <file alias="TutorChat.qml">TutorChat.qml</file>
+        <file alias="NotesWindow.qml">NotesWindow.qml</file>
+        <file alias="Icon.qml">Icon.qml</file>
+        <file alias="Bar.qml">Bar.qml</file>
         <file alias="labs/labs.json">labs/labs.json</file>
         <file alias="references/references.json">references/references.json</file>
         <file alias="skill/SKILL.md">skill/SKILL.md</file>

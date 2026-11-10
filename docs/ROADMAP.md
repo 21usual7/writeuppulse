@@ -228,3 +228,33 @@ still load, and a CLAUDE.md update.
   `src/extractor.{h,cpp}`, `src/knowledge.{h,cpp}`, `src/learner.{h,cpp}`;
   QML `Dashboard.qml`, `LibraryView.qml`, `GraphView.qml`,
   `LearningView.qml`.
+
+## 11. Idea: the database in a free cloud (not started)
+
+Asked 2026-11-10; nothing built. Goal it would serve: the same progress, answers,
+review and notes on several machines (and maybe on the site).
+
+- **Don't move the SQLite file.** `library.db` holds an index anyone can rebuild
+  (days, FTS, passages, concepts) next to the user's own data. Only the user's part
+  needs to travel: `progress`, `events`, `notes` (a few KB per user). Search and the
+  map stay local.
+- **Sync, not a remote database.** The window keeps working offline on its local
+  SQLite and exchanges changes: `events` are append-only (push new rows, pull the
+  others', dedupe by a client-generated id); `progress` and `notes` are last write
+  wins by a timestamp per row (needs `updated_at` columns: a new migration).
+- **An API between the app and the database.** The app is open source: a database
+  token in it would be everyone's. A tiny HTTP service checks who is asking and
+  touches only that user's rows.
+- **Who the user is.** GitHub sign-in (OAuth device flow fits a desktop app: no
+  redirect URL), or, simpler, a random sync key shown once and typed on the second
+  machine. Notes are personal: encrypt them on the machine with a key derived from
+  the sync key, so the server stores ciphertext.
+- **Free hosting that fits** (limits change; check before choosing):
+  Cloudflare Workers + D1 (SQLite dialect, same SQL as here, no sleeping);
+  Turso (libSQL over HTTP, generous free tier); Supabase or Neon (Postgres; Supabase
+  pauses an idle free project after a week). Render's free web services sleep and
+  take ~1 min to wake: poor for a sync on open.
+- **Work:** a `sync_id` + `updated_at` migration, a `CloudSync` class beside `Syncer`
+  (QNetworkAccessManager, the same size caps and timeouts), the Worker (~200 lines),
+  a Settings section, tests against a local stand-in server. Claude is not involved,
+  so the budget rule holds.

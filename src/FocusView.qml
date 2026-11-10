@@ -51,11 +51,11 @@ Rectangle {
         width: parent.width - 80
         spacing: 20
 
-        Text {
-            text: "✕"
-            color: Style.muted
-            font.pixelSize: 18
-            HoverHandler { cursorShape: Qt.PointingHandCursor }
+        Icon {
+            name: "close"
+            size: 20
+            color: closeHover.hovered ? Style.ink : Style.muted
+            HoverHandler { id: closeHover; cursorShape: Qt.PointingHandCursor }
             TapHandler { onTapped: study.closed() }
         }
         Text { text: "WriteupPulse"; color: Style.ink; font.family: Style.sans; font.pixelSize: 16; font.weight: Font.DemiBold }

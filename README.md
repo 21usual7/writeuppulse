@@ -124,7 +124,8 @@ Shop, WebGoat, DVWA, crAPI, pwn.college, how2heap, CloudGoat, Kubernetes Goat, G
 Atomic Red Team, Security Datasets, Security Onion, FLARE-VM, REMnux, garak, PyRIT),
 then free online ones (OverTheWire, picoCTF, Cryptopals, flAWS).
 
-**Notes** (6) is a page of your own on each writeup. Notes stay in the app, and,
+**Notes** (N) is a page of your own on each writeup, in a small window of its own:
+one at a time, it stays on its writeup while you read on. Notes stay in the app, and,
 if you pick a notes folder in Settings (an Obsidian vault, or any folder a Markdown
 app reads), each one is also saved there as `WriteupPulse/<date> <title>.md` with the
 summary, takeaways, tags, and the writeup's ATT&CK/CWE terms as `[[links]]`, so they
@@ -173,7 +174,8 @@ Other settings come from the environment: `WRITEUPPULSE_MODEL` (default `sonnet`
 | --- | --- |
 | ↑ ↓ (K J) | Previous or next writeup |
 | ← → | Older or newer day; in focus mode, previous or next step |
-| 1 – 6 | Summary, takeaways, questions, practice, ask the tutor, notes |
+| 1 – 5 | Summary, takeaways, questions, practice, ask the tutor |
+| N | Notes on the writeup, in their own window |
 | Enter | Study the writeup step by step |
 | Space | In focus mode, reveal the next answer or go on |
 | O | Open the article in the browser |

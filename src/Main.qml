@@ -30,7 +30,8 @@ ApplicationWindow {
     property string graphFocus: ""
     // Single-key shortcuts stay quiet while the user types in a field.
     // (and stay out of the way while Get started is open).
-    readonly property bool typing: (activeFocusItem !== null && activeFocusItem.cursorPosition !== undefined) || startVisible
+    // The notes window shares these application-wide shortcuts, so typing there counts too.
+    readonly property bool typing: (activeFocusItem !== null && activeFocusItem.cursorPosition !== undefined) || startVisible || notesWindow.active
     property bool startAgain: false
     readonly property bool startVisible: !backend.onboarded || startAgain
     readonly property bool searching: backend.query.trim().length > 0
@@ -173,6 +174,7 @@ ApplicationWindow {
     Shortcut {
         sequence: "Esc"
         context: Qt.ApplicationShortcut
+        enabled: !notesWindow.active
         onActivated: {
             if (win.helpVisible) win.helpVisible = false
             else if (win.settingsVisible) win.settingsVisible = false
@@ -201,12 +203,15 @@ ApplicationWindow {
     Shortcut { sequence: "3"; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: reader.tab = 2 }
     Shortcut { sequence: "4"; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: reader.tab = 3 }
     Shortcut { sequence: "5"; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: reader.tab = 4 }
-    Shortcut { sequence: "6"; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: reader.tab = 5 }
+    Shortcut { sequence: "N"; context: Qt.ApplicationShortcut; enabled: !win.typing && reader.visible && win.item !== null; onActivated: notesWindow.openFor(win.item) }
     Shortcut { sequences: ["Down", "J"]; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: win.move(1) }
     Shortcut { sequences: ["Up", "K"]; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: win.move(-1) }
     Shortcut { sequence: "Left"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.focusVisible ? focusView.previousStep() : backend.olderDay() }
     Shortcut { sequence: "Right"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.focusVisible ? focusView.nextStep() : backend.newerDay() }
     Shortcut { sequence: "Space"; context: Qt.ApplicationShortcut; enabled: !win.typing && win.focusVisible; onActivated: focusView.reveal() }
+
+    NotesWindow { id: notesWindow }
+    onClosing: notesWindow.close()
 
     // Right-to-left languages mirror the window; the Translator sets the
     // application's layout direction.
@@ -245,18 +250,18 @@ ApplicationWindow {
                     Item { width: 1; height: 8 }
                     Repeater {
                         model: [
-                            ["☰", "day", qsTr("Days")],
-                            ["★", "favorites", qsTr("Favorites")],
-                            ["↻", "review", qsTr("Review")],
-                            ["∑", "stats", qsTr("Statistics")],
-                            ["◈", "graph", qsTr("Concepts")]
+                            ["days", "day", qsTr("Days")],
+                            ["star", "favorites", qsTr("Favorites")],
+                            ["review", "review", qsTr("Review")],
+                            ["stats", "stats", qsTr("Statistics")],
+                            ["graph", "graph", qsTr("Concepts")]
                         ]
                         Rectangle {
                             required property var modelData
                             readonly property bool on: backend.view === modelData[1] && !win.searching
                             width: 40; height: 40; radius: 10
                             color: on ? Style.raised : railHover.hovered ? Style.pane : "transparent"
-                            Text { anchors.centerIn: parent; text: modelData[0]; color: parent.on ? Style.ink : Style.faint; font.pixelSize: 18 }
+                            Icon { anchors.centerIn: parent; name: modelData[0]; size: 21; color: parent.on ? Style.accent : railHover.hovered ? Style.ink : Style.muted }
                             // How many questions wait for today's review.
                             Rectangle {
                                 readonly property int count: modelData[1] === "review" ? (backend.review.cards || []).length : 0
@@ -281,14 +286,13 @@ ApplicationWindow {
                     anchors.bottomMargin: 18
                     spacing: 10
                     Repeater {
-                        model: [["⚙", qsTr("Settings and directions")], ["?", qsTr("Help and shortcuts")]]
+                        model: [["settings", qsTr("Settings and directions")], ["help", qsTr("Help and shortcuts")]]
                         Rectangle {
                             required property var modelData
                             required property int index
                             width: 40; height: 40; radius: 10
                             color: bottomHover.hovered ? Style.pane : "transparent"
-                            // A symbol font keeps the gear monochrome instead of an emoji.
-                            Text { anchors.centerIn: parent; text: modelData[0]; color: Style.faint; font.family: "Noto Sans Symbols"; font.pixelSize: 17 }
+                            Icon { anchors.centerIn: parent; name: modelData[0]; size: 20; color: bottomHover.hovered ? Style.ink : Style.muted }
                             HoverHandler { id: bottomHover; cursorShape: Qt.PointingHandCursor }
                             TapHandler { onTapped: index === 0 ? win.settingsVisible = true : win.helpVisible = true }
                             ToolTip.visible: bottomHover.hovered
@@ -344,14 +348,14 @@ ApplicationWindow {
                                 }
                             }
                             Repeater {
-                                model: [["‹", qsTr("Older day")], ["›", qsTr("Newer day")]]
+                                model: [["left", qsTr("Older day")], ["right", qsTr("Newer day")]]
                                 Rectangle {
                                     required property var modelData
                                     required property int index
                                     visible: backend.view === "day" && !win.searching
                                     width: 28; height: 28; radius: 8
                                     color: navHover.hovered ? Style.hover : "transparent"
-                                    Text { anchors.centerIn: parent; text: modelData[0]; color: Style.muted; font.pixelSize: 20 }
+                                    Icon { anchors.centerIn: parent; name: modelData[0]; size: 18; color: navHover.hovered ? Style.ink : Style.muted }
                                     HoverHandler { id: navHover; cursorShape: Qt.PointingHandCursor }
                                     TapHandler { onTapped: index === 0 ? backend.olderDay() : backend.newerDay() }
                                     ToolTip.visible: navHover.hovered
@@ -362,7 +366,7 @@ ApplicationWindow {
                                 id: moreButton
                                 width: 28; height: 28; radius: 8
                                 color: moreHover.hovered ? Style.hover : "transparent"
-                                Text { anchors.centerIn: parent; text: "⋯"; color: Style.muted; font.pixelSize: 18 }
+                                Icon { anchors.centerIn: parent; name: "more"; size: 18; color: moreHover.hovered ? Style.ink : Style.muted }
                                 HoverHandler { id: moreHover; cursorShape: Qt.PointingHandCursor }
                                 TapHandler { onTapped: moreMenu.popup(moreButton, 0, moreButton.height) }
                                 Menu {
@@ -401,12 +405,11 @@ ApplicationWindow {
                                 ToolTip.visible: statusHover.hovered && text.length > 50
                                 ToolTip.text: text
                             }
-                            Text {
+                            Row {
                                 visible: !backend.running && !win.agentNeeded
-                                text: "↻ " + qsTr("Refresh")
-                                color: Style.accent
-                                font.family: Style.sans
-                                font.pixelSize: 11
+                                spacing: 4
+                                Icon { anchors.verticalCenter: parent.verticalCenter; name: "refresh"; size: 13; weight: 2.2; color: Style.accent }
+                                Text { text: qsTr("Refresh"); color: Style.accent; font.family: Style.sans; font.pixelSize: 11 }
                                 HoverHandler { cursorShape: Qt.PointingHandCursor }
                                 TapHandler { onTapped: backend.refresh() }
                             }
@@ -519,7 +522,7 @@ ApplicationWindow {
                         clip: true
                         model: backend.items
                         boundsBehavior: Flickable.StopAtBounds
-                        ScrollBar.vertical: ScrollBar {}
+                        ScrollBar.vertical: Bar {}
                         delegate: WriteupRow {
                             required property var modelData
                             required property int index
@@ -567,6 +570,7 @@ ApplicationWindow {
                     onQuestionJudged: (question, result) => backend.setCheck(win.item, question, result)
                     onTagsEdited: tags => backend.setTags(win.item.url, tags)
                     onReferenceShown: id => { backend.graphSource = "references"; win.graphFocus = id; win.show("graph") }
+                    onNotesRequested: notesWindow.openFor(win.item)
                 }
                 Text {
                     anchors.centerIn: parent
@@ -644,15 +648,17 @@ ApplicationWindow {
             Overlay.modal: Rectangle { color: "#b0000000" }
 
             Flickable {
+                id: settingsFlick
                 anchors.fill: parent
                 contentHeight: settingsColumn.implicitHeight
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
-                ScrollBar.vertical: ScrollBar {}
+                // The bar gets a lane of its own instead of covering the fields.
+                ScrollBar.vertical: Bar { policy: settingsFlick.contentHeight > settingsFlick.height ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff }
 
                 ColumnLayout {
                     id: settingsColumn
-                    width: parent.width
+                    width: parent.width - (settingsFlick.contentHeight > settingsFlick.height ? 16 : 0)
                     spacing: 14
 
                     Text { text: qsTr("Settings"); color: Style.ink; font.family: Style.sans; font.pixelSize: 22; font.weight: Font.DemiBold }
@@ -829,7 +835,7 @@ ApplicationWindow {
                     Text {
                         Layout.fillWidth: true
                         wrapMode: Text.Wrap
-                        text: qsTr("Notes (tab 6 on a writeup) are kept in the app. With a folder, each note is also saved there as Markdown with front matter and [[links]] to its terms, ready for Obsidian, Logseq, or any Markdown app. For Notion, create an integration at notion.so/my-integrations, share a page with it, and paste its token and the page's link: \"Send to Notion\" then adds a page under it. The token is kept in ~/.config on this computer.")
+                        text: qsTr("Notes (N on a writeup) are kept in the app. With a folder, each note is also saved there as Markdown with front matter and [[links]] to its terms, ready for Obsidian, Logseq, or any Markdown app. For Notion, create an integration at notion.so/my-integrations, share a page with it, and paste its token and the page's link: \"Send to Notion\" then adds a page under it. The token is kept in ~/.config on this computer.")
                         color: Style.faint
                         font.family: Style.sans
                         font.pixelSize: 12

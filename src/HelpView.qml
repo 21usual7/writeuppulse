@@ -12,7 +12,7 @@ Flickable {
     contentHeight: column.implicitHeight
     clip: true
     boundsBehavior: Flickable.StopAtBounds
-    ScrollBar.vertical: ScrollBar {}
+    ScrollBar.vertical: Bar {}
 
     component Heading: Text {
         Layout.topMargin: 14
@@ -57,7 +57,7 @@ Flickable {
                 qsTr("Open today's writeup at your level (it comes first) and read the summary. Unknown terms under it explain themselves."),
                 qsTr("Press Enter to study it step by step: remember the takeaways, then check yourself and say whether you knew each answer."),
                 qsTr("Pick one practice idea and try it in one of the suggested labs. Mark it done in a lab with B."),
-                qsTr("Write a line in Notes (6): what you learned, what to try next."),
+                qsTr("Write a line in Notes (N): what you learned, what to try next."),
                 qsTr("Tomorrow, press V: the questions come back until you know them. A day of review keeps your streak too.")
             ]
             RowLayout {
@@ -80,17 +80,17 @@ Flickable {
         Heading { text: qsTr("Views, on the left") }
         Repeater {
             model: [
-                ["☰", qsTr("Days"), qsTr("Each day's writeups; ← and → move between days, the title picks one. Search (Ctrl+F) covers every saved day and, with article texts saved, the articles themselves.")],
-                ["★", qsTr("Favorites"), qsTr("Writeups you starred with F, with your tags to filter them.")],
-                ["↻", qsTr("Review (V)"), qsTr("Today's questions from earlier writeups, spaced out: 1, 3, 7, 16, then 35 days after each right answer.")],
-                ["∑", qsTr("Statistics (S)"), qsTr("Your streak, what you read and practiced, and how many answers you knew.")],
-                ["◈", qsTr("Concepts (G)"), qsTr("A map of the ATT&CK techniques, CWE weaknesses, CAPEC patterns, and OWASP categories your writeups name, and how they relate. With Ollama, it can show the local model's concepts instead.")]
+                ["days", qsTr("Days"), qsTr("Each day's writeups; ← and → move between days, the title picks one. Search (Ctrl+F) covers every saved day and, with article texts saved, the articles themselves.")],
+                ["star", qsTr("Favorites"), qsTr("Writeups you starred with F, with your tags to filter them.")],
+                ["review", qsTr("Review (V)"), qsTr("Today's questions from earlier writeups, spaced out: 1, 3, 7, 16, then 35 days after each right answer.")],
+                ["stats", qsTr("Statistics (S)"), qsTr("Your streak, what you read and practiced, and how many answers you knew.")],
+                ["graph", qsTr("Concepts (G)"), qsTr("A map of the ATT&CK techniques, CWE weaknesses, CAPEC patterns, and OWASP categories your writeups name, and how they relate. With Ollama, it can show the local model's concepts instead.")]
             ]
             RowLayout {
                 required property var modelData
                 Layout.fillWidth: true
                 spacing: 12
-                Text { Layout.alignment: Qt.AlignTop; Layout.preferredWidth: 18; text: modelData[0]; color: Style.faint; font.pixelSize: 15 }
+                Icon { Layout.alignment: Qt.AlignTop; name: modelData[0]; size: 18; color: Style.muted }
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 2
@@ -102,7 +102,7 @@ Flickable {
 
         Heading { text: qsTr("A writeup, in tabs") }
         Para {
-            text: qsTr("Summary (1) with the terms it uses; Takeaways (2); Check yourself (3), questions with hidden answers; Practice (4), ideas to try by hand and legal labs to try them in; Ask (5), the local tutor, when Ollama runs; Notes (6), your own words, which can go to an Obsidian folder or Notion.")
+            text: qsTr("Summary (1) with the terms it uses; Takeaways (2); Check yourself (3), questions with hidden answers; Practice (4), ideas to try by hand and legal labs to try them in; Ask (5), the local tutor, when Ollama runs. Notes (N) open in a small window of their own, one note per writeup, which can go to an Obsidian folder or Notion.")
         }
 
         Heading { text: qsTr("For learning, not attacking") }
@@ -124,7 +124,8 @@ Flickable {
                 model: [
                     ["↑ ↓", qsTr("Previous or next writeup")],
                     ["← →", qsTr("Older or newer day")],
-                    ["1 – 6", qsTr("Summary, takeaways, questions, practice, ask, notes")],
+                    ["1 – 5", qsTr("Summary, takeaways, questions, practice, ask")],
+                    ["N", qsTr("Notes on the writeup, in their own window")],
                     ["Enter", qsTr("Study the writeup step by step")],
                     ["O", qsTr("Open the article in the browser")],
                     ["M", qsTr("Mark as read")],

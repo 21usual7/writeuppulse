@@ -49,10 +49,16 @@ version 4 the first time a window from it opens. Everything through this list is
 user's go-ahead. The morning run publishes
 `site/` from committed `master` with this binary, so the site gets the new features then.
 
+Later the same day: notes moved to their own window (N), line icons (`Icon.qml`), a
+softer palette, thin scroll bars, and the settings scroll bar no longer covers the
+fields. README screenshots retaken except `docs/focus.png` (old palette and icons;
+its made-up data isn't in the repo).
+
 **Next:** nothing planned beyond the list above; see `docs/ROADMAP.md`. Open ideas:
-retake `docs/focus.png` when focus mode changes; GPU for Ollama needs the drop-in
-`/etc/systemd/system/ollama.service.d/igpu.conf` with `Environment=OLLAMA_IGPU_ENABLE=1`
-(sudo, the user's call), then measure tokens/s.
+retake `docs/focus.png`; the database in a free cloud (not started; the analysis is
+`docs/ROADMAP.md` §11). GPU: the drop-in `/etc/systemd/system/ollama.service.d/igpu.conf`
+(`OLLAMA_IGPU_ENABLE=1`) exists since 2026-11-10 12:46 but needs `daemon-reload` and a
+restart of `ollama` to apply; then measure tokens/s against the CPU's ~6.
 
 ## Commands
 
@@ -204,9 +210,14 @@ the QML window.
   `WriteupRow` marks "your level". The prompt asks for security directions first (3 of
   5 when they're wanted) and at least one Junior and one Senior a day; its length was
   kept by shortening the source list (budget rule).
-- **Notes:** `notes` table (database version 4: url, text, notion page id). The reader's
-  Notes tab (6) saves 0.8 s after typing stops and before another writeup opens
-  (`ReaderPane.saveNote`). `Notes` (`src/notes.cpp`): `markdown()` = YAML front matter
+- **Notes:** `notes` table (database version 4: url, text, notion page id). Notes open
+  in `NotesWindow.qml`, a separate `Window` (N, or "Notes" among the reader's actions;
+  the user asked for a mini window, one at a time): it stays on the writeup it was
+  opened for while the main window moves on, and `openFor` another writeup saves and
+  switches. It saves 0.8 s after typing stops, when it loses focus, and on close; the
+  main window closes it. The main window's shortcuts are `Qt.ApplicationShortcut`, so
+  they fire in that window too: `win.typing` counts `notesWindow.active`, and Esc in
+  Main is off while it's active. `Notes` (`src/notes.cpp`): `markdown()` = YAML front matter
   (title, url, date, category, level, tags incl. `writeuppulse` and the user's) +
   summary, takeaways, catalog terms as `[[ID Name]]` wiki links, "My notes";
   `writeToVault(folder, …)` writes `<folder>/WriteupPulse/<date> <title>.md` and keeps a
@@ -340,7 +351,13 @@ the QML window.
   (`src/Style.qml`, registered by `src/qmldir`). Layout is a reader — icon rail, list
   (`WriteupRow`), open writeup in tabs (`ReaderPane`) — plus `FocusView`, a step-by-step
   overlay. Controls are mostly hand-drawn (`Pill`, `ActionButton`); Material only
-  styles fields, menus, and popups. `translator.{h,cpp}` comes from the omarchy-app
+  styles fields, menus, and popups. Icons are `Icon.qml` (24×24 SVG paths drawn by
+  `QtQuick.Shapes` with the curve renderer, coloured from `Style`; add a path to its
+  map rather than a font glyph). Scroll bars are `Bar.qml` (thin, the app's colours;
+  Material's grew into a wide block over the content). The palette (2026-11-10, the
+  user found the old one harsh): soft slate, not black; `faint` text ≥ 4.5:1 on panes.
+  `ReaderPane` resets the tab only when the writeup's URL changes: a rebuilt list
+  hands over a new object for the same writeup. `translator.{h,cpp}` comes from the omarchy-app
   templates. Keep agent-supplied text in QML as `textFormat: Text.PlainText`.
 
 ## Gotchas
