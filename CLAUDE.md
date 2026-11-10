@@ -38,7 +38,7 @@ New plan, in order, each done → noted here: **review** (spaced repetition, don
 **open references** (MITRE ATT&CK, CWE, CAPEC, OWASP Top 10 as JSON in the repo:
 glossary for beginners, a model-free concept graph; done), **level tracks** (my level in
 Settings, a Junior and a Senior pick a day, security first; done), **open labs** (curated
-category/CWE → Juice Shop, WebGoat, DVWA, pwn.college…), **notes** (per writeup, export
+category/CWE → Juice Shop, WebGoat, DVWA, pwn.college…; done), **notes** (per writeup, export
 to an Obsidian vault / Markdown folder and Notion), **Help and Get started**, then the
 same review/glossary/levels/RSS on the **site**.
 
@@ -201,6 +201,12 @@ the QML window.
   `WriteupRow` marks "your level". The prompt asks for security directions first (3 of
   5 when they're wanted) and at least one Junior and one Senior a day; its length was
   kept by shortening the source list (budget rule).
+- **Labs:** `src/labs/labs.json` (qrc) is a hand-picked list of legal practice places
+  (name, own project URL, `open` = open source and self-hosted vs free online,
+  directions, levels, `about` in en/ru/uk). `Backend::labs(category, level)` gives up to
+  three, this level's first, then open source; the Practice tab lists them under the
+  practice ideas. Check every URL responds and every claim is true before adding one;
+  only legal, self-owned or purpose-built targets.
 - **Preferences and export:** the Settings popup (P) writes `categories` (empty = all)
   and `preferred` to `QSettings`; `Fetcher::prompt` reads them, and `Backend::rebuild`
   puts preferred directions first in a day. Export goes through `FilePicker`

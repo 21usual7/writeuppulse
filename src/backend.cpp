@@ -285,6 +285,25 @@ QVariantList Backend::references(const QString &url) const {
     return list;
 }
 
+QVariantList Backend::labs(const QString &category, const QString &level) const {
+    static const QJsonArray all = [] {
+        QFile file(":/labs/labs.json");
+        return file.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(file.readAll()).object().value("labs").toArray()
+                                               : QJsonArray();
+    }();
+    QVariantList list;
+    for (const auto &value : all)
+        if (value.toObject().value("directions").toArray().contains(category))
+            list << value.toObject().toVariantMap();
+    std::stable_sort(list.begin(), list.end(), [&](const QVariant &a, const QVariant &b) {
+        auto rank = [&](const QVariant &lab) {
+            return 2 * lab.toMap().value("levels").toStringList().contains(level) + lab.toMap().value("open").toBool();
+        };
+        return rank(a) > rank(b);
+    });
+    return list.mid(0, 3);
+}
+
 // Nodes are the entries the library names; two are related when a passage
 // names both (a passage naming more than six is an overview and relates
 // nothing, as with the model's concepts) or when a catalog relates them.

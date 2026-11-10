@@ -380,6 +380,69 @@ Flickable {
             }
         }
 
+        // Where to try it: legal labs for the writeup's direction and level.
+        ColumnLayout {
+            readonly property var labs: pane.item ? backend.labs(pane.item.category || "", pane.item.level || "") : []
+            Layout.fillWidth: true
+            Layout.topMargin: 26
+            visible: pane.tab === 3 && labs.length > 0
+            spacing: 10
+            Text {
+                text: qsTr("Where to practice legally")
+                color: Style.muted
+                font.family: Style.sans
+                font.pixelSize: 13
+                font.weight: Font.DemiBold
+            }
+            Repeater {
+                model: parent.labs
+                Rectangle {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    implicitHeight: labColumn.implicitHeight + 24
+                    radius: 12
+                    color: labHover.hovered ? Style.hover : Style.raised
+                    Column {
+                        id: labColumn
+                        x: 16; y: 12
+                        width: parent.width - 32
+                        spacing: 4
+                        Row {
+                            spacing: 10
+                            Text {
+                                text: modelData.name + " ↗"
+                                color: Style.ink
+                                font.family: Style.sans
+                                font.pixelSize: 14
+                                font.weight: Font.DemiBold
+                            }
+                            Text {
+                                anchors.baseline: parent.children[0].baseline
+                                text: (modelData.open ? qsTr("open source, on your machine") : qsTr("free online"))
+                                      + "  ·  " + modelData.levels.join(", ")
+                                color: Style.faint
+                                font.family: Style.sans
+                                font.pixelSize: 11
+                            }
+                        }
+                        Text {
+                            width: parent.width
+                            text: {
+                                translator.language
+                                return modelData.about[translator.language] || modelData.about.en
+                            }
+                            wrapMode: Text.Wrap
+                            color: Style.muted
+                            font.family: Style.sans
+                            font.pixelSize: 13
+                        }
+                    }
+                    HoverHandler { id: labHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: Qt.openUrlExternally(modelData.url) }
+                }
+            }
+        }
+
         // Ask
         TutorChat {
             Layout.fillWidth: true

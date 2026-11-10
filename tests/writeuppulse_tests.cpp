@@ -996,6 +996,13 @@ private slots:
         backend.setMyLevel("Junior");
         QCOMPARE(titles(), QStringList({"easy", "deep"}));
         QCOMPARE(backend.review().value("cards").toList().first().toMap().value("question").toString(), QString("easy?"));
+        // Labs for the direction, this level's first.
+        const QVariantList labs = backend.labs("Web", "Junior");
+        QCOMPARE(labs.size(), 3);
+        for (const auto &lab : labs)
+            QVERIFY(lab.toMap().value("levels").toStringList().contains("Junior"));
+        QVERIFY(!labs.first().toMap().value("about").toMap().value("uk").toString().isEmpty());
+        QVERIFY(backend.labs("Postmortems", "Junior").isEmpty());
         backend.setMyLevel("Nobody");
         QCOMPARE(backend.myLevel(), QString());
         QCOMPARE(titles(), QStringList({"deep", "easy"}));

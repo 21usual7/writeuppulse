@@ -155,6 +155,10 @@ public:
     // The catalog entries one writeup names, most named first: {id, kind,
     // name, text, link, count}.
     Q_INVOKABLE QVariantList references(const QString &url) const;
+    // Up to three legal places to practice a direction (src/labs/labs.json):
+    // labs for this level first, then open-source ones. {name, url, open,
+    // levels, about: {en, ru, uk}}.
+    Q_INVOKABLE QVariantList labs(const QString &category, const QString &level) const;
     // Places nodes (from Database::graph) so related ones sit together:
     // a force layout from a fixed start, so the same graph looks the same.
     static void layout(QJsonArray &nodes, const QJsonArray &edges);

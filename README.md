@@ -114,6 +114,12 @@ search" on (Settings, on by default), the window downloads each writeup's page o
 from the site that published it and keeps its text, without code blocks, on your
 machine, so search also covers whole articles. Only public web addresses are
 fetched, and nothing is sent to Claude.
+The Practice tab also suggests where to try it legally: two or three labs for the
+writeup's direction and level, open-source ones you run yourself first (OWASP Juice
+Shop, WebGoat, DVWA, crAPI, pwn.college, how2heap, CloudGoat, Kubernetes Goat, GOAD,
+Atomic Red Team, Security Datasets, Security Onion, FLARE-VM, REMnux, garak, PyRIT),
+then free online ones (OverTheWire, picoCTF, Cryptopals, flAWS).
+
 Pick your level in Settings (Junior, Middle, or Senior): each day lists the
 writeups at your level first, and review starts new questions from them. Every day
 has at least one piece a beginner can follow and one deep dive, security first.
