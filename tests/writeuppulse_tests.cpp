@@ -555,6 +555,7 @@ private slots:
         backend.setSearchCategories({"Pwn", "Web"});
         QCOMPARE(backend.searchCategories(), QStringList({"Web", "Pwn"}));
         QVERIFY(Fetcher(Store(dir.path()), "/bin/true").prompt("2026-11-09").contains("especially wants: Pwn."));
+        QVERIFY(Fetcher(Store(dir.path()), "/bin/true").prompt("2026-11-09").contains("at least one Junior piece"));
         backend.setSearchCategories({});
         backend.setPreferredCategories({});
     }
@@ -971,6 +972,33 @@ private slots:
         QVERIFY(phishing.value("evidence").toList().first().toMap().value("text").toString().startsWith("Phishing mail"));
         QVERIFY(!xss.value("catalog").toList().isEmpty());
         QVERIFY(!xss.value("link").toString().isEmpty());
+    }
+
+    void backendPutsTheReadersLevelFirst()
+    {
+        QTemporaryDir dir;
+        Store store(dir.path());
+        QString error;
+        auto item = [](const QString &title, const QString &level) {
+            return QJsonObject{{"title", title}, {"url", "https://example.com/" + title}, {"summary", "About " + title},
+                               {"category", "Web"}, {"level", level},
+                               {"questions", QJsonArray{QJsonObject{{"question", title + "?"}, {"answer", "Yes."}}}}};
+        };
+        QVERIFY(store.saveDigest({{"date", "2026-11-01"}, {"items", QJsonArray{item("deep", "Senior"), item("easy", "Junior")}}}, &error));
+        Backend backend(dir.path(), false);
+        auto titles = [&] {
+            QStringList list;
+            for (const auto &value : backend.items())
+                list << value.toMap().value("title").toString();
+            return list;
+        };
+        QCOMPARE(titles(), QStringList({"deep", "easy"}));
+        backend.setMyLevel("Junior");
+        QCOMPARE(titles(), QStringList({"easy", "deep"}));
+        QCOMPARE(backend.review().value("cards").toList().first().toMap().value("question").toString(), QString("easy?"));
+        backend.setMyLevel("Nobody");
+        QCOMPARE(backend.myLevel(), QString());
+        QCOMPARE(titles(), QStringList({"deep", "easy"}));
     }
 
     void backendShowsTheGraphOfTheLibrary()

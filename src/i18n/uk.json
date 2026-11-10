@@ -214,5 +214,9 @@
   "Definitions from MITRE ATT&CK, CWE, CAPEC (© MITRE) and the OWASP Top 10 2025 (CC BY-SA 4.0), matched by name in your writeups.": "Визначення з MITRE ATT&CK, CWE, CAPEC (© MITRE) та OWASP Top 10 2025 (CC BY-SA 4.0), знайдені за назвою у ваших розборах.",
   "Officially: %1": "Офіційно: %1",
   "Terms in this writeup": "Терміни в цьому розборі",
-  "Show on the map": "Показати на карті"
+  "Show on the map": "Показати на карті",
+  "My level": "Мій рівень",
+  "Any": "Будь-який",
+  "your level": "ваш рівень",
+  "Each day shows the writeups at your level first, and review starts new questions from them. Every day has at least one piece for beginners and one deep dive.": "Кожен день спершу показує розбори вашого рівня, і нові питання для повторення беруться спершу з них. У кожному дні є щонайменше один розбір для новачків і один глибокий."
 }

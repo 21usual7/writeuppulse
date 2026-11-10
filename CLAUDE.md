@@ -37,7 +37,7 @@ tutor, so stage 6 (tutor modes) is dropped; stages 4–5 stay, extraction spread
 New plan, in order, each done → noted here: **review** (spaced repetition, done),
 **open references** (MITRE ATT&CK, CWE, CAPEC, OWASP Top 10 as JSON in the repo:
 glossary for beginners, a model-free concept graph; done), **level tracks** (my level in
-Settings, a Junior and a Senior pick a day, security first), **open labs** (curated
+Settings, a Junior and a Senior pick a day, security first; done), **open labs** (curated
 category/CWE → Juice Shop, WebGoat, DVWA, pwn.college…), **notes** (per writeup, export
 to an Obsidian vault / Markdown folder and Notion), **Help and Get started**, then the
 same review/glossary/levels/RSS on the **site**.
@@ -195,6 +195,12 @@ the QML window.
   `references`) switches `graph`/`conceptInfo` between `referenceGraph`/`referenceInfo`
   (same shapes plus `text`, `link`, `title`, `catalog`) and the model's tables.
   Attribution text is in the JSON's `notice`, the README, and the map's footer: keep it.
+- **Levels:** QSettings `myLevel` (Junior/Middle/Senior or empty) via `Backend::myLevel`:
+  `rebuild` ranks a day's items by my level (2) + preferred direction (1), stable;
+  `Backend::review` puts my level's writeups first so new questions come from them;
+  `WriteupRow` marks "your level". The prompt asks for security directions first (3 of
+  5 when they're wanted) and at least one Junior and one Senior a day; its length was
+  kept by shortening the source list (budget rule).
 - **Preferences and export:** the Settings popup (P) writes `categories` (empty = all)
   and `preferred` to `QSettings`; `Fetcher::prompt` reads them, and `Backend::rebuild`
   puts preferred directions first in a day. Export goes through `FilePicker`

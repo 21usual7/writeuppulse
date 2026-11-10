@@ -54,6 +54,7 @@ class Backend : public QObject {
     Q_PROPERTY(QStringList preferredCategories READ preferredCategories WRITE setPreferredCategories NOTIFY preferencesChanged)
     Q_PROPERTY(QString notice READ notice NOTIFY noticeChanged)
     Q_PROPERTY(bool saveTexts READ saveTexts WRITE setSaveTexts NOTIFY preferencesChanged)
+    Q_PROPERTY(QString myLevel READ myLevel WRITE setMyLevel NOTIFY preferencesChanged)
     Q_PROPERTY(QVariantMap graph READ graph NOTIFY graphChanged)
     Q_PROPERTY(QString graphSource READ graphSource WRITE setGraphSource NOTIFY graphChanged)
     Q_PROPERTY(QVariantMap review READ review NOTIFY progressChanged)
@@ -91,6 +92,10 @@ public:
     QStringList preferredCategories() const { return m_preferredCategories; }
     void setPreferredCategories(const QStringList &categories);
     QString notice() const { return m_notice; }
+    // The reader's level (Junior, Middle, Senior, or empty for any): a day
+    // shows writeups at it first, and review takes new questions from them first.
+    QString myLevel() const { return m_myLevel; }
+    void setMyLevel(const QString &level);
     // Whether the window downloads each writeup's page for search; on by
     // default, and only in a real session, never in tests.
     bool saveTexts() const { return m_saveTexts; }
@@ -119,7 +124,7 @@ public:
     QStringList tags() const { return m_progress.tags(); }
     // Today's questions to go over (see Progress::review); answering one
     // with setCheck moves it out of today's list.
-    QVariantMap review() const { return m_progress.review(m_library); }
+    QVariantMap review() const;
 
     // QML reads a writeup's state through state(url) in bindings that also
     // read progressRevision, so they re-evaluate after every change.
@@ -228,6 +233,7 @@ private:
     bool m_hideRead = false;
     int m_hiddenCount = 0;
     QStringList m_searchCategories, m_preferredCategories;
+    QString m_myLevel;
     FilePicker *m_picker = nullptr;
     QString m_pendingExport;
     QString m_notice;

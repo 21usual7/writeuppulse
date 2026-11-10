@@ -37,6 +37,13 @@ Rectangle {
                 font.family: Style.sans
                 font.pixelSize: 11
             }
+            Text {
+                visible: backend.myLevel !== "" && row.item.level === backend.myLevel
+                text: "·  " + qsTr("your level")
+                color: Style.accent
+                font.family: Style.sans
+                font.pixelSize: 11
+            }
         }
         Text {
             width: parent.width

@@ -31,6 +31,7 @@ Backend::Backend(const QString &directory, bool systemd, QObject *parent)
     m_hideRead = settings.value("hideRead", false).toBool();
     m_searchCategories = settings.value("categories").toStringList();
     m_preferredCategories = settings.value("preferred").toStringList();
+    m_myLevel = Store::levels().contains(settings.value("myLevel").toString()) ? settings.value("myLevel").toString() : QString();
     m_saveTexts = settings.value("saveTexts", true).toBool();
     m_graphSource = settings.value("graphSource", "references").toString() == "model" ? "model" : "references";
     // A newly saved page can change what a search finds and which
@@ -176,6 +177,27 @@ QSet<QString> Backend::libraryUrls() const {
 void Backend::graphOutdated() {
     m_graphOutdated = true;
     emit graphChanged();
+}
+
+void Backend::setMyLevel(const QString &level) {
+    const QString value = Store::levels().contains(level) ? level : QString();
+    if (value == m_myLevel)
+        return;
+    m_myLevel = value;
+    QSettings("writeuppulse", "writeuppulse").setValue("myLevel", value);
+    emit preferencesChanged();
+    rebuild();
+    emit progressChanged();
+}
+
+QVariantMap Backend::review() const {
+    if (m_myLevel.isEmpty())
+        return m_progress.review(m_library);
+    QVariantList library = m_library;
+    std::stable_sort(library.begin(), library.end(), [this](const QVariant &a, const QVariant &b) {
+        return (a.toMap().value("level") == m_myLevel) > (b.toMap().value("level") == m_myLevel);
+    });
+    return m_progress.review(library);
 }
 
 void Backend::setGraphSource(const QString &source) {
@@ -623,11 +645,13 @@ void Backend::rebuild() {
 
     // A day lists the directions the user prefers first, otherwise in the
     // agent's order.
-    if (m_view == "day" && words.isEmpty() && !m_preferredCategories.isEmpty())
-        std::stable_sort(items.begin(), items.end(), [this](const QVariant &a, const QVariant &b) {
-            return m_preferredCategories.contains(a.toMap().value("category").toString())
-                   > m_preferredCategories.contains(b.toMap().value("category").toString());
-        });
+    // A day starts with the writeups at the reader's level, then the preferred directions.
+    auto rank = [this](const QVariant &item) {
+        return 2 * (!m_myLevel.isEmpty() && item.toMap().value("level").toString() == m_myLevel)
+               + m_preferredCategories.contains(item.toMap().value("category").toString());
+    };
+    if (m_view == "day" && words.isEmpty())
+        std::stable_sort(items.begin(), items.end(), [&](const QVariant &a, const QVariant &b) { return rank(a) > rank(b); });
 
     m_hiddenCount = hidden;
     if (items != m_items || shown != m_shownCategories) {

@@ -114,6 +114,9 @@ search" on (Settings, on by default), the window downloads each writeup's page o
 from the site that published it and keeps its text, without code blocks, on your
 machine, so search also covers whole articles. Only public web addresses are
 fetched, and nothing is sent to Claude.
+Pick your level in Settings (Junior, Middle, or Senior): each day lists the
+writeups at your level first, and review starts new questions from them. Every day
+has at least one piece a beginner can follow and one deep dive, security first.
 Settings (P) holds the language, the daily timer, and which directions the agent
 searches, with stars for the ones it should pick more often. Export (E) saves the
 day, or the week ending on it, as Markdown through the desktop's save dialog, with

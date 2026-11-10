@@ -117,9 +117,9 @@ Find fresh, popular, in-depth technical writeups in these directions: %3. Prefer
 Where to look (use WebSearch and WebFetch):
 - Hacker News front page (news.ycombinator.com, or https://hn.algolia.com/api/v1/search?tags=front_page for points)
 - Reddit r/netsec, r/ReverseEngineering, r/MachineLearning, and r/programming top of the day (https://old.reddit.com/r/netsec/top/?t=day)
-- CTFtime writeups, lobste.rs, GitHub Trending, Medium and Substack posts, company engineering and security research blogs, and personal blogs
+- CTFtime writeups, lobste.rs, GitHub Trending, Medium, Substack, company research blogs, personal blogs
 
-Choose the 5 most interesting and popular ones. Mix directions, prefer original writeups over news coverage, and skip paywalled pages, marketing, and listicles. Open and read each one before summarizing it; never summarize from the title alone.
+Choose the 5 most interesting and popular ones. Security directions first: at least 3 of 5 when they are among the directions. Mix levels: at least one Junior piece a beginner can follow and one Senior deep dive. Prefer original writeups over news coverage; skip paywalls, marketing, listicles. Open and read each one before summarizing it; never summarize from the title alone.
 
 For each writeup give:
 - category: the one direction from the list that fits best, and level: Junior, Middle, or Senior, for who gets the most out of it

@@ -672,6 +672,29 @@ ApplicationWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 14
+                        Text { text: qsTr("My level"); color: Style.muted; font.family: Style.sans; font.pixelSize: 14 }
+                        Repeater {
+                            model: [""].concat(backend.levels)
+                            Pill {
+                                required property string modelData
+                                text: modelData ? modelData : qsTr("Any")
+                                on: backend.myLevel === modelData
+                                onClicked: backend.myLevel = modelData
+                            }
+                        }
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        wrapMode: Text.Wrap
+                        text: qsTr("Each day shows the writeups at your level first, and review starts new questions from them. Every day has at least one piece for beginners and one deep dive.")
+                        color: Style.faint
+                        font.family: Style.sans
+                        font.pixelSize: 12
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 14
                         Text { text: qsTr("Language"); color: Style.muted; font.family: Style.sans; font.pixelSize: 14 }
                         Repeater {
                             model: [["en", "English"], ["ru", "Русский"], ["uk", "Українська"]]
