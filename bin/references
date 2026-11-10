@@ -147,8 +147,16 @@ def cwe(path):
         common = [text_of(t.find("c:Term", ns)) for t in w.findall("c:Alternate_Terms/c:Alternate_Term", ns)
                   if any(text_of(r) == "Common-Name" for r in t.findall("c:Role", ns))]
         label = w.get("Name")
-        if len(label.split()) > 5:
-            label = next((t for t in common + alternates if 1 < len(t.split()) <= 5 or (len(t) > 3 and t.isupper())), label)
+        quoted = re.search(r"\('([^']+)'\)", label)
+        short_common = [t for t in common if len(t.split()) <= 5]
+        if len(label.split()) <= 4:
+            pass
+        elif short_common:
+            label = short_common[0]
+        elif quoted:
+            label = quoted.group(1)
+        elif len(label.split()) > 5:
+            label = next((t for t in common + alternates if 1 < len(t.split()) <= 5 or (len(t) >= 3 and t.isupper())), label)
             label = label[:1].upper() + label[1:]
         entries[wid] = {
             "id": wid, "kind": "weakness", "name": label, **({"title": w.get("Name")} if label != w.get("Name") else {}), "text": short(text_of(w.find("c:Description", ns))),

@@ -84,6 +84,8 @@ days, one you didn't returns tomorrow, and up to five new ones join daily, from
 writeups you marked read first. Reveal with Space, answer with Y or N. A day of
 review keeps the streak going.
 
+![Review: one question at a time, spaced out](docs/review.png)
+
 Under each summary, **Terms in this writeup** lists the MITRE ATT&CK techniques, CWE
 weaknesses, CAPEC attack patterns, and OWASP Top 10 2025 categories the writeup (and
 its saved page) names, each with its official definition and a link to read more:
@@ -102,6 +104,8 @@ related concepts with the passages that relate them, and open a writeup from the
 It is the model's reading, not a set of facts, and the window says so. Without
 Ollama that map stays empty and says what it needs; everything else works. The
 model reads one writeup at a time, spread over two hours, and only on AC power.
+
+![The concept map from ATT&CK, CWE, CAPEC, and OWASP, with an entry's definition and writeups](docs/concepts.png)
 
 WriteupPulse is for understanding, not attacking: the agent is told never to write
 code, commands, payloads, or exploits, and the app cuts out any code block that

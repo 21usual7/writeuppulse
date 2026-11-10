@@ -180,6 +180,25 @@ Modules, one class per role like the current code:
   version-3 tables. Every view of it says the concepts are the model's; with
   no model, it says what's missing instead of an empty map.
 
+- 2026-11-10, change of plan (the user): the local model is too slow on this
+  machine for a tutor, so stage 6 (tutor modes) is dropped and stages 7–8 are
+  replaced. Stages 4–5 stay; extraction is spread over two hours a batch and
+  stops off AC power. Done the same day, without the model and without more
+  Claude usage:
+  - **Review:** spaced repetition (Leitner, 1/3/7/16/35 days) over the
+    self-check questions, from the `events` history; review days count for
+    the streak.
+  - **Open references:** MITRE ATT&CK, CWE, CAPEC, OWASP Top 10 2025 built
+    into the app (`bin/references`): "Terms in this writeup" as a glossary,
+    and a concept map from them that works on every install.
+  - **Levels:** the reader's level first in each day and in review; the
+    prompt asks for a Junior and a Senior piece a day, security first.
+  - **Labs:** hand-picked legal labs per direction and level.
+  - **Notes:** per writeup, into an Obsidian/Markdown folder (never
+    overwriting the reader's edits) or Notion.
+  - **Help and Get started.**
+  - **Site:** levels, terms, labs, review in localStorage, an Atom feed.
+
 ## 7–9. Roadmap
 
 | # | Stage | Size | Needs |

@@ -16,7 +16,7 @@ build new features locally — SQLite, the local Ollama model, the article pages
 
 ## Status (2026-11-10)
 
-Roadmap stages done, each with tests (40 passing) and docs:
+Roadmap stages done, each with tests (46 passing) and docs:
 
 - **0 (bugs):** start limits in `[Unit]` (packaged and local unit), statistics take
   the category from the day, progress keyed by `Store::canonicalUrl`.
@@ -42,14 +42,16 @@ category/CWE → Juice Shop, WebGoat, DVWA, pwn.college…; done), **notes** (pe
 to an Obsidian vault / Markdown folder and Notion; done), **Help and Get started** (done), then
 the same review/glossary/levels/RSS on the **site** (done).
 
-On this machine `~/.local/bin/writeuppulse` is the stage-5 binary (installed
-2026-11-10): the first window it opens migrates the database to version 3 and starts
-extracting concepts from the 10 saved pages while Ollama is up (~2–4 min of CPU each),
-so the Concepts view fills in over about half an hour of an open window. Nothing is
-pushed; the last release is still 0.3.0, so cutting 0.4.0 would need the user's go-ahead.
+On this machine `~/.local/bin/writeuppulse` is the build from the end of 2026-11-10
+(references, review, notes, site publishing with terms/labs/feed); the database moves to
+version 4 the first time a window from it opens. Nothing is pushed; the last release is
+still 0.3.0, so cutting 0.4.0 would need the user's go-ahead. The morning run publishes
+`site/` from committed `master` with this binary, so the site gets the new features then.
 
-**Next: stage 6**, the learning engine: tutor modes, teach-back and knowledge checks
-with structured grading, history in the database. See `docs/ROADMAP.md`.
+**Next:** nothing planned beyond the list above; see `docs/ROADMAP.md`. Open ideas:
+retake `docs/focus.png` when focus mode changes; GPU for Ollama needs the drop-in
+`/etc/systemd/system/ollama.service.d/igpu.conf` with `Environment=OLLAMA_IGPU_ENABLE=1`
+(sudo, the user's call), then measure tokens/s.
 
 ## Commands
 
