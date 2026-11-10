@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import QtQuick.Dialogs
 
 ApplicationWindow {
     id: win
@@ -197,6 +198,7 @@ ApplicationWindow {
     Shortcut { sequence: "3"; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: reader.tab = 2 }
     Shortcut { sequence: "4"; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: reader.tab = 3 }
     Shortcut { sequence: "5"; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: reader.tab = 4 }
+    Shortcut { sequence: "6"; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: reader.tab = 5 }
     Shortcut { sequences: ["Down", "J"]; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: win.move(1) }
     Shortcut { sequences: ["Up", "K"]; context: Qt.ApplicationShortcut; enabled: !win.typing && !win.focusVisible; onActivated: win.move(-1) }
     Shortcut { sequence: "Left"; context: Qt.ApplicationShortcut; enabled: !win.typing; onActivated: win.focusVisible ? focusView.previousStep() : backend.olderDay() }
@@ -772,6 +774,57 @@ ApplicationWindow {
                     }
 
                     Rectangle { Layout.fillWidth: true; Layout.topMargin: 6; height: 1; color: Style.line }
+                    Text { text: qsTr("Notes"); color: Style.ink; font.family: Style.sans; font.pixelSize: 17; font.weight: Font.DemiBold }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 14
+                        Text { text: qsTr("Notes folder"); color: Style.muted; font.family: Style.sans; font.pixelSize: 14 }
+                        TextField {
+                            id: folderField
+                            Layout.fillWidth: true
+                            text: backend.notesFolder
+                            placeholderText: qsTr("An Obsidian vault or any folder")
+                            color: Style.ink
+                            font.family: Style.sans
+                            font.pixelSize: 13
+                            onEditingFinished: backend.notesFolder = text
+                        }
+                        ActionButton { text: qsTr("Choose…"); onClicked: folderDialog.open() }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 14
+                        Text { text: qsTr("Notion"); color: Style.muted; font.family: Style.sans; font.pixelSize: 14 }
+                        TextField {
+                            Layout.fillWidth: true
+                            text: backend.notionToken
+                            placeholderText: qsTr("Integration token")
+                            echoMode: TextInput.Password
+                            color: Style.ink
+                            font.family: Style.sans
+                            font.pixelSize: 13
+                            onEditingFinished: backend.notionToken = text
+                        }
+                        TextField {
+                            Layout.fillWidth: true
+                            text: backend.notionParent
+                            placeholderText: qsTr("Link to the page for notes")
+                            color: Style.ink
+                            font.family: Style.sans
+                            font.pixelSize: 13
+                            onEditingFinished: backend.notionParent = text
+                        }
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        wrapMode: Text.Wrap
+                        text: qsTr("Notes (tab 6 on a writeup) are kept in the app. With a folder, each note is also saved there as Markdown with front matter and [[links]] to its terms, ready for Obsidian, Logseq, or any Markdown app. For Notion, create an integration at notion.so/my-integrations, share a page with it, and paste its token and the page's link: \"Send to Notion\" then adds a page under it. The token is kept in ~/.config on this computer.")
+                        color: Style.faint
+                        font.family: Style.sans
+                        font.pixelSize: 12
+                    }
+
+                    Rectangle { Layout.fillWidth: true; Layout.topMargin: 6; height: 1; color: Style.line }
                     Text { text: qsTr("Directions"); color: Style.ink; font.family: Style.sans; font.pixelSize: 17; font.weight: Font.DemiBold }
                     Text {
                         Layout.fillWidth: true
@@ -838,6 +891,12 @@ ApplicationWindow {
             }
         }
 
+        FolderDialog {
+            id: folderDialog
+            title: qsTr("Notes folder")
+            onAccepted: backend.notesFolder = selectedFolder.toString()
+        }
+
         Popup {
             anchors.centerIn: parent
             modal: true
@@ -855,7 +914,7 @@ ApplicationWindow {
                     model: [
                         ["↑ ↓", qsTr("Previous or next writeup")],
                         ["← →", qsTr("Older or newer day")],
-                        ["1 – 5", qsTr("Summary, takeaways, questions, practice, ask")],
+                        ["1 – 6", qsTr("Summary, takeaways, questions, practice, ask, notes")],
                         ["Enter", qsTr("Study the writeup step by step")],
                         ["O", qsTr("Open the article in the browser")],
                         ["M", qsTr("Mark as read")],

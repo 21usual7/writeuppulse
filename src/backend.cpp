@@ -31,6 +31,15 @@ Backend::Backend(const QString &directory, bool systemd, QObject *parent)
     m_hideRead = settings.value("hideRead", false).toBool();
     m_searchCategories = settings.value("categories").toStringList();
     m_preferredCategories = settings.value("preferred").toStringList();
+    m_notesFolder = settings.value("notesFolder").toString();
+    m_notionToken = settings.value("notionToken").toString();
+    m_notionParent = settings.value("notionParent").toString();
+    connect(&m_notes, &Notes::sent, this, [this](const QString &url, bool ok, const QString &page, const QString &message) {
+        if (ok)
+            m_database.setNotionPage(Store::canonicalUrl(url), page);
+        setNotice(ok ? tr("Sent to Notion") : tr("Notion: %1").arg(message));
+        emit sendingChanged();
+    });
     m_myLevel = Store::levels().contains(settings.value("myLevel").toString()) ? settings.value("myLevel").toString() : QString();
     m_saveTexts = settings.value("saveTexts", true).toBool();
     m_graphSource = settings.value("graphSource", "references").toString() == "model" ? "model" : "references";
@@ -177,6 +186,84 @@ QSet<QString> Backend::libraryUrls() const {
 void Backend::graphOutdated() {
     m_graphOutdated = true;
     emit graphChanged();
+}
+
+QStringList Backend::termsOf(const QVariantMap &item) const {
+    QStringList terms;
+    for (const auto &value : references(item.value("url").toString()))
+        terms << value.toMap().value("id").toString() + " " + value.toMap().value("name").toString();
+    return terms;
+}
+
+bool Backend::writeNote(const QVariantMap &item, bool quiet) {
+    QString path, error;
+    const QString url = Store::canonicalUrl(item.value("url").toString());
+    const bool ok = Notes::writeToVault(m_notesFolder, item, m_database.note(url), termsOf(item),
+                                        m_progress.entry(url).value("tags").toVariant().toStringList(), &path, &error);
+    if (!ok)
+        setNotice(error);
+    else if (!quiet)
+        setNotice(tr("Saved %1").arg(QFileInfo(path).fileName()));
+    return ok;
+}
+
+void Backend::setNote(const QVariantMap &item, const QString &text) {
+    const QString url = Store::canonicalUrl(item.value("url").toString());
+    if (text == m_database.note(url))
+        return;
+    if (!m_database.saveNote(url, text)) {
+        setProblem(tr("Could not save your note."));
+        return;
+    }
+    if (!m_notesFolder.isEmpty())
+        writeNote(item, true);
+}
+
+void Backend::saveToFolder(const QVariantMap &item) {
+    if (m_notesFolder.isEmpty())
+        setNotice(tr("Choose a notes folder in Settings first."));
+    else
+        writeNote(item, false);
+}
+
+void Backend::sendToNotion(const QVariantMap &item) {
+    const QString parent = Notes::notionId(m_notionParent);
+    if (m_notionToken.isEmpty() || parent.isEmpty()) {
+        setNotice(tr("Add your Notion token and page in Settings first."));
+        return;
+    }
+    const QString url = Store::canonicalUrl(item.value("url").toString());
+    m_notes.sendToNotion(item, m_database.note(url), termsOf(item), m_notionToken, parent, m_database.notionPage(url));
+    emit sendingChanged();
+}
+
+void Backend::setNotesFolder(const QString &folder) {
+    QString value = folder.trimmed();
+    if (value.startsWith("file://"))
+        value = QUrl(value).toLocalFile();
+    if (value.startsWith("~/"))
+        value = QDir::homePath() + value.mid(1);
+    if (value == m_notesFolder)
+        return;
+    m_notesFolder = value;
+    QSettings("writeuppulse", "writeuppulse").setValue("notesFolder", value);
+    emit preferencesChanged();
+}
+
+void Backend::setNotionToken(const QString &token) {
+    if (token.trimmed() == m_notionToken)
+        return;
+    m_notionToken = token.trimmed();
+    QSettings("writeuppulse", "writeuppulse").setValue("notionToken", m_notionToken);
+    emit preferencesChanged();
+}
+
+void Backend::setNotionParent(const QString &parent) {
+    if (parent.trimmed() == m_notionParent)
+        return;
+    m_notionParent = parent.trimmed();
+    QSettings("writeuppulse", "writeuppulse").setValue("notionParent", m_notionParent);
+    emit preferencesChanged();
 }
 
 void Backend::setMyLevel(const QString &level) {

@@ -97,6 +97,8 @@ bool Database::migrate(const QString &directory) {
                  "CREATE TABLE extractions (url TEXT PRIMARY KEY, status TEXT NOT NULL, source TEXT, model TEXT,"
                  " error TEXT, attempts INTEGER NOT NULL DEFAULT 0, at TEXT NOT NULL)"})
             ok = ok && run(sql);
+    if (ok && current < 4)
+        ok = run("CREATE TABLE notes (url TEXT PRIMARY KEY, text TEXT NOT NULL DEFAULT '', notion TEXT, at TEXT NOT NULL)");
     ok = ok && (current == version || run(QString("PRAGMA user_version = %1").arg(version))) && run("COMMIT");
     if (!ok)
         QSqlQuery(connection()).exec("ROLLBACK");
@@ -208,6 +210,49 @@ QJsonArray Database::checks() const {
             list.append(QJsonObject{{"url", query.value(0).toString()}, {"question", query.value(1).toString()},
                                     {"result", query.value(2).toString()}, {"at", query.value(3).toString()}});
     return list;
+}
+
+QString Database::note(const QString &url) const {
+    QSqlQuery query(connection());
+    query.prepare("SELECT text FROM notes WHERE url = ?");
+    query.addBindValue(url);
+    return query.exec() && query.next() ? query.value(0).toString() : QString();
+}
+
+// A note emptied but sent to Notion keeps its row for the page id.
+bool Database::saveNote(const QString &url, const QString &text) {
+    QSqlQuery query(connection());
+    query.prepare(text.isEmpty() ? "DELETE FROM notes WHERE url = ? AND notion IS NULL"
+                                 : "INSERT INTO notes (url, text, at) VALUES (?, ?, ?)"
+                                   " ON CONFLICT (url) DO UPDATE SET text = excluded.text, at = excluded.at");
+    query.addBindValue(url);
+    if (!text.isEmpty()) {
+        query.addBindValue(text);
+        query.addBindValue(QDateTime::currentDateTime().toString(Qt::ISODate));
+    }
+    if (!query.exec())
+        return false;
+    if (text.isEmpty()) {
+        query.prepare("UPDATE notes SET text = '' WHERE url = ?");
+        query.addBindValue(url);
+        return query.exec();
+    }
+    return true;
+}
+
+QString Database::notionPage(const QString &url) const {
+    QSqlQuery query(connection());
+    query.prepare("SELECT notion FROM notes WHERE url = ?");
+    query.addBindValue(url);
+    return query.exec() && query.next() ? query.value(0).toString() : QString();
+}
+
+bool Database::setNotionPage(const QString &url, const QString &page) {
+    QSqlQuery query(connection());
+    query.prepare("INSERT INTO notes (url, notion, at) VALUES (?, ?, ?) ON CONFLICT (url) DO UPDATE SET notion = excluded.notion");
+    for (const QString &value : {url, page, QDateTime::currentDateTime().toString(Qt::ISODate)})
+        query.addBindValue(value);
+    return query.exec();
 }
 
 static QString stamp(const QString &path) {

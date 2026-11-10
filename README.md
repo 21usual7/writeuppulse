@@ -120,6 +120,15 @@ Shop, WebGoat, DVWA, crAPI, pwn.college, how2heap, CloudGoat, Kubernetes Goat, G
 Atomic Red Team, Security Datasets, Security Onion, FLARE-VM, REMnux, garak, PyRIT),
 then free online ones (OverTheWire, picoCTF, Cryptopals, flAWS).
 
+**Notes** (6) is a page of your own on each writeup. Notes stay in the app, and,
+if you pick a notes folder in Settings (an Obsidian vault, or any folder a Markdown
+app reads), each one is also saved there as `WriteupPulse/<date> <title>.md` with the
+summary, takeaways, tags, and the writeup's ATT&CK/CWE terms as `[[links]]`, so they
+join your own knowledge graph. A file you edit in Obsidian is yours: the app never
+overwrites it. To keep notes in Notion, create an integration at
+notion.so/my-integrations, share a page with it, and paste its token and the page's
+link into Settings; "Send to Notion" then adds the writeup and your note as a page.
+
 Pick your level in Settings (Junior, Middle, or Senior): each day lists the
 writeups at your level first, and review starts new questions from them. Every day
 has at least one piece a beginner can follow and one deep dive, security first.

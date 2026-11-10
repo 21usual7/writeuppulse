@@ -15,6 +15,7 @@ HEADERS += \
     src/extractor.h \
     src/fetcher.h \
     src/llmclient.h \
+    src/notes.h \
     src/filepicker.h \
     src/portalfilepicker.h \
     src/progress.h \
@@ -33,6 +34,7 @@ SOURCES += \
     src/extractor.cpp \
     src/fetcher.cpp \
     src/llmclient.cpp \
+    src/notes.cpp \
     src/portalfilepicker.cpp \
     src/progress.cpp \
     src/references.cpp \

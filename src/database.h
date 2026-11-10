@@ -24,7 +24,7 @@ public:
     Database(const Database &) = delete;
     Database &operator=(const Database &) = delete;
 
-    static constexpr int version = 3;
+    static constexpr int version = 4;
 
     QString path() const { return m_path; }
     // Empty when the file opened and is at the current version.
@@ -41,6 +41,13 @@ public:
     bool addCheck(const QString &url, const QString &question, const QString &result);
     // Every self-check answer, oldest first: {url, question, result, at}.
     QJsonArray checks() const;
+
+    // The reader's own note on a writeup (Markdown), and the Notion page it
+    // was last sent to. An empty text deletes the note.
+    QString note(const QString &url) const;
+    bool saveNote(const QString &url, const QString &text);
+    QString notionPage(const QString &url) const;
+    bool setNotionPage(const QString &url, const QString &page);
 
     // Brings the index in line with the days on disk: changed days again,
     // removed days out.

@@ -33,7 +33,22 @@ Flickable {
     readonly property var references: item ? backend.references(item.url) : []
     property string term: ""
 
+    // The note being edited, saved a moment after the last keystroke and
+    // before another writeup opens.
+    property string noteText: ""
+    property var noteItem: null
+    function saveNote() {
+        if (noteTimer.running) {
+            noteTimer.stop()
+            if (noteItem) backend.setNote(noteItem, noteText)
+        }
+    }
+    Timer { id: noteTimer; interval: 800; onTriggered: if (pane.noteItem) backend.setNote(pane.noteItem, pane.noteText) }
+
     onItemChanged: {
+        saveNote()
+        noteItem = item
+        noteText = item ? backend.note(item.url) : ""
         tab = 0
         term = ""
         contentY = 0
@@ -179,7 +194,8 @@ Flickable {
                     qsTr("Takeaways") + "  " + pane.count(pane.takeaways.length),
                     qsTr("Check yourself") + "  " + pane.count(pane.questions.length),
                     qsTr("Practice") + "  " + qsTr("%1/%2").arg(pane.count(pane.done.length)).arg(pane.count(pane.practice.length)),
-                    qsTr("Ask")
+                    qsTr("Ask"),
+                    qsTr("Notes") + (pane.noteText.trim().length > 0 ? "  •" : "")
                 ]
                 Column {
                     required property string modelData
@@ -449,6 +465,68 @@ Flickable {
             Layout.topMargin: 18
             visible: pane.tab === 4
             item: pane.item
+        }
+
+        // Notes: the reader's own words, kept here and, when set up, in a
+        // notes folder (Obsidian) or Notion.
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: 18
+            visible: pane.tab === 5
+            spacing: 12
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: Math.max(220, noteArea.implicitHeight + 20)
+                radius: 12
+                color: Style.raised
+                TextArea {
+                    id: noteArea
+                    anchors.fill: parent
+                    anchors.margins: 4
+                    text: pane.noteText
+                    wrapMode: TextEdit.Wrap
+                    color: Style.ink
+                    font.family: Style.sans
+                    font.pixelSize: 14
+                    background: null
+                    onTextChanged: if (text !== pane.noteText) { pane.noteText = text; noteTimer.restart() }
+                    onActiveFocusChanged: if (!activeFocus) pane.saveNote()
+                    Text {
+                        x: noteArea.leftPadding; y: noteArea.topPadding
+                        width: noteArea.width - noteArea.leftPadding - noteArea.rightPadding
+                        visible: noteArea.text.length === 0
+                        wrapMode: Text.Wrap
+                        text: qsTr("What did you learn, what to try next, what to look up. Markdown works.")
+                        color: Style.faint
+                        font: noteArea.font
+                    }
+                }
+            }
+            Row {
+                spacing: 10
+                ActionButton {
+                    visible: backend.notesFolder !== ""
+                    text: qsTr("Save to notes folder")
+                    hint: backend.notesFolder
+                    onClicked: { pane.saveNote(); backend.saveToFolder(pane.item) }
+                }
+                ActionButton {
+                    visible: backend.notionToken !== ""
+                    text: backend.sending ? qsTr("Sending…") : qsTr("Send to Notion")
+                    enabled: !backend.sending
+                    onClicked: { pane.saveNote(); backend.sendToNotion(pane.item) }
+                }
+            }
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                text: backend.notesFolder !== ""
+                      ? qsTr("Each saved note is also written to %1/WriteupPulse with the summary, takeaways, and terms as links. A file you edit there is yours: the app won't overwrite it.").arg(backend.notesFolder)
+                      : qsTr("Notes stay on this computer. To keep them in Obsidian or another Markdown app, or in Notion, set it up in Settings (P).")
+                color: Style.faint
+                font.family: Style.sans
+                font.pixelSize: 12
+            }
         }
 
         Text {

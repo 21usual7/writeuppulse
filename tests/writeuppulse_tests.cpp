@@ -16,6 +16,7 @@
 #include "fetcher.h"
 #include "filepicker.h"
 #include "llmclient.h"
+#include "notes.h"
 #include "progress.h"
 #include "references.h"
 #include "store.h"
@@ -1006,6 +1007,104 @@ private slots:
         backend.setMyLevel("Nobody");
         QCOMPARE(backend.myLevel(), QString());
         QCOMPARE(titles(), QStringList({"deep", "easy"}));
+    }
+
+    void notesGoToTheDatabaseAndTheVault()
+    {
+        QTemporaryDir dir;
+        {
+            Database database(dir.path());
+            QVERIFY(database.saveNote("https://example.com/a", "First thought."));
+            QCOMPARE(database.note("https://example.com/a"), QString("First thought."));
+            QVERIFY(database.setNotionPage("https://example.com/a", "page1"));
+            // Emptied, the note goes, but the Notion page is remembered.
+            QVERIFY(database.saveNote("https://example.com/a", ""));
+            QVERIFY(database.note("https://example.com/a").isEmpty());
+            QCOMPARE(database.notionPage("https://example.com/a"), QString("page1"));
+        }
+
+        const QVariantMap item{{"title", "Heap: a tour / part 1"}, {"url", "https://example.com/heap"}, {"date", "2026-11-09"},
+                               {"category", "Pwn"}, {"level", "Senior"}, {"summary", "About heaps."},
+                               {"takeaways", QVariantList{"Bins matter."}}};
+        QCOMPARE(Notes::fileName(item), QString("2026-11-09 Heap a tour part 1.md"));
+        const QString text = Notes::markdown(item, "Mine.", {"CWE-416 Use After Free"}, {"to study"});
+        QVERIFY(text.startsWith("---\ntitle: \"Heap: a tour / part 1\"\n"));
+        QVERIFY(text.contains("tags: [writeuppulse, pwn, to-study]"));
+        QVERIFY(text.contains("[[CWE-416 Use After Free]]"));
+        QVERIFY(text.contains("- Bins matter."));
+        QVERIFY(text.trimmed().endsWith("Mine."));
+
+        QTemporaryDir vault;
+        QString path, error;
+        QVERIFY(Notes::writeToVault(vault.path(), item, "One.", {}, {}, &path, &error));
+        QCOMPARE(path, vault.path() + "/WriteupPulse/2026-11-09 Heap a tour part 1.md");
+        QVERIFY(Notes::writeToVault(vault.path(), item, "Two.", {}, {}, &path, &error));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QVERIFY(file.readAll().contains("Two."));
+        file.close();
+        // Edited in Obsidian, the file is the reader's from then on.
+        QVERIFY(file.open(QIODevice::Append));
+        file.write("My own line.\n");
+        file.close();
+        QVERIFY(!Notes::writeToVault(vault.path(), item, "Three.", {}, {}, &path, &error));
+        QVERIFY(error.contains("left as it is"));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QVERIFY(file.readAll().contains("My own line."));
+
+        QCOMPARE(Notes::notionId("https://www.notion.so/me/Learning-1a2b3c4d5e6f40718293a4b5c6d7e8f9?pvs=4"),
+                 QString("1a2b3c4d5e6f40718293a4b5c6d7e8f9"));
+        QCOMPARE(Notes::notionId("1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9"), QString("1a2b3c4d5e6f40718293a4b5c6d7e8f9"));
+        QVERIFY(Notes::notionId("not a page").isEmpty());
+    }
+
+    void notesSendAPageToNotion()
+    {
+        // A stand-in for api.notion.com that records requests.
+        QTcpServer server;
+        QVERIFY(server.listen(QHostAddress::LocalHost));
+        QByteArrayList requests;
+        connect(&server, &QTcpServer::newConnection, this, [&] {
+            QTcpSocket *socket = server.nextPendingConnection();
+            auto request = std::make_shared<QByteArray>();
+            connect(socket, &QTcpSocket::readyRead, socket, [&, socket, request] {
+                *request += socket->readAll();
+                const qsizetype head = request->indexOf("\r\n\r\n");
+                if (head < 0)
+                    return;
+                const QByteArray length = request->mid(request->toLower().indexOf("content-length:") + 15).split('\r').value(0).trimmed();
+                if (request->size() - head - 4 < length.toInt())
+                    return;
+                requests << *request;
+                const QByteArray body = request->startsWith("POST") ? QByteArray("{\"object\":\"page\",\"id\":\"new-page\"}") : QByteArray("{}");
+                socket->write("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: "
+                              + QByteArray::number(body.size()) + "\r\n\r\n" + body);
+                socket->disconnectFromHost();
+            });
+        });
+        Notes notes;
+        notes.api = QUrl(QString("http://127.0.0.1:%1").arg(server.serverPort()));
+        QSignalSpy sent(&notes, &Notes::sent);
+        const QVariantMap item{{"title", "Heaps"}, {"url", "https://example.com/heap"}, {"summary", "One.\n\nTwo."},
+                               {"takeaways", QVariantList{"Bins."}}};
+        notes.sendToNotion(item, QString(2500, 'x'), {"CWE-416 Use After Free"}, "secret", "parentid", "oldpage");
+        QTRY_COMPARE(sent.count(), 1);
+        QCOMPARE(sent.first().at(1).toBool(), true);
+        QCOMPARE(sent.first().at(2).toString(), QString("new-page"));
+        QCOMPARE(requests.size(), 2);
+        // The old page to the trash first, then the new one.
+        QVERIFY(requests[0].startsWith("PATCH /v1/pages/oldpage "));
+        QVERIFY(requests[0].contains("\"archived\":true"));
+        QVERIFY(requests[1].startsWith("POST /v1/pages "));
+        QVERIFY(requests[1].contains("Authorization: Bearer secret"));
+        QVERIFY(requests[1].contains("Notion-Version: 2022-06-28"));
+        const QJsonObject body = QJsonDocument::fromJson(requests[1].mid(requests[1].indexOf("\r\n\r\n") + 4)).object();
+        QCOMPARE(body.value("parent").toObject().value("page_id").toString(), QString("parentid"));
+        const QJsonArray children = body.value("children").toArray();
+        QCOMPARE(children.first().toObject().value("type").toString(), QString("bookmark"));
+        // Two summary paragraphs, and a long note in pieces of 2000 characters.
+        const QJsonObject last = children.last().toObject();
+        QCOMPARE(last.value("paragraph").toObject().value("rich_text").toArray().size(), 2);
     }
 
     void backendShowsTheGraphOfTheLibrary()

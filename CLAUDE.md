@@ -39,7 +39,7 @@ New plan, in order, each done → noted here: **review** (spaced repetition, don
 glossary for beginners, a model-free concept graph; done), **level tracks** (my level in
 Settings, a Junior and a Senior pick a day, security first; done), **open labs** (curated
 category/CWE → Juice Shop, WebGoat, DVWA, pwn.college…; done), **notes** (per writeup, export
-to an Obsidian vault / Markdown folder and Notion), **Help and Get started**, then the
+to an Obsidian vault / Markdown folder and Notion; done), **Help and Get started**, then the
 same review/glossary/levels/RSS on the **site**.
 
 On this machine `~/.local/bin/writeuppulse` is the stage-5 binary (installed
@@ -201,6 +201,21 @@ the QML window.
   `WriteupRow` marks "your level". The prompt asks for security directions first (3 of
   5 when they're wanted) and at least one Junior and one Senior a day; its length was
   kept by shortening the source list (budget rule).
+- **Notes:** `notes` table (database version 4: url, text, notion page id). The reader's
+  Notes tab (6) saves 0.8 s after typing stops and before another writeup opens
+  (`ReaderPane.saveNote`). `Notes` (`src/notes.cpp`): `markdown()` = YAML front matter
+  (title, url, date, category, level, tags incl. `writeuppulse` and the user's) +
+  summary, takeaways, catalog terms as `[[ID Name]]` wiki links, "My notes";
+  `writeToVault(folder, …)` writes `<folder>/WriteupPulse/<date> <title>.md` and keeps a
+  hash of what it wrote in `<folder>/WriteupPulse/.writeuppulse` (QSettings ini, key =
+  hash of the path): a file changed since (or not written by the app) is never
+  overwritten. With QSettings `notesFolder` set, every note save writes it; "Save to
+  notes folder" does it on demand. `sendToNotion` (`Notion-Version: 2022-06-28`,
+  `WRITEUPPULSE_NOTION` overrides the API base for tests) archives the previous page
+  (PATCH `archived`) and POSTs a new one under `notionParent` (`notionId()` takes a page
+  link or ID): bookmark, headings, paragraphs (2000-char pieces), ≤ 100 blocks. The
+  token is in QSettings (plain, ~/.config), as the Settings text says; only the user's
+  own action sends anything.
 - **Labs:** `src/labs/labs.json` (qrc) is a hand-picked list of legal practice places
   (name, own project URL, `open` = open source and self-hosted vs free online,
   directions, levels, `about` in en/ru/uk). `Backend::labs(category, level)` gives up to

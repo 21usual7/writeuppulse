@@ -12,6 +12,7 @@
 #include "database.h"
 #include "extractor.h"
 #include "filepicker.h"
+#include "notes.h"
 #include "progress.h"
 #include "references.h"
 #include "store.h"
@@ -55,6 +56,10 @@ class Backend : public QObject {
     Q_PROPERTY(QString notice READ notice NOTIFY noticeChanged)
     Q_PROPERTY(bool saveTexts READ saveTexts WRITE setSaveTexts NOTIFY preferencesChanged)
     Q_PROPERTY(QString myLevel READ myLevel WRITE setMyLevel NOTIFY preferencesChanged)
+    Q_PROPERTY(QString notesFolder READ notesFolder WRITE setNotesFolder NOTIFY preferencesChanged)
+    Q_PROPERTY(QString notionToken READ notionToken WRITE setNotionToken NOTIFY preferencesChanged)
+    Q_PROPERTY(QString notionParent READ notionParent WRITE setNotionParent NOTIFY preferencesChanged)
+    Q_PROPERTY(bool sending READ sending NOTIFY sendingChanged)
     Q_PROPERTY(QVariantMap graph READ graph NOTIFY graphChanged)
     Q_PROPERTY(QString graphSource READ graphSource WRITE setGraphSource NOTIFY graphChanged)
     Q_PROPERTY(QVariantMap review READ review NOTIFY progressChanged)
@@ -155,6 +160,22 @@ public:
     // The catalog entries one writeup names, most named first: {id, kind,
     // name, text, link, count}.
     Q_INVOKABLE QVariantList references(const QString &url) const;
+    // The reader's note on a writeup. Saving it also writes the writeup's
+    // file into the notes folder, when one is set (see Notes::writeToVault).
+    Q_INVOKABLE QString note(const QString &url) const { return m_database.note(Store::canonicalUrl(url)); }
+    Q_INVOKABLE void setNote(const QVariantMap &item, const QString &text);
+    Q_INVOKABLE void saveToFolder(const QVariantMap &item);
+    Q_INVOKABLE void sendToNotion(const QVariantMap &item);
+    // A folder for Markdown notes (an Obsidian vault), and Notion's
+    // integration token and the page new pages go under; all in settings.
+    QString notesFolder() const { return m_notesFolder; }
+    void setNotesFolder(const QString &folder);
+    QString notionToken() const { return m_notionToken; }
+    void setNotionToken(const QString &token);
+    QString notionParent() const { return m_notionParent; }
+    void setNotionParent(const QString &parent);
+    bool sending() const { return m_notes.busy(); }
+
     // Up to three legal places to practice a direction (src/labs/labs.json):
     // labs for this level first, then open-source ones. {name, url, open,
     // levels, about: {en, ru, uk}}.
@@ -182,6 +203,7 @@ signals:
     void preferencesChanged();
     void noticeChanged();
     void graphChanged();
+    void sendingChanged();
 
 private:
     void reload();
@@ -238,6 +260,10 @@ private:
     int m_hiddenCount = 0;
     QStringList m_searchCategories, m_preferredCategories;
     QString m_myLevel;
+    Notes m_notes;
+    QString m_notesFolder, m_notionToken, m_notionParent;
+    QStringList termsOf(const QVariantMap &item) const;
+    bool writeNote(const QVariantMap &item, bool quiet);
     FilePicker *m_picker = nullptr;
     QString m_pendingExport;
     QString m_notice;
