@@ -608,6 +608,23 @@ private slots:
         QCOMPARE(days.size(), 2);
         QCOMPARE(days[0]["items"][0]["title"].toString(), QString("New"));
         QCOMPARE(days[1]["items"][0]["topic"].toString(), QString("Other"));
+
+        // The site also gets the labs and an Atom feed of the newest writeups.
+        QVERIFY(QFile::exists(site.path() + "/labs.json"));
+        QFile feed(site.path() + "/feed.xml");
+        QVERIFY(feed.open(QIODevice::ReadOnly));
+        const QByteArray atom = feed.readAll();
+        QVERIFY(atom.contains("<feed xmlns=\"http://www.w3.org/2005/Atom\">"));
+        QVERIFY(atom.contains("<title>New</title>"));
+        QVERIFY(atom.contains("<link href=\"https://example.com/a\"/>"));
+        QCOMPARE(atom.count("<entry>"), 2);
+        QVERIFY(atom.contains("Z</updated>"));
+
+        // Each writeup names its catalog terms for the glossary.
+        const QJsonArray terms = Store::terms(QJsonObject{{"title", "A stored XSS"}, {"summary", "Then SSRF to the metadata service."}});
+        QCOMPARE(terms.size(), 2);
+        QVERIFY(terms[0].toObject().value("url").toString().startsWith("https://capec.mitre.org/")
+                || terms[1].toObject().value("url").toString().startsWith("https://capec.mitre.org/"));
     }
 
     void syncDownloadsOnlyNewCheckedDays()

@@ -40,7 +40,7 @@ glossary for beginners, a model-free concept graph; done), **level tracks** (my 
 Settings, a Junior and a Senior pick a day, security first; done), **open labs** (curated
 category/CWE → Juice Shop, WebGoat, DVWA, pwn.college…; done), **notes** (per writeup, export
 to an Obsidian vault / Markdown folder and Notion; done), **Help and Get started** (done), then
-the same review/glossary/levels/RSS on the **site**.
+the same review/glossary/levels/RSS on the **site** (done).
 
 On this machine `~/.local/bin/writeuppulse` is the stage-5 binary (installed
 2026-11-10): the first window it opens migrates the database to version 3 and starts
@@ -240,6 +240,14 @@ the QML window.
   `bin/publish` keeps a worktree of the `pages` branch in `~/.cache/writeuppulse/pages`,
   copies `site/` from committed `master`, runs `writeuppulse publish data`, commits, and
   pushes only `pages` (GitHub Pages serves it), so unpushed `master` work stays local.
+  `publish` also adds each item's `terms` (`Store::terms`: catalog entries its title,
+  why, summary, takeaways name, ≤ 8, with definition and link), writes `labs.json` (the
+  qrc copy) and `feed.xml` (Atom, newest 30, UTC times). The site has a level picker
+  (sorts, marks "your level"), Terms and "Where to practice legally" on a writeup, "I
+  knew it / I didn't" under each answer, and `#/review` (same Leitner rules as the app,
+  over the last 30 days, new questions from opened writeups first); level, opened
+  writeups (`wp.seen`), and answers (`wp.cards`) live in the browser's localStorage only.
+  The site must still work with older data (no `terms`, no `labs.json`): it does.
   Agent text goes into the DOM only via text nodes; only http(s) URLs become links.
   Preview: `writeuppulse publish site/data` (ignored by git), then
   `python3 -m http.server -d site`.

@@ -11,8 +11,10 @@
 #include <QStandardPaths>
 #include <QUrl>
 #include <QUrlQuery>
+#include <QXmlStreamWriter>
 
 #include "progress.h"
+#include "references.h"
 
 Store::Store(const QString &directory)
     : m_directory(!directory.isEmpty() ? directory
@@ -279,6 +281,7 @@ bool Store::publish(const QString &directory, QString *error) const {
         for (const auto &value : day.value("items").toArray()) {
             QJsonObject item = value.toObject();
             item.insert("topic", topicOf(item.value("category").toString()));
+            item.insert("terms", terms(item));
             items.append(item);
         }
         day.insert("items", items);
@@ -307,10 +310,75 @@ bool Store::publish(const QString &directory, QString *error) const {
         }
         days.append(QJsonObject{{"date", date}, {"generatedAt", published.value("generatedAt")}, {"items", items}});
     }
-    if (!writeAtomically(directory + "/index.json", QJsonDocument(QJsonObject{{"days", days}}).toJson(QJsonDocument::Compact))) {
+    QFile labs(":/labs/labs.json");
+    if (!writeAtomically(directory + "/index.json", QJsonDocument(QJsonObject{{"days", days}}).toJson(QJsonDocument::Compact))
+        || !labs.open(QIODevice::ReadOnly) || !writeAtomically(directory + "/labs.json", labs.readAll())
+        || !writeAtomically(directory + "/feed.xml", site.feed())) {
         if (error)
             *error = QString("Could not write to %1.").arg(directory);
         return false;
     }
     return true;
+}
+
+QJsonArray Store::terms(const QJsonObject &item) {
+    QStringList texts{item.value("title").toString(), item.value("why").toString(), item.value("summary").toString()};
+    for (const auto &takeaway : item.value("takeaways").toArray())
+        texts << takeaway.toString();
+    QJsonArray list;
+    for (const auto &hit : References::instance().find({texts.join('\n')})) {
+        const QJsonObject entry = References::instance().entry(hit.id);
+        list.append(QJsonObject{{"id", hit.id}, {"name", entry.value("name")}, {"kind", entry.value("kind")},
+                                {"text", entry.value("text")}, {"url", entry.value("url")}});
+        if (list.size() == 8)
+            break;
+    }
+    return list;
+}
+
+// Atom, newest first, the last 30 writeups; each entry links to the original
+// article and carries the summary as text.
+QByteArray Store::feed() const {
+    // Atom wants a time zone; the days keep local time.
+    auto atomTime = [](const QString &local, const QString &fallback) {
+        const QDateTime time = QDateTime::fromString(local, Qt::ISODate);
+        return (time.isValid() ? time : QDateTime::fromString(fallback, Qt::ISODate)).toUTC().toString(Qt::ISODate);
+    };
+    QByteArray xml;
+    QXmlStreamWriter out(&xml);
+    out.setAutoFormatting(true);
+    out.writeStartDocument();
+    out.writeStartElement("feed");
+    out.writeDefaultNamespace("http://www.w3.org/2005/Atom");
+    out.writeTextElement("title", "WriteupPulse");
+    out.writeTextElement("subtitle", "Five technical writeups a day, security first, picked and summarized by an agent.");
+    out.writeTextElement("id", "urn:writeuppulse:feed");
+    const QStringList days = dates();
+    out.writeTextElement("updated", atomTime(days.isEmpty() ? QString() : digest(days.first()).value("generatedAt").toString(),
+                                             QDateTime::currentDateTime().toString(Qt::ISODate)));
+    int count = 0;
+    for (const auto &date : days) {
+        const QJsonObject day = digest(date);
+        const QString updated = atomTime(day.value("generatedAt").toString(), date + "T08:00:00");
+        const QJsonArray items = day.value("items").toArray();
+        for (int i = 0; i < items.size() && count < 30; ++i, ++count) {
+            const QJsonObject item = items.at(i).toObject();
+            out.writeStartElement("entry");
+            out.writeTextElement("id", QString("urn:writeuppulse:%1:%2").arg(date).arg(i + 1));
+            out.writeTextElement("title", item.value("title").toString());
+            out.writeTextElement("updated", updated);
+            out.writeEmptyElement("link");
+            out.writeAttribute("href", item.value("url").toString());
+            out.writeEmptyElement("category");
+            out.writeAttribute("term", item.value("category").toString("Other"));
+            out.writeStartElement("summary");
+            out.writeAttribute("type", "text");
+            out.writeCharacters(item.value("summary").toString());
+            out.writeEndElement();
+            out.writeEndElement();
+        }
+    }
+    out.writeEndElement();
+    out.writeEndDocument();
+    return xml;
 }

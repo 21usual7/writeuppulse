@@ -202,6 +202,14 @@ bin/build    # build/writeuppulse
 bin/test     # Qt Test, offscreen
 ```
 
+## The site
+
+[The public site](https://21usual7.github.io/writeuppulse/) has the same days for
+anyone, no install: pick your level, open the terms a writeup uses, find a legal lab
+for its practice ideas, answer its questions, and come back to **Review** for them,
+spaced out. Your level and answers stay in your browser. New days are also in an
+[Atom feed](https://21usual7.github.io/writeuppulse/data/feed.xml).
+
 ## Reference data
 
 `src/references/references.json` is built by `bin/references` from MITRE ATT&CK

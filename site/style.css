@@ -75,6 +75,21 @@ details p { margin: 8px 0 0; color: var(--muted); }
 .pager a:last-child { margin-left: auto; text-align: right; }
 .note { font-size: 13px; color: var(--faint); margin-top: 28px; }
 
+.chips .label { align-self: center; font-size: 13px; color: var(--faint); margin-right: 4px; }
+.yours { display: inline-block; margin-top: 4px; font-size: 12px; color: var(--accent); }
+.term summary { font-weight: 600; }
+.id { margin-left: 10px; font-size: 12px; font-weight: 400; color: var(--faint); }
+.judge { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.labs { list-style: none; padding: 0; }
+.labs li { padding: 10px 14px; background: var(--pane); border: 1px solid var(--line); border-radius: var(--radius); margin: 0 0 8px; }
+.labs p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.count:not(:empty) { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 700; text-align: center; }
+.review { max-width: 680px; padding: 22px 24px; background: var(--pane); border: 1px solid var(--line); border-radius: 14px; }
+.review .from { font-size: 13px; color: var(--muted); }
+.review .question { font: 22px/1.4 var(--serif); text-transform: none; letter-spacing: 0; color: var(--ink); margin: 10px 0 18px; }
+.review .open { border: 0; cursor: pointer; font: inherit; font-weight: 600; }
+.answer p { font: 16px/1.6 var(--serif); color: #7fd1a0; margin: 0 0 10px; }
+
 .about { max-width: 680px; }
 .about p, .about li { color: var(--muted); }
 .about strong { color: var(--ink); font-weight: 600; }

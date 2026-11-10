@@ -38,8 +38,16 @@ public:
     static QString markdown(const QJsonObject &digest, const Progress *progress = nullptr);
     // One day, or the seven days ending on it, oldest first.
     QString exportMarkdown(const QString &date, bool week, const Progress *progress = nullptr) const;
-    // Copies every day into the public site's data directory, plus an index.
+    // Copies every day into the public site's data directory, plus an index,
+    // the labs (labs.json), and an Atom feed of the newest writeups
+    // (feed.xml). Each published writeup carries the catalog entries its own
+    // text names ("terms": id, name, kind, text, url), for the site's glossary.
     bool publish(const QString &directory, QString *error) const;
+    // The ATT&CK, CWE, CAPEC, and OWASP entries a writeup's title, why,
+    // summary, and takeaways name, most named first, at most eight.
+    static QJsonArray terms(const QJsonObject &item);
+    // The Atom feed publish() writes.
+    QByteArray feed() const;
 
 private:
     QString m_directory;
