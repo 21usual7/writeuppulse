@@ -1,0 +1,305 @@
+{
+    "date": "2026-11-11",
+    "generatedAt": "2026-11-11T11:32:58",
+    "items": [
+        {
+            "category": "Reverse",
+            "level": "Senior",
+            "popularity": "Hacker News · 107 points",
+            "practice": [
+                "Read Android documentation on how companion apps talk to Bluetooth and Wi-Fi Direct peripherals, and sketch the trust boundaries for a device you own.",
+                "In your own test app, design a signed configuration file scheme and write down what an attacker who controls the transport could and could not change.",
+                "Study how A/B-style OTA update formats work and list which fields should be covered by a signature.",
+                "Take a lab Android app you built and review where server-driven feature flags gate security behavior, then propose a safer design.",
+                "Write a threat model for a screenless IoT gadget, listing every channel through which code or configuration arrives."
+            ],
+            "questions": [
+                {
+                    "answer": "They hooked the Android companion app to find the update CDN URL, then found a server-side GraphQL flag that made the service return the full image instead of an incremental one.",
+                    "question": "How did the author obtain the full firmware without opening the glasses?"
+                },
+                {
+                    "answer": "Signature enforcement was controlled by a feature flag in a config file delivered via the phone. The glasses only validated its structure, so changing one byte disabled the check.",
+                    "question": "Why did the first fix in firmware 127 not stop the attack?"
+                },
+                {
+                    "answer": "They used the phone's tone generator, with different beep patterns signalling different execution stages.",
+                    "question": "How did the author debug with no display or logs?"
+                },
+                {
+                    "answer": "Security-critical settings were accepted from an untrusted intermediary with no integrity protection.",
+                    "question": "What design principle was violated in the config handling?"
+                }
+            ],
+            "source": "p0pcycle.com",
+            "summary": "The author started from the Pwn2Own target list, found the glasses had been dropped from the wearables category, and went looking for a code-execution path anyway. With no screen or console on the device, they worked through the companion Meta AI Android app. Runtime instrumentation of the app revealed the firmware CDN location. That first package was only an incremental update, so the author found a server-controlled GraphQL flag that made the service offer the full image, which could then be unpacked and studied.\n\nThe code execution came from the Device Access Toolkit delivery path. The phone pushes a companion APK to the glasses, and firmware up to version 126 did not check that the APK was signed by Meta. By interfering with that installer step, the author got their own app onto the glasses. They debugged blind by using the phone's tone generator as a status channel, and they forced the glasses onto the phone's Wi-Fi Direct group so that the app could expose an interactive shell inside its sandbox.\n\nFirmware 127 added signature enforcement, but whether to enforce was itself a feature flag in a configuration file pushed from Meta's servers via the phone. The glasses checked only that the file was well-formed, not that it was authentic, so altering a single value turned the check off. Meta paid a bounty after a payout dispute, and the author assumes the issue is now fixed but has not confirmed it.",
+            "tags": [
+                "wearables",
+                "android",
+                "firmware"
+            ],
+            "takeaways": [
+                "Companion mobile apps are often the easiest window into a device with no screen, ports or console.",
+                "Server-controlled flags can expose more than intended, such as a full firmware image instead of a delta.",
+                "Updates and add-on apps need signature checks on the device itself, not only in the phone app.",
+                "Security-relevant configuration that passes through an untrusted intermediary must be signed, not just structurally validated.",
+                "A patch that adds a check controlled by a flag is only as strong as the flag's integrity.",
+                "Creative side channels, such as audio tones, can stand in for logs when debugging a headless target.",
+                "Local network services on a device need real authentication, even on a private link like Wi-Fi Direct.",
+                "Bounty processes can be messy, so keep records and get written approval before publishing."
+            ],
+            "terms": [
+            ],
+            "title": "Hacking the Meta Ray-Ban smartglasses",
+            "topic": "Security",
+            "url": "https://p0pcycle.com/2026/11/06/hacking-the-meta-ray-ban-smartglasses/",
+            "why": "A rare, end-to-end look at attacking a locked-down consumer wearable without opening the hardware, including a bypass of the vendor's own fix."
+        },
+        {
+            "category": "Pwn",
+            "level": "Middle",
+            "popularity": "Lobsters · 4 points",
+            "practice": [
+                "Capture traffic from a legacy multiplayer game you own in your own lab network and try to identify the protocol layers.",
+                "Read about Wireshark dissector development and outline a dissector for a made-up simple game protocol.",
+                "In a disassembler, practise locating a dispatch table in a binary you compiled yourself and mapping which entries are used.",
+                "Write a short code review checklist for network handlers that index arrays with packet fields.",
+                "Work through a beginner heap or array out-of-bounds challenge on a CTF platform, focusing on function pointer overwrites."
+            ],
+            "questions": [
+                {
+                    "answer": "A recognisable string in the packets suggested Microsoft DirectPlay, and the game's use of an IPX-over-UDP wrapper explained the extra header.",
+                    "question": "How did the researchers identify the unknown game protocol?"
+                },
+                {
+                    "answer": "In the handler for message type 0x21, which used a network-supplied index into the player array without bounds checking.",
+                    "question": "Where was the vulnerability?"
+                },
+                {
+                    "answer": "It overwrote an entry in the message handler table so a later message of that type jumped to attacker data in the receive buffer.",
+                    "question": "How did the out-of-bounds write become code execution?"
+                },
+                {
+                    "answer": "A malicious host sends crafted messages to a joining client.",
+                    "question": "Who attacks whom in this scenario?"
+                }
+            ],
+            "source": "Synacktiv",
+            "summary": "Synacktiv researchers analysed the multiplayer mode of the 1999 game. Captured discovery and join traffic did not decode in Wireshark, but a recurring string pointed to Microsoft DirectPlay. The game also used an IPX-over-UDP wrapper, so they decoded that header, wrote a dissector, and adjusted the DirectPlay dissector for packets lacking optional headers.\n\nIn IDA they found the DirectPlay setup and receive routine and followed message dispatch to a handler table in which only 26 of 100 possible message IDs were used. Reviewing those handlers exposed a type 0x21 handler that took an index from the packet and wrote a player name into a player-state array without a range check, so large indices write out of bounds.\n\nFor exploitation, a small custom server hosted a session and sent the joining client a crafted message. The out-of-bounds write landed on the dispatch table and replaced another message type's handler with an address in the client's receive buffer. A later message of that type made the client run attacker-supplied data, giving remote code execution on Windows 10. The team published a proof of concept for educational use.",
+            "tags": [
+                "directplay",
+                "windows",
+                "ida"
+            ],
+            "takeaways": [
+                "Unknown traffic can often be identified by spotting ASCII strings that point to a known framework.",
+                "Writing a small dissector pays off quickly when reversing a custom protocol.",
+                "Message dispatch tables are a good map of attack surface, and sparsely populated ones reduce how much code needs review.",
+                "An unchecked index taken from the network is a classic and still productive bug class.",
+                "Overwriting a function pointer table is a simple route from an out-of-bounds write to control flow.",
+                "Old software often lacks modern mitigations, which makes it a good place to learn.",
+                "Client-side bugs matter in peer-to-peer or host-driven games, since a malicious host can attack players."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-787",
+                    "kind": "weakness",
+                    "name": "Out-of-bounds Write",
+                    "text": "The product writes data past the end, or before the beginning, of the intended buffer.",
+                    "url": "https://cwe.mitre.org/data/definitions/787.html"
+                }
+            ],
+            "title": "Finding a vulnerability in Star Wars Episode I: Racer",
+            "topic": "Security",
+            "url": "https://synacktiv.com/en/publications/star-wars-episode-i-racer",
+            "why": "A clear, approachable walk through reversing an old game's network protocol to a remote code execution bug, from packet capture to handler table overwrite."
+        },
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "Lobsters · 16 points",
+            "practice": [
+                "Read the Rustonomicon chapters on unwinding and exception safety and write down where a panic could leave data half-built.",
+                "Design a small safe wrapper around an unsafe buffer on paper and list invariants that a hostile trait implementation could break.",
+                "Read about the thread-safety of environment variable access in libc and explain why a lock in Rust alone cannot protect it.",
+                "Review the linked public issue threads and summarise how each fix changed the contract or the implementation.",
+                "Audit a small unsafe crate of your own for panic-safety using a written checklist."
+            ],
+            "questions": [
+                {
+                    "answer": "Trusting code not to panic, trusting user-provided trait implementations, and trusting the underlying system.",
+                    "question": "What are the three patterns of misplaced trust?"
+                },
+                {
+                    "answer": "Its buffer destructor was armed before slots were written, so a panicking user clone caused uninitialised values to be dropped.",
+                    "question": "Why was the MapWindows clone bug unsound?"
+                },
+                {
+                    "answer": "By stabilising the Allocator API with a rule that implementors must not unwind.",
+                    "question": "How did maintainers address allocator unwinding?"
+                },
+                {
+                    "answer": "They depend on runtime and C library behaviour that traditional static analysis does not model.",
+                    "question": "Why are the OS-boundary bugs harder to find?"
+                }
+            ],
+            "source": "Microsoft FORGE Lab",
+            "summary": "Microsoft's FORGE Lab reports soundness bugs in Rust's std and core, several triggerable from entirely safe code. Some were found with an AI-assisted scanner, then reported to maintainers. The post groups them into three patterns of misplaced trust in unsafe code.\n\nFirst, code assumed it would not panic: a destructor armed before a buffer was fully written dropped uninitialised values when a user clone function panicked, and custom allocators that unwind broke several collection operations. The maintainers' answer was to require that allocators not unwind. Second, code trusted user-supplied trait implementations: a string replace fast path assumed a one-byte pattern was ASCII, corrupting UTF-8, and a join fix from 2020 missed a path that led to a heap overflow. Third, code trusted the underlying system: process exit from a child thread unmapped the main thread's alternate signal stack, an exec path wrote the global environment under a read lock, and exit inside thread-local destructors caused a double free.\n\nThe authors note that the third class is hard for conventional static analysis since it depends on OS and C library behaviour. They also stress that these need unusual setups, so a library soundness bug is not automatically a vulnerability in every program.",
+            "tags": [
+                "rust",
+                "soundness",
+                "unsafe"
+            ],
+            "takeaways": [
+                "Unsafe code must stay correct even if a panic unwinds at any point.",
+                "Arm destructors only after the data they clean is fully initialised, or hold it in a wrapper that suppresses dropping until then.",
+                "Safe trait implementations written by callers can lie, so unsafe code cannot rely on their consistency.",
+                "Encoding invariants in types, such as guaranteed UTF-8 strings, is more robust than runtime assumptions.",
+                "Incomplete fixes happen, as the join bug shows, so re-audit sibling code paths after a fix.",
+                "OS and libc boundaries bring process-wide state that Rust types cannot protect.",
+                "Sometimes the best fix is a contract change, like forbidding unwinding allocators.",
+                "Soundness bugs and exploitable vulnerabilities are different things; assess reachability."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-119",
+                    "kind": "weakness",
+                    "name": "Buffer Overflow",
+                    "text": "The product performs operations on a memory buffer, but it reads from or writes to a memory location outside the buffer's intended boundary.",
+                    "url": "https://cwe.mitre.org/data/definitions/119.html"
+                },
+                {
+                    "id": "CWE-122",
+                    "kind": "weakness",
+                    "name": "Heap-based Buffer Overflow",
+                    "text": "The product writes past the end of a buffer that was allocated on the heap.",
+                    "url": "https://cwe.mitre.org/data/definitions/122.html"
+                },
+                {
+                    "id": "CWE-415",
+                    "kind": "weakness",
+                    "name": "Double Free",
+                    "text": "The product calls free() twice on the same memory address.",
+                    "url": "https://cwe.mitre.org/data/definitions/415.html"
+                }
+            ],
+            "title": "Memory Safety Bugs in Rust Standard Library",
+            "topic": "Security",
+            "url": "https://forge-blog.github.io/posts/rust-std-memory-safety/",
+            "why": "It shows how even a memory-safe language's own library breaks when unsafe code trusts panics, user trait impls or the OS, in three clear patterns."
+        },
+        {
+            "category": "Blue Team",
+            "level": "Junior",
+            "popularity": "Hacker News · 181 points",
+            "practice": [
+                "On your own Mac, list which files in your home folder a script running as you could read, and note which hold secrets.",
+                "Write a short threat model comparing file-based keys, passphrase-protected keys and hardware-bound keys.",
+                "If you have a hardware security key, compare its behaviour with the enclave approach in a test account you own.",
+                "Design a key-rotation and backup plan for a personal server, with a documented recovery path.",
+                "Review your SSH client configuration to see which identities are offered first and why."
+            ],
+            "questions": [
+                {
+                    "answer": "Theft of the private key file by malware or malicious code running on the Mac, since the key cannot be exported.",
+                    "question": "What threat does a Secure Enclave key address?"
+                },
+                {
+                    "answer": "Only a reference to the enclave key, useless on any other machine.",
+                    "question": "What does the file in the SSH folder contain?"
+                },
+                {
+                    "answer": "Because the enclave key is bound to one Mac, losing it would otherwise lock you out.",
+                    "question": "Why register a second key on each server?"
+                },
+                {
+                    "answer": "A user-presence check on every signing operation, so malware cannot use the key silently.",
+                    "question": "What does Touch ID add?"
+                }
+            ],
+            "source": "gatezh.com",
+            "summary": "The author wants SSH private keys that cannot be stolen as files, even by malware running as the user, fake take-home projects, or a fully compromised Mac. The answer is a key generated inside the Secure Enclave: a P-256 key that cannot be exported and never appears in memory or on disk, and whose every use requires Touch ID.\n\nThe file left in the SSH folder is only a handle, useless without that specific Mac's hardware. Servers just receive an ordinary public key, so nothing changes on their side. SSH hands each challenge to a provider library, which asks the enclave to sign after biometric approval.\n\nThe author found the native route secure but awkward: the Touch ID prompt text is cryptic, enrollment issues blocked key creation, many online guides use deprecated flags, other agents can conflict, and the key cannot be backed up. They plan to adopt a third-party app using the same hardware for a nicer interface and to register a backup key from another device on every server.",
+            "tags": [
+                "ssh",
+                "macos",
+                "hardening"
+            ],
+            "takeaways": [
+                "Keys stored as files in the home folder can be copied by any process running as that user.",
+                "A hardware-bound, non-exportable key removes the whole class of key-theft malware.",
+                "Requiring biometric approval per signature makes every use visible to the user.",
+                "Servers need no changes, since they only store a standard public key.",
+                "The on-disk file is a handle, not a secret.",
+                "Non-exportable keys mean no backup, so always register a second key from another device.",
+                "Usability matters: unclear prompts and fragile setup push people to weaker options.",
+                "Outdated online guides are a hazard; check current documentation."
+            ],
+            "terms": [
+                {
+                    "id": "T1552.004",
+                    "kind": "technique",
+                    "name": "Private Keys",
+                    "text": "Adversaries may search for private key certificate files on compromised systems for insecurely stored credentials. Private cryptographic keys and certificates are used for authentication, encryption/decryption, and digital signatures. Common key and certificate file extensions include: .key, .pgp, .gpg, .ppk, .p12, .pem, .pfx, .cer, .p7b, .asc.",
+                    "url": "https://attack.mitre.org/techniques/T1552/004"
+                }
+            ],
+            "title": "Protecting SSH Keys with macOS Secure Enclave",
+            "topic": "Security",
+            "url": "https://gatezh.com/posts/macos-secure-enclave-ssh-keys/",
+            "why": "A practical, honest hardening story that a beginner can follow, including the rough edges that most guides skip."
+        },
+        {
+            "category": "Other",
+            "level": "Middle",
+            "popularity": "Hacker News · 397 points",
+            "practice": [
+                "Read how the CVE and exploited-vulnerability catalogs differ and write down what each can and cannot tell you.",
+                "Pick a public CVE feed and compute, by hand or spreadsheet, the share of entries from one source over a month.",
+                "Draft a triage policy for a small open-source project receiving automated reports, including duplicate handling.",
+                "Compare CVSS severity with maintainer-assigned severity for several public advisories in a project you follow.",
+                "Write a short critique of this post listing which claims you would want independent data to verify."
+            ],
+            "questions": [
+                {
+                    "answer": "About 0.5% (442 CVEs), with only 2 in VulnCheck's exploited catalog.",
+                    "question": "What fraction of this year's CVEs are credited to Anthropic, and how many are known exploited?"
+                },
+                {
+                    "answer": "Findings rose by about 12,000 but fixes by only 15, while duplicates and withdrawals climbed.",
+                    "question": "What changed in the ledger between September and November?"
+                },
+                {
+                    "answer": "Most published reports were judged not vulnerabilities and the confirmed ones were low severity.",
+                    "question": "What did the curl case study show?"
+                },
+                {
+                    "answer": "The author sells vulnerability intelligence, is skeptical of the project, and relies on a ledger with a known bug and a single maintainer's experience.",
+                    "question": "What caveats apply to the analysis?"
+                }
+            ],
+            "source": "VulnCheck (Patrick Garrity)",
+            "summary": "VulnCheck's seven-month review of Anthropic's Project Glasswing tracks CVEs credited to Anthropic since April, using CVE records, advisories, kernel commits and Anthropic's own ledger, then checks them against VulnCheck's exploited-vulnerability catalog. It counts 442 credited CVEs, about 0.5% of this year's total, and only two appear in the exploited catalog.\n\nComparing ledger snapshots from September and November, total findings grew by almost 12,000 while fixes grew by only 15, and duplicates and withdrawals rose sharply. In the curl case, of 34 published reports 19 were judged not vulnerabilities and 6 confirmed as low severity. The author also notes a gap between how the model rated severity and how maintainers did, and that triage effort is shifting onto open-source maintainers.\n\nThe author concludes AI is a useful finding tool but that the launch narrative is not supported by the evidence. The piece should be read with care: VulnCheck sells vulnerability intelligence, the author is openly skeptical, and the analysis leans on a ledger the author says has a bug and on one maintainer's experience.",
+            "tags": [
+                "vulnerability-management",
+                "ai",
+                "cve"
+            ],
+            "takeaways": [
+                "Counts of findings say little without fix rates, exploitation data and duplicate rates.",
+                "The exploited-vulnerability catalog is a useful reality check on real-world impact.",
+                "Comparing snapshots of a public ledger over time reveals trends that a single number hides.",
+                "Severity ratings by automated tools can run much higher than maintainer ratings.",
+                "High volumes of unverified reports push triage cost onto open-source maintainers.",
+                "Duplicates grow when disclosure lags, since others find and fix the same bugs.",
+                "Consider the author's incentives and sample size when reading vendor-adjacent analysis.",
+                "Publishing low-severity reports openly, as curl does, makes independent evaluation possible."
+            ],
+            "terms": [
+            ],
+            "title": "Tracking Anthropic-discovered vulnerabilities",
+            "topic": "Other",
+            "url": "https://www.vulncheck.com/blog/anthropic-glasswing-november-update",
+            "why": "A data-driven critique of AI-driven vulnerability discovery that teaches how to read CVE, KEV and disclosure-ledger numbers skeptically."
+        }
+    ]
+}

@@ -24,6 +24,8 @@
                 "MFA can be undermined by alternate OAuth grant types that skip the second step.",
                 "Per-region differences in hardening mean one environment can be much weaker than another."
             ],
+            "terms": [
+            ],
             "title": "Unlocking any car from X brand in most of the world",
             "topic": "Other",
             "url": "https://shubs.io/unlocking-any-car-from-x-brand-in-most-of-the-world/",
@@ -50,6 +52,8 @@
                 "glibc's speed comes mainly from data structures (bins and tcache), not from any single trick.",
                 "Large allocations use mmap and can be returned immediately, but each new mapping page-faults on every page it writes.",
                 "glibc retaining about 19 MiB after all frees is a deliberate design choice, not a leak."
+            ],
+            "terms": [
             ],
             "title": "What is malloc doing, anyway?",
             "topic": "Other",
@@ -78,6 +82,8 @@
                 "The library, a video and an explorable supplement are public, so it can be tried today.",
                 "No user study or benchmark is reported, so the productivity claims rest on demos."
             ],
+            "terms": [
+            ],
             "title": "Declarative Dragging",
             "topic": "Other",
             "url": "https://declarative-dragging.github.io/",
@@ -104,6 +110,15 @@
                 "LLM prompt injection is now a taint category for static analysis.",
                 "Dead-code detection by reachability from entry points catches unused cycles."
             ],
+            "terms": [
+                {
+                    "id": "CWE-1427",
+                    "kind": "weakness",
+                    "name": "Prompt injection",
+                    "text": "The product uses externally-provided data to build prompts provided to large language models (LLMs), but the way these prompts are constructed causes the LLM to fail to distinguish between user-supplied inputs and developer provided system directives.",
+                    "url": "https://cwe.mitre.org/data/definitions/1427.html"
+                }
+            ],
             "title": "Psalm 7 release: PHP security and static analysis",
             "topic": "Other",
             "url": "https://psalm.dev/articles/psalm-7",
@@ -129,6 +144,8 @@
                 "Validate what is being measured before comparing numbers.",
                 "Statistics cannot rescue bad data, and high variance should prompt a search for the cause.",
                 "Spending more effort up front can prevent costly decisions based on bad results."
+            ],
+            "terms": [
             ],
             "title": "Active Benchmarking",
             "topic": "Other",

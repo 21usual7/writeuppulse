@@ -52,6 +52,29 @@
                 "A cooperative vendor response (fast acknowledgment, an embargo request, credit) is worth noting; a working security.txt helps researchers reach the right people.",
                 "Cheaper AI-assisted research increases report volume, which strains maintainers."
             ],
+            "terms": [
+                {
+                    "id": "CAPEC-188",
+                    "kind": "pattern",
+                    "name": "Reverse Engineering",
+                    "text": "An adversary discovers the structure, function, and composition of an object, resource, or system by using a variety of analysis techniques to effectively determine how the analyzed entity was constructed or operates. The goal of reverse engineering is often to duplicate the function, or a part of the function, of an object in order to duplicate or \"back engineer\" some aspect of its functioning.",
+                    "url": "https://capec.mitre.org/data/definitions/188.html"
+                },
+                {
+                    "id": "CWE-119",
+                    "kind": "weakness",
+                    "name": "Buffer Overflow",
+                    "text": "The product performs operations on a memory buffer, but it reads from or writes to a memory location outside the buffer's intended boundary.",
+                    "url": "https://cwe.mitre.org/data/definitions/119.html"
+                },
+                {
+                    "id": "CWE-122",
+                    "kind": "weakness",
+                    "name": "Heap-based Buffer Overflow",
+                    "text": "The product writes past the end of a buffer that was allocated on the heap.",
+                    "url": "https://cwe.mitre.org/data/definitions/122.html"
+                }
+            ],
             "title": "Never Gonna Print You Up",
             "topic": "Security",
             "url": "https://dixken.de/blog/never-gonna-print-you-up",
@@ -102,6 +125,8 @@
                 "Building in small stages and adding features from real-use feedback worked well.",
                 "A server that pushes new code to clients makes iterating on many devices much faster."
             ],
+            "terms": [
+            ],
             "title": "Locating the source of a mysterious beep",
             "topic": "AI / ML",
             "url": "https://simonwillison.net/2026/Nov/9/mysterious-beeps/",
@@ -150,6 +175,8 @@
                 "Spilled values need reserved scratch registers for loads and stores.",
                 "One IR with shared liveness can serve both an interpreter VM and a JIT.",
                 "Resolving moves along block edges is a separate, harder step than computing intervals."
+            ],
+            "terms": [
             ],
             "title": "An ode to livelyness analysis; SSA to registers",
             "topic": "Other",
@@ -201,6 +228,8 @@
                 "Branchless tricks can hurt when data is predictable.",
                 "Non-trivially-copyable types need different strategies."
             ],
+            "terms": [
+            ],
             "title": "A C++ Quicksort Faster Than std::sort",
             "topic": "Engineering",
             "url": "https://tiki.li/blog/about_blqsort",
@@ -250,6 +279,8 @@
                 "Always keep an independent backup of disk keys.",
                 "Integrating with init and early-boot systems is the hardest part to test automatically.",
                 "A threat model should say what it does not cover, such as a thief keeping the machine online."
+            ],
+            "terms": [
             ],
             "title": "Unattended reboots with encrypted disks",
             "topic": "Engineering",
