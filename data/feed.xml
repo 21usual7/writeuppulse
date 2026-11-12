@@ -3,7 +3,67 @@
     <title>WriteupPulse</title>
     <subtitle>Five technical writeups a day, security first, picked and summarized by an agent.</subtitle>
     <id>urn:writeuppulse:feed</id>
-    <updated>2026-11-11T09:32:58Z</updated>
+    <updated>2026-11-12T06:31:27Z</updated>
+    <entry>
+        <id>urn:writeuppulse:2026-11-12:1</id>
+        <title>Using voltage glitching to unleash the A100 in my mining card</title>
+        <updated>2026-11-12T06:31:27Z</updated>
+        <link href="https://blog.kate.land/posts/using-voltage-glitching-to-unlock-the-a100/"/>
+        <category term="Reverse"/>
+        <summary type="text">The author wanted to unlock the features NVIDIA disables on the GA100 die inside a CMP 170HX mining card: the full memory, all streaming multiprocessors, PCIe Gen4 and NVLink. Product segmentation is controlled by eFuses that a fuse controller reads at boot. Some are &quot;fuseless&quot; option records that gate floorswept hardware, and on production cards the controller normally refuses to program them.
+
+The author injected voltage faults during boot, using a microcontroller wired to the card's regulator control and sense lines, to push the fuse controller into a state where that protection was off. Different glitch patterns gave different failures. One corrupted nearly all option reads, one hit a single row-repair mechanism, and one cleared the control-derived options while leaving the key protection flag unset. In that last state new fuse records could be written to clear the disable masks.
+
+Most sampled cards then exposed the full 80 GB of memory and about 120–126 SMs, and FP16 throughput came out around 18% above a retail A100. PCIe Gen4 worked, and NVLink also needed a small board modification. One card had only 64 GB of working memory and gained nothing. The author disclosed to NVIDIA beforehand and notes that another researcher independently found the same flaw.</summary>
+    </entry>
+    <entry>
+        <id>urn:writeuppulse:2026-11-12:2</id>
+        <title>Critical RCE Vulnerability in Apache HTTP Server</title>
+        <updated>2026-11-12T06:31:27Z</updated>
+        <link href="https://www.wiz.io/blog/cve-2026-119618-rce-apache-http-server-vulnerability"/>
+        <category term="Web"/>
+        <summary type="text">Wiz describes CVE-2026-119618, a race condition in the header-assignment logic of Apache's mod_http2. Concurrent threads touch shared state without proper synchronization, which can corrupt heap memory. A remote, unauthenticated attacker could potentially reach code execution with the privileges of the web server process. The flaw was reportedly found independently by Anthropic and Google Cloud's Vulnerability Research Team.
+
+Affected are Apache HTTP Server 2.4.55 through 2.4.70, fixed in 2.4.71, as well as the standalone mod_h2 build. Only deployments that serve HTTP/2 (h2 or h2c) are exposed. Wiz's data suggests about 64% of cloud environments hold vulnerable resources and about 51% have publicly exposed instances, without accounting for configuration. At publication no public exploit or in-the-wild exploitation was known.
+
+The fix is to upgrade, or, where that is not possible, to restrict the server to HTTP/1.1 so the vulnerable module is never reached. Note that the page is inconsistent in places: the standalone mod_h2 patched version differs between the table and the text, and a heading shows a different CVE number, so check the upstream Apache advisory before acting.</summary>
+    </entry>
+    <entry>
+        <id>urn:writeuppulse:2026-11-12:3</id>
+        <title>Lock Your GitHub Actions</title>
+        <updated>2026-11-12T06:31:27Z</updated>
+        <link href="https://hugovk.dev/blog/2026/lock-github-actions/"/>
+        <category term="Blue Team"/>
+        <summary type="text">The post starts from the problem that GitHub Actions are fetched from Git, so a tag such as a version number can be moved to point at malicious code. The tj-actions/changed-files attack is the cited example. Pinning to a full commit SHA helps but makes workflows unreadable and hard to update.
+
+The author's answer is GitHub's new workflow lockfile support. Workflows keep readable version tags, and a separate lockfile records the exact commit SHA and repository ID for each action. A GitHub CLI extension generates and verifies it. Renovate and Dependabot can update the lockfile, ideally with dependency cooldowns so brand-new releases are not adopted at once.
+
+The author also runs a CI job that fails if the lockfile drifts from the workflows or a pinned action no longer verifies, and uses the zizmor linter for Actions security. A leftover chore is keeping the verification tool's own version current.</summary>
+    </entry>
+    <entry>
+        <id>urn:writeuppulse:2026-11-12:4</id>
+        <title>How I accidentally became a millionaire</title>
+        <updated>2026-11-12T06:31:27Z</updated>
+        <link href="https://lyra.horse/blog/2026/11/disinformation-machine/"/>
+        <category term="Other"/>
+        <summary type="text">The author, a Chrome security researcher, had a 2022 Background Fetch bug fixed in 2026 with a $1,000 bounty. Due to a mix-up in Google's bug tracker they were made a verifier on the issue, which gave them edit access to the reward field. On November 7, 2026 they changed it to $1,333,337 and posted a screenshot as a joke, later clarifying that nothing was awarded.
+
+The joke spread. A Community Notes note generated by an AI contributor wrongly described the screenshot, an automated AI news podcast site reported the figure as fact, and Google's AI Overview then called the author a millionaire. Other assistants reportedly repeated it too.
+
+Google removed the edit access, restored the $1,000 value and added a correction. The author argues the chain shows how easily a single unverified post can be laundered into authoritative-looking answers, which could be done deliberately.</summary>
+    </entry>
+    <entry>
+        <id>urn:writeuppulse:2026-11-12:5</id>
+        <title>A false smoke alarm almost drowned Jane Street's only NYC datacenter</title>
+        <updated>2026-11-12T06:31:27Z</updated>
+        <link href="https://michael.bacarella.com/2026/11/10/false-smoke-alarm-jane-street-datacenter/"/>
+        <category term="Postmortems"/>
+        <summary type="text">Contractors cutting materials next to Jane Street's only New York datacenter raised dust that triggered a smoke alarm. That alarm was wired to shut off the room's cooling to avoid feeding a fire, and the sprinkler pipes were pressurized, so rising heat could release water over the equipment.
+
+The author was called by the Hong Kong office, ran in, and manually pulled power from devices row by row while the room heated. Temperature peaked at about 143.6°F, below the roughly 150°F level where sprinklers could cause serious damage, then levelled off. Systems were back the next day and markets were closed, so impact was small.
+
+The postmortem was blameless and practical: keep the sprinklers, tighten procedures and surveillance. Hong Kong had noticed only by chance, as individual servers had no alerts on moderate heat. The author then built a monitor reading each Linux server's onboard temperature sensor and alerting on an elevated fleet average.</summary>
+    </entry>
     <entry>
         <id>urn:writeuppulse:2026-11-11:1</id>
         <title>Hacking the Meta Ray-Ban smartglasses</title>

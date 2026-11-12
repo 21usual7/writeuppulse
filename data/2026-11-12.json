@@ -1,0 +1,298 @@
+{
+    "date": "2026-11-12",
+    "generatedAt": "2026-11-12T08:31:27",
+    "items": [
+        {
+            "category": "Reverse",
+            "level": "Senior",
+            "popularity": "Hacker News · 287 points; lobste.rs · 42",
+            "practice": [
+                "Read an introductory text on fault injection and write down, in your own words, the difference between voltage, clock and electromagnetic glitching.",
+                "Study how eFuses and one-time-programmable memory work in a datasheet or open-source SoC documentation, and sketch a boot flow showing where a protection check could be skipped.",
+                "On a development board you own, such as a training target built for glitching, read the vendor's documentation on brown-out detection and list which countermeasures would hinder fault injection.",
+                "Take a CTF hardware challenge category and practice reading a power trace to identify the point in boot where a check occurs.",
+                "Write a short design review of a hypothetical fuse scheme, listing how you would make it resistant to faults (redundancy, checks repeated, restricting-only semantics)."
+            ],
+            "questions": [
+                {
+                    "answer": "eFuses, including option-record style fuses, read by a fuse controller at boot decide what hardware is disabled.",
+                    "question": "What controls which features are enabled on the GA100 in the mining card?"
+                },
+                {
+                    "answer": "A well-timed voltage fault put the fuse controller in a state where its protection against programming fuses was not set, so new records could be written.",
+                    "question": "Why did glitching help?"
+                },
+                {
+                    "answer": "Blowing a fuse should only tighten restrictions, but here fuse records could relax them.",
+                    "question": "What design principle does the author say was violated?"
+                },
+                {
+                    "answer": "Unlocking only exposes existing hardware, and one card only had 64 GB of working memory.",
+                    "question": "Why did some cards gain nothing?"
+                },
+                {
+                    "answer": "NVLink, which also needed a small hardware modification to the PCB.",
+                    "question": "Which feature needed more than a fuse change?"
+                }
+            ],
+            "source": "blog.kate.land",
+            "summary": "The author wanted to unlock the features NVIDIA disables on the GA100 die inside a CMP 170HX mining card: the full memory, all streaming multiprocessors, PCIe Gen4 and NVLink. Product segmentation is controlled by eFuses that a fuse controller reads at boot. Some are \"fuseless\" option records that gate floorswept hardware, and on production cards the controller normally refuses to program them.\n\nThe author injected voltage faults during boot, using a microcontroller wired to the card's regulator control and sense lines, to push the fuse controller into a state where that protection was off. Different glitch patterns gave different failures. One corrupted nearly all option reads, one hit a single row-repair mechanism, and one cleared the control-derived options while leaving the key protection flag unset. In that last state new fuse records could be written to clear the disable masks.\n\nMost sampled cards then exposed the full 80 GB of memory and about 120–126 SMs, and FP16 throughput came out around 18% above a retail A100. PCIe Gen4 worked, and NVLink also needed a small board modification. One card had only 64 GB of working memory and gained nothing. The author disclosed to NVIDIA beforehand and notes that another researcher independently found the same flaw.",
+            "tags": [
+                "hardware",
+                "fault-injection",
+                "GPU"
+            ],
+            "takeaways": [
+                "Product segmentation on GPUs is enforced by eFuses read by a fuse controller at boot.",
+                "Voltage fault injection can disturb a boot-time controller so it skips or mis-evaluates a protection check.",
+                "A good fuse design should only ever make a chip more restricted when a fuse is blown, never less.",
+                "Record-based (\"fuseless\") option encoding can be overwritten if the programming gate fails.",
+                "Different glitch parameters produce distinct failure signatures, and learning to read them guides tuning.",
+                "Using the card's own voltage regulator as the glitch source keeps the hardware setup small.",
+                "Results varied per card, since one board had damaged memory that no unlock could fix.",
+                "Responsible disclosure before publication is normal even for hobbyist hardware research."
+            ],
+            "terms": [
+            ],
+            "title": "Using voltage glitching to unleash the A100 in my mining card",
+            "topic": "Security",
+            "url": "https://blog.kate.land/posts/using-voltage-glitching-to-unlock-the-a100/",
+            "why": "A rare hands-on hardware attack writeup that shows how fault injection can defeat fuse-based product segmentation on a modern GPU."
+        },
+        {
+            "category": "Web",
+            "level": "Middle",
+            "popularity": "Hacker News · 90 points",
+            "practice": [
+                "In your own lab, check which Apache version and protocols a test server advertises, and write a plan for confirming whether HTTP/2 is on.",
+                "Read the HTTP/2 specification sections on streams and header frames and explain why per-stream concurrency raises synchronization risks.",
+                "Study a published write-up of a different race-condition memory bug and note how the race window is typically described.",
+                "Draft an internal patch-or-mitigate decision record for this CVE using only version and protocol facts.",
+                "Compare the Apache official advisory with this vendor page and list every discrepancy you find."
+            ],
+            "questions": [
+                {
+                    "answer": "A race condition in header assignment in mod_http2 where threads use shared resources without synchronization, corrupting heap memory.",
+                    "question": "What is the root cause?"
+                },
+                {
+                    "answer": "Apache 2.4.55 to 2.4.70 with HTTP/2 (h2 or h2c) enabled.",
+                    "question": "Which deployments are exposed?"
+                },
+                {
+                    "answer": "Restrict protocols to HTTP/1.1 so HTTP/2 is disabled.",
+                    "question": "What is the workaround if you cannot patch?"
+                },
+                {
+                    "answer": "It contains inconsistent patched version numbers for standalone mod_h2 and a mismatched CVE ID in a heading.",
+                    "question": "Why should you double-check this advisory?"
+                },
+                {
+                    "answer": "At publication, no public exploit and no in-the-wild exploitation were reported.",
+                    "question": "Was it being exploited?"
+                }
+            ],
+            "source": "wiz.io",
+            "summary": "Wiz describes CVE-2026-119618, a race condition in the header-assignment logic of Apache's mod_http2. Concurrent threads touch shared state without proper synchronization, which can corrupt heap memory. A remote, unauthenticated attacker could potentially reach code execution with the privileges of the web server process. The flaw was reportedly found independently by Anthropic and Google Cloud's Vulnerability Research Team.\n\nAffected are Apache HTTP Server 2.4.55 through 2.4.70, fixed in 2.4.71, as well as the standalone mod_h2 build. Only deployments that serve HTTP/2 (h2 or h2c) are exposed. Wiz's data suggests about 64% of cloud environments hold vulnerable resources and about 51% have publicly exposed instances, without accounting for configuration. At publication no public exploit or in-the-wild exploitation was known.\n\nThe fix is to upgrade, or, where that is not possible, to restrict the server to HTTP/1.1 so the vulnerable module is never reached. Note that the page is inconsistent in places: the standalone mod_h2 patched version differs between the table and the text, and a heading shows a different CVE number, so check the upstream Apache advisory before acting.",
+            "tags": [
+                "apache",
+                "http2",
+                "CVE"
+            ],
+            "takeaways": [
+                "The bug is a race condition in mod_http2, so it needs concurrent requests rather than a single malformed one.",
+                "Heap corruption from unsynchronized shared state can turn a concurrency flaw into code execution.",
+                "Only HTTP/2-enabled servers are affected, so protocol configuration defines exposure.",
+                "Upgrading to 2.4.71 or later is the fix for the main server.",
+                "Disabling HTTP/2 is a valid stopgap when patching must wait.",
+                "Exposure statistics from a cloud vendor ignore configuration, so they overstate real risk.",
+                "Vendor advisories can contain typos in version numbers or IDs, so verify against upstream.",
+                "Independent discovery by two teams is a hint that attackers may find it too."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-362",
+                    "kind": "weakness",
+                    "name": "Race Condition",
+                    "text": "The product contains a concurrent code sequence that requires temporary, exclusive access to a shared resource, but a timing window exists in which the shared resource can be modified by another code sequence operating concurrently.",
+                    "url": "https://cwe.mitre.org/data/definitions/362.html"
+                }
+            ],
+            "title": "Critical RCE Vulnerability in Apache HTTP Server",
+            "topic": "Security",
+            "url": "https://www.wiz.io/blog/cve-2026-119618-rce-apache-http-server-vulnerability",
+            "why": "A fresh advisory on a remote code execution race condition in one of the most widely deployed web servers, with clear exposure data and a no-patch mitigation."
+        },
+        {
+            "category": "Blue Team",
+            "level": "Junior",
+            "popularity": "Hacker News · 198 points; lobste.rs · 17",
+            "practice": [
+                "In a personal test repository, list every action your workflows use and note whether each is referenced by tag, branch or SHA.",
+                "Read the writeup on the tj-actions/changed-files incident and describe in prose how a moved tag spread.",
+                "Run a workflow linter on your own test repo and triage each finding by severity.",
+                "Configure an automated dependency updater on a scratch repository and observe how it proposes lockfile changes.",
+                "Write a short policy for your team on when to accept new action releases."
+            ],
+            "questions": [
+                {
+                    "answer": "Tags can be moved to a different commit, so the same reference may later run malicious code.",
+                    "question": "Why are version tags risky for actions?"
+                },
+                {
+                    "answer": "The exact commit SHA and repository ID for each referenced action.",
+                    "question": "What does the lockfile store?"
+                },
+                {
+                    "answer": "It delays adopting new releases so compromised versions are likely discovered first.",
+                    "question": "What is a dependency cooldown for?"
+                },
+                {
+                    "answer": "That the lockfile matches the workflows and that pinned actions still verify upstream.",
+                    "question": "What should CI verify?"
+                },
+                {
+                    "answer": "It lints GitHub Actions workflows for security problems.",
+                    "question": "What does zizmor do?"
+                }
+            ],
+            "source": "hugovk.dev",
+            "summary": "The post starts from the problem that GitHub Actions are fetched from Git, so a tag such as a version number can be moved to point at malicious code. The tj-actions/changed-files attack is the cited example. Pinning to a full commit SHA helps but makes workflows unreadable and hard to update.\n\nThe author's answer is GitHub's new workflow lockfile support. Workflows keep readable version tags, and a separate lockfile records the exact commit SHA and repository ID for each action. A GitHub CLI extension generates and verifies it. Renovate and Dependabot can update the lockfile, ideally with dependency cooldowns so brand-new releases are not adopted at once.\n\nThe author also runs a CI job that fails if the lockfile drifts from the workflows or a pinned action no longer verifies, and uses the zizmor linter for Actions security. A leftover chore is keeping the verification tool's own version current.",
+            "tags": [
+                "supply-chain",
+                "github-actions",
+                "ci"
+            ],
+            "takeaways": [
+                "Mutable tags on actions are a supply-chain risk because they can be repointed.",
+                "Commit SHA pinning is safe but hard to read and maintain.",
+                "A lockfile gives readable tags in workflows and verified SHAs stored separately.",
+                "Renovate and Dependabot can keep lockfiles current automatically.",
+                "Dependency cooldowns avoid adopting freshly released, possibly compromised versions.",
+                "A CI check should fail when the lockfile and workflows disagree.",
+                "zizmor is a security linter that finds risky Actions patterns.",
+                "The verification tooling itself must be pinned and updated."
+            ],
+            "terms": [
+            ],
+            "title": "Lock Your GitHub Actions",
+            "topic": "Security",
+            "url": "https://hugovk.dev/blog/2026/lock-github-actions/",
+            "why": "A short, practical guide to a supply-chain defense that any beginner maintaining a repository can follow today."
+        },
+        {
+            "category": "Other",
+            "level": "Junior",
+            "popularity": "lobste.rs · 70",
+            "practice": [
+                "Pick a recent viral claim and trace it to its earliest source, writing down each hop.",
+                "Review a bug tracker or ticketing tool you administer and list who can edit sensitive fields.",
+                "Ask an AI assistant about an obscure claim and compare its sources with primary ones.",
+                "Write a short threat model for how a false story could be pushed into AI summaries.",
+                "Read your own organization's rules about role assignment and access review."
+            ],
+            "questions": [
+                {
+                    "answer": "A mix-up in the bug tracker made them a verifier, which gave edit access to the reward field.",
+                    "question": "How did the author gain the ability to edit the bounty?"
+                },
+                {
+                    "answer": "A viral tweet was summarized by an AI news site and then repeated by Google's AI Overview.",
+                    "question": "How did the claim reach search results?"
+                },
+                {
+                    "answer": "An AI-generated note was inaccurate and was later removed.",
+                    "question": "What went wrong with Community Notes?"
+                },
+                {
+                    "answer": "It removed the edit access, reverted the bounty to $1,000 and added a correction.",
+                    "question": "What did Google do?"
+                },
+                {
+                    "answer": "Check AI answers against primary sources, especially when a claim rests on one post.",
+                    "question": "What is the main lesson?"
+                }
+            ],
+            "source": "lyra.horse",
+            "summary": "The author, a Chrome security researcher, had a 2022 Background Fetch bug fixed in 2026 with a $1,000 bounty. Due to a mix-up in Google's bug tracker they were made a verifier on the issue, which gave them edit access to the reward field. On November 7, 2026 they changed it to $1,333,337 and posted a screenshot as a joke, later clarifying that nothing was awarded.\n\nThe joke spread. A Community Notes note generated by an AI contributor wrongly described the screenshot, an automated AI news podcast site reported the figure as fact, and Google's AI Overview then called the author a millionaire. Other assistants reportedly repeated it too.\n\nGoogle removed the edit access, restored the $1,000 value and added a correction. The author argues the chain shows how easily a single unverified post can be laundered into authoritative-looking answers, which could be done deliberately.",
+            "tags": [
+                "disinformation",
+                "AI",
+                "bug-bounty"
+            ],
+            "takeaways": [
+                "A permissions mistake in an internal tracker exposed a field that should have been read-only.",
+                "One social post can be amplified by automated news sites into an apparent fact.",
+                "AI search summaries can present unverified claims with confidence.",
+                "Crowd fact-checking can be wrong or removed.",
+                "Engagement manipulation can make a claim look credible.",
+                "Correcting a false claim after it spreads is slow and incomplete.",
+                "Always trace claims back to a primary source.",
+                "The incident was harmless but the technique could be repeated maliciously."
+            ],
+            "terms": [
+            ],
+            "title": "How I accidentally became a millionaire",
+            "topic": "Other",
+            "url": "https://lyra.horse/blog/2026/11/disinformation-machine/",
+            "why": "A funny but sobering case study of how a bug-tracker permissions mistake and a joke became an AI-repeated \"fact\"."
+        },
+        {
+            "category": "Postmortems",
+            "level": "Middle",
+            "popularity": "Hacker News · 457 points; lobste.rs · 51",
+            "practice": [
+                "List the failure chain from a recent incident in your own environment and mark each coupling between systems.",
+                "Design a fleet-wide alert for a lab cluster you own that uses an aggregate rather than single thresholds.",
+                "Write a blameless postmortem for a small outage you caused or witnessed.",
+                "Review which of your services would shut down because of a safety or protective interlock.",
+                "Practice a power-down runbook on a home lab and time it."
+            ],
+            "questions": [
+                {
+                    "answer": "Construction dust set off a smoke alarm with no fire.",
+                    "question": "What triggered the incident?"
+                },
+                {
+                    "answer": "The alarm cut cooling and the pressurized sprinklers could spray once heat rose.",
+                    "question": "Why was it dangerous?"
+                },
+                {
+                    "answer": "The author manually removed power from devices row by row.",
+                    "question": "How was it contained?"
+                },
+                {
+                    "answer": "Individual servers had no alert on modest heat, so only an observant person noticed.",
+                    "question": "Why wasn't it caught earlier?"
+                },
+                {
+                    "answer": "A per-minute fleet average of server temperature sensors with alerts to the systems team.",
+                    "question": "What monitoring was added?"
+                }
+            ],
+            "source": "michael.bacarella.com",
+            "summary": "Contractors cutting materials next to Jane Street's only New York datacenter raised dust that triggered a smoke alarm. That alarm was wired to shut off the room's cooling to avoid feeding a fire, and the sprinkler pipes were pressurized, so rising heat could release water over the equipment.\n\nThe author was called by the Hong Kong office, ran in, and manually pulled power from devices row by row while the room heated. Temperature peaked at about 143.6°F, below the roughly 150°F level where sprinklers could cause serious damage, then levelled off. Systems were back the next day and markets were closed, so impact was small.\n\nThe postmortem was blameless and practical: keep the sprinklers, tighten procedures and surveillance. Hong Kong had noticed only by chance, as individual servers had no alerts on moderate heat. The author then built a monitor reading each Linux server's onboard temperature sensor and alerting on an elevated fleet average.",
+            "tags": [
+                "postmortem",
+                "datacenter",
+                "monitoring"
+            ],
+            "takeaways": [
+                "A safety system can cause a failure when coupled to another system.",
+                "Cutting cooling on a false smoke alarm can create more danger than the smoke.",
+                "Manual power-off is a valuable last resort.",
+                "Single-server thresholds miss broad, modest temperature rises.",
+                "Fleet-average monitoring reveals shared cooling failures.",
+                "Server sensors can be more reliable than room or cooling telemetry.",
+                "Detection was accidental, which is a sign of weak monitoring.",
+                "Blameless reviews focus on fixing the process."
+            ],
+            "terms": [
+            ],
+            "title": "A false smoke alarm almost drowned Jane Street's only NYC datacenter",
+            "topic": "Engineering",
+            "url": "https://michael.bacarella.com/2026/11/10/false-smoke-alarm-jane-street-datacenter/",
+            "why": "A vivid incident postmortem about a physical failure chain where a safety system nearly destroyed the thing it protects."
+        }
+    ]
+}
