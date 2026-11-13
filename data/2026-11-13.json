@@ -1,0 +1,340 @@
+{
+    "date": "2026-11-13",
+    "generatedAt": "2026-11-13T09:52:27",
+    "items": [
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "Hacker News · 174 points",
+            "practice": [
+                "Read the PostgreSQL documentation on composite types and prepared statements and write down where cached values might outlive a schema change.",
+                "In a throwaway local database you own, observe how prepared statements behave after schema changes, without trying to crash anything.",
+                "Study an introductory resource on type confusion in a memory-unsafe language and list the conditions that make it exploitable.",
+                "Write a short threat model for a shared database where users can alter types, listing which privileges should be withheld.",
+                "Compare the upstream fix notes with the article and explain in your own words why versioning is a root-cause fix."
+            ],
+            "questions": [
+                {
+                    "answer": "A composite type is altered after a prepared statement has built a value of it, and the stored bytes are not rewritten, so they are later read under the new layout.",
+                    "question": "What is the core condition that creates the type confusion?"
+                },
+                {
+                    "answer": "Reaching the crash needs only a normal login role, so the bug is exposed on shared or managed instances where users are not fully trusted.",
+                    "question": "Why is a low-privileged role relevant?"
+                },
+                {
+                    "answer": "A related array type confusion exposes pointer bits as an ordinary integer, helping defeat address randomization before a control-flow hijack.",
+                    "question": "What role does the information leak play?"
+                },
+                {
+                    "answer": "It adds versioning of composite attributes so values are tied to the layout they were created under.",
+                    "question": "How does the upstream fix address the root cause?"
+                },
+                {
+                    "answer": "Apply the security releases promptly and restrict who can create or alter types in shared databases.",
+                    "question": "What practical defenses does a database operator have?"
+                }
+            ],
+            "source": "mehmetince.net",
+            "summary": "The author describes a type-confusion flaw in PostgreSQL core. A composite type's row layout can be altered after a prepared statement has already built a value of that type. The stored bytes are not rewritten, so the old bytes are later read under the new type. For example, bytes stored as one fixed-size type get interpreted as a variable-length header and pointer. The mutable row-type behavior dates to 2004, and the expanded-object callbacks it depends on to 2015.\n\nThe crash is easy to trigger from a low-privileged login role. The author argues that a reliable path to code execution exists. At a high level, controlled bytes steer native function dispatch, and a related array type confusion leaks an address to defeat address randomization.\n\nThe upstream fix, CVE-2026-6460, adds versioning of composite attributes, so existing values are tied to the layout they were built under. Several related CVEs cover anonymous record descriptors, type modifiers, statistics import and a tuple-size overflow. Several researchers reported overlapping variants, which suggests a systemic weakness.",
+            "tags": [
+                "PostgreSQL",
+                "type confusion",
+                "memory safety"
+            ],
+            "takeaways": [
+                "Type confusion happens when bytes built under one type are later read under another.",
+                "Schema changes can invalidate assumptions held by prepared or cached values.",
+                "A bug in a decades-old design can stay hidden until a later feature (here, expanded-object callbacks) makes it exploitable.",
+                "A crash primitive that a low-privileged role can reach is often a starting point for deeper control.",
+                "Trusted native callbacks fed with attacker-influenced data are a classic path to control-flow hijack.",
+                "An information leak from a type mismatch can defeat address randomization.",
+                "Managed Postgres-compatible services inherit core bugs, so patch timing is shared between provider and customer.",
+                "Several overlapping reports indicate a class of bug; the fix tackles the root cause (versioning) rather than one path."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-119",
+                    "kind": "weakness",
+                    "name": "Buffer Overflow",
+                    "text": "The product performs operations on a memory buffer, but it reads from or writes to a memory location outside the buffer's intended boundary.",
+                    "url": "https://cwe.mitre.org/data/definitions/119.html"
+                },
+                {
+                    "id": "CWE-200",
+                    "kind": "weakness",
+                    "name": "Information Disclosure",
+                    "text": "The product exposes sensitive information to an actor that is not explicitly authorized to have access to that information.",
+                    "url": "https://cwe.mitre.org/data/definitions/200.html"
+                },
+                {
+                    "id": "CWE-843",
+                    "kind": "weakness",
+                    "name": "Type Confusion",
+                    "text": "The product allocates or initializes a resource such as a pointer, object, or variable using one type, but it later accesses that resource using a type that is incompatible with the original type.",
+                    "url": "https://cwe.mitre.org/data/definitions/843.html"
+                }
+            ],
+            "title": "Part 3/6 | How I Ended Up Turning a 22-Year-Old PostgreSQL Type-Confusion Primitive into RCE (CVE-2026-6460)",
+            "topic": "Security",
+            "url": "https://mehmetince.net/part-3-6-how-i-ended-up-turning-a-22-year-old-postgresql-type-confusion-primitive-into-rce-cve-2026-6460/",
+            "why": "A fresh, high-impact memory-safety bug in a database used everywhere, with a clear explanation of how an old design choice became exploitable."
+        },
+        {
+            "category": "Reverse",
+            "level": "Junior",
+            "popularity": "Lobsters · 42 points",
+            "practice": [
+                "On your own network, set up a DNS filter and watch which domains a smart device you own contacts.",
+                "Read about how TLS certificate validation and trust stores work, and list who can add anchors on your devices.",
+                "Using an intercepting proxy on your own laptop's browser traffic, inspect the structure of a few API responses.",
+                "Look up how a certificate authority revocation is propagated to vendors and write a short summary.",
+                "Document the network behavior of one of your own devices over a day and note anything surprising."
+            ],
+            "questions": [
+                {
+                    "answer": "The TV would not accept a user-added certificate, so interception and spoofing only worked with a CA already in its trust store.",
+                    "question": "Why did the author need a certificate authority the TV already trusted?"
+                },
+                {
+                    "answer": "Either an empty JSON object or a JSON description of an ad.",
+                    "question": "What did the ad endpoint return?"
+                },
+                {
+                    "answer": "Any device that still trusts that CA can be impersonated, so the damage spreads to every unpatched device.",
+                    "question": "Why does a leaked CA key matter beyond this TV?"
+                },
+                {
+                    "answer": "A firmware update that revokes the CA or the certificate expiring.",
+                    "question": "What would end the approach?"
+                },
+                {
+                    "answer": "So the TV would reach the spoofing server on the home network instead of the real ad domain.",
+                    "question": "Why did the author need DNS redirection?"
+                }
+            ],
+            "source": "dvratil.cz",
+            "summary": "The author's Samsung TV began showing ads in its Smart Hub after a home network change broke the DNS blocking that had kept them away. To understand the ad flow, they routed the TV's traffic through an intercepting proxy on a Raspberry Pi. The TV does not let users add a custom certificate, so the author relied on a leaked certificate authority key that the TV still trusted.\n\nTraffic analysis showed the TV contacts one ad domain on certain events and when returning to the home screen. It answers either with an empty JSON object or a description of an ad. The author built a small server mimicking that endpoint, returning a link to a family photo, and blocking other ad-network requests with empty replies. A wildcard certificate signed with the compromised CA made the TV accept it, and the router redirected the ad domain to the author's NAS.\n\nThe trick works only while the TV trusts that CA. A firmware update or CA expiry would end it.",
+            "tags": [
+                "TLS",
+                "traffic analysis",
+                "IoT"
+            ],
+            "takeaways": [
+                "Watching a device's traffic is a simple way to learn what it really does.",
+                "The ad protocol was small and predictable: few endpoints and a simple response shape.",
+                "Devices that block custom certificates are harder to inspect, which limits owners' control.",
+                "One compromised certificate authority can undermine trust on every device that still accepts it.",
+                "DNS-level blocking is fragile and can break when the network topology changes.",
+                "Updates trade patches against owner control; blocking them has its own risks.",
+                "The technique depends on a trust anchor that vendors can revoke at any time.",
+                "Doing this on hardware you own is a legitimate way to learn."
+            ],
+            "terms": [
+                {
+                    "id": "CAPEC-589",
+                    "kind": "pattern",
+                    "name": "DNS Blocking",
+                    "text": "An adversary intercepts traffic and intentionally drops DNS requests based on content in the request. In this way, the adversary can deny the availability of specific services or content to the user even if the IP address is changed.",
+                    "url": "https://capec.mitre.org/data/definitions/589.html"
+                },
+                {
+                    "id": "T1590.004",
+                    "kind": "technique",
+                    "name": "Network Topology",
+                    "text": "Adversaries may gather information about the victim's network topology that can be used during targeting. Information about network topologies may include a variety of details, including the physical and/or logical arrangement of both external-facing and internal network environments. This information may also include specifics regarding network devices (gateways, routers, etc.) and other infrastructure.",
+                    "url": "https://attack.mitre.org/techniques/T1590/004"
+                }
+            ],
+            "title": "Hijacking Samsung TV Smart Hub Ads",
+            "topic": "Security",
+            "url": "https://dvratil.cz/2026/11/hijacking-samsung-tv-smart-hub-ads/",
+            "why": "A beginner-friendly, hands-on look at inspecting what a smart device does on your network and why trust anchors matter."
+        },
+        {
+            "category": "Malware",
+            "level": "Middle",
+            "popularity": "Published Nov 4, 2026 by ESET Research; no vote count seen",
+            "practice": [
+                "Read about DLL side-loading and list the file and process signals a defender could alert on.",
+                "In a lab VM you own, review how a signed binary resolves libraries and which directories are searched.",
+                "Write a detection idea for signed binaries running from unexpected directories using your own endpoint logs.",
+                "Study the difference between hash checks and signature verification and explain why one fails here.",
+                "Review the IOCs in the ESET report and map them to the MITRE ATT&CK techniques they illustrate."
+            ],
+            "questions": [
+                {
+                    "answer": "The brand-promotion feature requested its configuration over unencrypted HTTP, so a DNS-controlling attacker could substitute the response.",
+                    "question": "What weakness made the delivery possible?"
+                },
+                {
+                    "answer": "The attacker supplied the expected values in the same malicious config, matching their own payloads.",
+                    "question": "Why did the integrity checks fail?"
+                },
+                {
+                    "answer": "A renamed signed Adobe binary placed in a component directory side-loaded the malicious DLL when the Sogou utility ran it.",
+                    "question": "How did the implant get executed?"
+                },
+                {
+                    "answer": "Version 16.10 moved the requests to HTTPS and added certificate pinning.",
+                    "question": "How did the vendor fix it?"
+                },
+                {
+                    "answer": "Where in the network path DNS resolution was manipulated.",
+                    "question": "What is unknown about the attack?"
+                }
+            ],
+            "source": "ESET Research (welivesecurity.com)",
+            "summary": "ESET describes SlippyNunchucks, a China-aligned actor active since at least 2023 that uses the DarkVigil toolset. In this campaign it abused Sogou Input Method, which periodically fetches a brand-promotion configuration over plain HTTP. With control of DNS resolution, the attacker pointed the request at a staging server. ESET could not determine where DNS was manipulated. Victims were in Hong Kong, Thailand, Japan, Vietnam, Sri Lanka and Oman from July 2026.\n\nThe malicious configuration told the software to download a legitimately signed Adobe binary renamed as a Sogou file, plus the implant as a DLL. The files were placed where Sogou's component utility would run them, so the signed binary side-loaded the DLL and persistence came from the existing workflow. The config also carried matching integrity values for the attacker's payloads, so the checks offered no protection.\n\nDarkVigil is a modular .NET toolset with its own protocol that supports relaying traffic through the implant. Plugins are stored compressed in the registry and loaded in memory. ESET reported the issue to Tencent, which shipped version 16.10 with HTTPS and certificate pinning (CVE-2026-120422).",
+            "tags": [
+                "APT",
+                "DLL side-loading",
+                "supply chain"
+            ],
+            "takeaways": [
+                "Software that fetches config or code over plain HTTP can be hijacked by anyone controlling DNS.",
+                "Integrity values delivered with the payload prove nothing if the attacker controls the response.",
+                "Abusing a legitimate update-like workflow gives persistence without a new mechanism.",
+                "Side-loading a malicious DLL into a signed binary hides activity behind a trusted name.",
+                "Plugins stored in the registry and loaded in memory leave few file traces.",
+                "Certificate pinning and HTTPS close this class of delivery attack.",
+                "Attribution is cautious: ESET found no overlap with a group that public reports had linked.",
+                "Defenders should watch for unexpected binaries in component directories and unusual registry keys."
+            ],
+            "terms": [
+            ],
+            "title": "SlippyNunchucks hijacks Sogou Input Method's brand promotion mechanism to distribute malware",
+            "topic": "Security",
+            "url": "https://www.welivesecurity.com/en/eset-research/slippynunchucks-hijacks-sogou-input-methods-brand-promotion-mechanism-to-distribute-malware/",
+            "why": "A clear end-to-end case of how unencrypted update-like traffic plus side-loading gave a state-aligned actor quiet persistence."
+        },
+        {
+            "category": "Blue Team",
+            "level": "Middle",
+            "popularity": "Published Nov 5, 2026; featured in Check Point's weekly report; no vote count seen",
+            "practice": [
+                "Audit one of your own web apps for secrets in client-side bundles and list how you would rotate them.",
+                "In an intentionally vulnerable lab, review how missing object-level authorization looks in logs.",
+                "Write a detection idea for bursts of automated requests that rotate source addresses, using your own test logs.",
+                "Read about IDOR and write a checklist for reviewing API routes in your own project.",
+                "Review your storage bucket permissions in a test account and confirm none allow public writes."
+            ],
+            "questions": [
+                {
+                    "answer": "An AI-powered penetration testing platform where LLM agents plan, run tools and log evidence under human supervision.",
+                    "question": "What is ARTEX?"
+                },
+                {
+                    "answer": "Ten misconfigured instances exposed full databases with models, prompts and agent actions.",
+                    "question": "How did researchers get insight into operators?"
+                },
+                {
+                    "answer": "No. Despite many findings, no funds moved, and some agents claimed success unsupported by wallet data.",
+                    "question": "Did the crypto campaign succeed?"
+                },
+                {
+                    "answer": "Web RCE, weak or hardcoded credentials, missing authentication, IDOR and template injection.",
+                    "question": "Which weaknesses did agents exploit most?"
+                },
+                {
+                    "answer": "Assume automated persistent attackers, remove hardcoded secrets, enforce object-level authorization and use behavioral detection.",
+                    "question": "What defensive shift does the report suggest?"
+                }
+            ],
+            "source": "Check Point Research",
+            "summary": "Check Point examines ARTEX, a Chinese open-source, AI-driven penetration testing platform. LLM agents plan tests, run tools and record evidence, with a human on a dashboard. After links to attacks on South Korean banks, the developer closed the source, but forks remain and criminals use them. Researchers counted 2,557 hosts that hosted panels, 1,608 publicly reachable. Ten misconfigured instances exposed databases showing models, prompts and agent steps.\n\nOperators barely interacted after setting a goal. Chinese models dominated. Goals were opportunistic and financial. One campaign recovered over 300 iOS signing certificates, three validated. A crypto-draining campaign hit hundreds of domains but moved no funds, and agents sometimes reported success the data did not support. A gaming campaign found an exposed credential file with over 190,000 credential sets, around 3.3% still valid.\n\nThe weaknesses exploited were ordinary: web RCE, weak or hardcoded credentials, missing authentication, IDOR and template injection. The lesson is to assume tireless automated probing and fix basics.",
+            "tags": [
+                "AI agents",
+                "threat intel",
+                "cybercrime"
+            ],
+            "takeaways": [
+                "Agentic attack tools lower the cost of broad, persistent probing.",
+                "The weaknesses found were basic: hardcoded secrets, missing auth, IDOR.",
+                "Secrets in client-side code are easy for agents to harvest.",
+                "Agents can overclaim success, so attacker results are noisy.",
+                "Exposed attacker panels give defenders unusual visibility into operations.",
+                "Residential proxies make IP blocking less useful; behavior-based detection matters.",
+                "Never leave credential files in web-accessible directories.",
+                "Restrict write access to storage buckets and watch for changes to distributed apps."
+            ],
+            "terms": [
+                {
+                    "id": "T1221",
+                    "kind": "technique",
+                    "name": "Template Injection",
+                    "text": "Adversaries may create or modify references in user document templates to conceal malicious code or force authentication attempts. For example, Microsoft’s Office Open XML (OOXML) specification defines an XML-based format for Office documents (.docx, xlsx, .pptx) to replace older binary formats (.doc, .xls, .ppt).",
+                    "url": "https://attack.mitre.org/techniques/T1221"
+                }
+            ],
+            "title": "Hacking on Autopilot: Inside ARTEX Cybercrime Campaigns",
+            "topic": "Security",
+            "url": "https://research.checkpoint.com/2026/hacking-on-autopilot-inside-artex-cybercrime-campaigns/",
+            "why": "Rare operator-side view of AI-driven attack campaigns, showing that the weaknesses they exploit are still the basics."
+        },
+        {
+            "category": "Malware",
+            "level": "Middle",
+            "popularity": "Published Nov 3, 2026; featured in Check Point's weekly report; GitHub repo with 250+ stars; no vote count seen",
+            "practice": [
+                "Inspect the global instruction files of an agent tool you use and note who or what can modify them.",
+                "Set up a periodic comparison of your agent config files and review any change after installing packages.",
+                "Write a policy for vetting third-party skills before installing them in a test environment.",
+                "Read about prompt injection and list where trusted and untrusted text mix in your agent workflow.",
+                "Draft a checklist for evaluating an LLM gateway service, covering data handling and logging."
+            ],
+            "questions": [
+                {
+                    "answer": "Persistent promotional text placed in an agent's trusted instruction files so that it changes behavior without any executable code.",
+                    "question": "What is prompt adware?"
+                },
+                {
+                    "answer": "On a misconfigured web server run by an actor who used Cobalt Strike and other tools.",
+                    "question": "How was the bundle discovered?"
+                },
+                {
+                    "answer": "Users and scanners cannot easily inspect what is installed into their agent configuration.",
+                    "question": "Why is the encrypted packaging a concern?"
+                },
+                {
+                    "answer": "Its model flagged the injected instructions as a prompt-injection attempt and did not follow them.",
+                    "question": "How did Claude Code behave in testing?"
+                },
+                {
+                    "answer": "They sit on the path of prompts and tool calls and could capture data, steal credentials or inject calls.",
+                    "question": "What risk do LLM gateways pose?"
+                }
+            ],
+            "source": "Check Point Research",
+            "summary": "Check Point analyzed Haiou, a Chinese-language jailbreak bundle for OpenAI Codex, version 4.5.0, found on a misconfigured server of an actor who also ran Cobalt Strike. They studied packaging, installer, prompt modules and skills, and behavior in live Codex and Claude Code sessions.\n\nThe prompts use role-play, refusal suppression and pretexting. The bundle installs security-related skills. Its prompt content ships in signed, encrypted archives, which makes inspection hard. Most notably it writes persistent advertising into global agent instruction files, so greetings trigger a promotion for a paid LLM gateway. The authors call this prompt adware: changing an agent's trusted instructions with natural language rather than code.\n\nThe Claude variant lacked the ad, and in testing Claude Code flagged the injected instructions as prompt injection. Check Point found no evidence the gateway is malicious, but notes gateways can capture data or inject tool calls.",
+            "tags": [
+                "prompt adware",
+                "AI agents",
+                "supply chain"
+            ],
+            "takeaways": [
+                "Agent instruction files and skills are a trust boundary.",
+                "Prompt adware modifies behavior through natural language, not executable code.",
+                "Encrypted prompt bundles cannot be audited by users.",
+                "Free tools may be an acquisition channel for paid services.",
+                "LLM gateways can see and potentially alter sensitive prompts and tool calls.",
+                "Diffing agent config files after installs can reveal injected text.",
+                "Some models detect injected instructions, but layered defenses are still needed.",
+                "Jailbreak and AI pentest tools now appear in real threat actor environments."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-1427",
+                    "kind": "weakness",
+                    "name": "Prompt injection",
+                    "text": "The product uses externally-provided data to build prompts provided to large language models (LLMs), but the way these prompts are constructed causes the LLM to fail to distinguish between user-supplied inputs and developer provided system directives.",
+                    "url": "https://cwe.mitre.org/data/definitions/1427.html"
+                }
+            ],
+            "title": "Free the Model, Sell the Gateway: Prompt Adware Hidden in Jailbreak Bundles",
+            "topic": "Security",
+            "url": "https://research.checkpoint.com/2026/free-the-model-sell-the-gateway-prompt-adware-hidden-in-jailbreak-bundles/",
+            "why": "Introduces prompt adware, a new class of threat where agent instruction files, not code, carry the payload."
+        }
+    ]
+}
