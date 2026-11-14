@@ -1,0 +1,309 @@
+{
+    "date": "2026-11-14",
+    "generatedAt": "2026-11-14T08:03:51",
+    "items": [
+        {
+            "category": "Reverse",
+            "level": "Junior",
+            "popularity": "Hacker News · 723 points",
+            "practice": [
+                "On a network and device you own, set up a lab access point and observe which hosts a smart gadget contacts and whether it uses encrypted connections.",
+                "Read the MQTT specification and write down how topics, quality of service and TLS are used in a typical device-to-broker exchange.",
+                "Capture Bluetooth traffic from a toy or beacon you own using a phone's developer logging, then identify the service and characteristic structure in a viewer.",
+                "Study how a mobile app trusts certificates, and list where a device could be bootstrapped with a trust anchor safely versus unsafely.",
+                "Install Home Assistant in a test setup and explore how local integrations differ from cloud-polling ones."
+            ],
+            "questions": [
+                {
+                    "answer": "The fan fetched its root certificate over unencrypted HTTP first, so he could serve his own certificate authority and the fan would trust his proxy.",
+                    "question": "Why could the author intercept the fan's TLS traffic without exploiting a certificate flaw?"
+                },
+                {
+                    "answer": "It supplied the MQTT broker address and device certificates, so altering it redirected the fan's messaging to the author's own server.",
+                    "question": "What did the provisioning API response control?"
+                },
+                {
+                    "answer": "The device sent its identity, the app sent a random key, an AES key was derived from that key and the MAC address, and the encrypted Wi-Fi and server configuration followed.",
+                    "question": "How was the Bluetooth setup protocol structured?"
+                },
+                {
+                    "answer": "The fan was told at setup time to talk to the author's infrastructure, so no ongoing man-in-the-middle was needed.",
+                    "question": "Why did setting server URLs during provisioning remove the need for runtime interception?"
+                },
+                {
+                    "answer": "A local Home Assistant integration that provisions the fan over Web Bluetooth and exposes it to Apple Home without the Coway cloud.",
+                    "question": "What was the main practical outcome?"
+                }
+            ],
+            "source": "scottjg.com (Scott J. Goldman)",
+            "summary": "The author wanted his Coway Airmega purifier to work locally in Apple Home without the vendor cloud. The existing community integration impersonated the phone app and polled Coway's servers, so it kept breaking whenever the company changed the app, banned accounts or altered pages.\n\nHe set up a man-in-the-middle Wi-Fi access point on a Raspberry Pi with a traffic-inspecting proxy. He found that the fan downloads a root certificate over plain HTTP before it makes any TLS connection. He could swap in his own certificate authority, so the fan trusted his proxy. The traffic showed that a provisioning API tells the fan which MQTT broker to use and which certificates to trust. By controlling that answer, he redirected the fan's MQTT traffic and mapped each message to an app action such as speed, timer or filter reset.\n\nThe first-time Bluetooth setup was analysed from Android HCI logs and the decompiled app, with an AI agent doing much of the matching. The fan reports its identity, receives a random key, derives an AES key from that key and its MAC address, and accepts an encrypted Wi-Fi and server configuration. Because that configuration includes server URLs and certificates, he could point the fan at his own infrastructure at setup time. The result is a local Home Assistant integration that provisions over Web Bluetooth, after which the fan talks directly to the local network. He estimates the AI cut days of manual protocol work to about 20 minutes.",
+            "tags": [
+                "IoT",
+                "MQTT",
+                "BLE"
+            ],
+            "takeaways": [
+                "Devices that fetch their trust anchor over plain HTTP undermine their own TLS, because anyone on the path can substitute a certificate.",
+                "A provisioning API that tells a device where to connect is a control point: whoever controls that response controls the device.",
+                "Mapping captured protocol messages to known user actions is an efficient way to learn a command set.",
+                "Bluetooth HCI logs plus a decompiled companion app reveal how pairing and key derivation work.",
+                "Deriving a key from public values such as a MAC address plus a nonce gives weak protection against a nearby observer.",
+                "Cloud-dependent integrations that mimic a phone app are fragile and can be broken by vendor changes or bans.",
+                "AI assistants can speed up protocol analysis, but the analyst still has to design the capture setup and verify the results."
+            ],
+            "terms": [
+                {
+                    "id": "CAPEC-188",
+                    "kind": "pattern",
+                    "name": "Reverse Engineering",
+                    "text": "An adversary discovers the structure, function, and composition of an object, resource, or system by using a variety of analysis techniques to effectively determine how the analyzed entity was constructed or operates. The goal of reverse engineering is often to duplicate the function, or a part of the function, of an object in order to duplicate or \"back engineer\" some aspect of its functioning.",
+                    "url": "https://capec.mitre.org/data/definitions/188.html"
+                },
+                {
+                    "id": "CAPEC-192",
+                    "kind": "pattern",
+                    "name": "Protocol Analysis",
+                    "text": "An adversary engages in activities to decipher and/or decode protocol information for a network or application communication protocol used for transmitting information between interconnected nodes or systems on a packet-switched data network. While this type of analysis involves the analysis of a networking protocol inherently, it does not require the presence of an actual or physical network.",
+                    "url": "https://capec.mitre.org/data/definitions/192.html"
+                }
+            ],
+            "title": "Reverse engineering my Coway air purifier to ditch the cloud",
+            "topic": "Security",
+            "url": "https://scottjg.com/posts/2026-11-11-reverse-engineering-my-coway-air-purifier-to-ditch-the-cloud/",
+            "why": "A friendly, end-to-end example of taking apart a consumer IoT device's cloud dependency, from traffic interception to Bluetooth provisioning."
+        },
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "Lobste.rs · 4 points (security tag)",
+            "practice": [
+                "Read the Linux and embedded documentation on stack canaries, position-independent executables and secure boot, and list which each protects against.",
+                "In a deliberately vulnerable training environment, study how an unbounded copy leads to a stack overflow and how canaries change the outcome.",
+                "Review your own network inventory for devices that might be reachable from outside, including those behind cellular modems.",
+                "Practise reading a firmware image of an open-source or training device you own in a disassembler, looking only for the use of risky string functions.",
+                "Draft a short exposure-reduction plan for a fictional building-control system, covering access paths, VPN and allowlist options."
+            ],
+            "questions": [
+                {
+                    "answer": "Six pre-authentication stack-based buffer overflows, mostly from unbounded string copying in reachable handlers.",
+                    "question": "What class of bug did the researchers find, and how many?"
+                },
+                {
+                    "answer": "Its own component, a separate web application firewall binary, contains a pre-authentication overflow that is also exploitable.",
+                    "question": "Why does the strict session-control mode not solve the problem?"
+                },
+                {
+                    "answer": "The vulnerable processes run as root, protections like canaries are absent, and secure boot seems unused, enabling persistence or bricking.",
+                    "question": "What makes successful exploitation especially damaging here?"
+                },
+                {
+                    "answer": "Inventory exposed controllers, then remove internet exposure using a VPN, private APN or tight IP allowlists.",
+                    "question": "What mitigations do the authors recommend instead of relying on patches?"
+                },
+                {
+                    "answer": "The certification of the development lifecycle says little about the real security of the shipped product.",
+                    "question": "Why do the authors criticise reliance on IEC 62443-4-1?"
+                }
+            ],
+            "source": "Midnight Blue",
+            "summary": "Midnight Blue describes six pre-authentication stack buffer overflows found in about an hour of manual review of firmware 5.3.2, the latest at the time, for the Danfoss AK-SM800A refrigeration controller. All versions up to and including 5.3.2 are affected. The post sits against a wave of attacks on internet-exposed Danfoss and Copeland refrigeration controllers since October that reportedly spoiled food and caused some fires.\n\nThe device runs a Yocto-based Linux on an i.MX6. It has an NGINX front end, CGI handlers and a large monolithic process that acts like an RTOS in userland. The root cause is unbounded string copying in externally reachable handlers, many reachable without authentication because older firmware checked authentication handler by handler. The binaries lack stack canaries and position-independent code, and the processes run as root. Even the newer strict session-control mode, which works as a web application firewall in a separate binary, has its own pre-authentication overflow.\n\nSecure boot features appear to be unused, so an attacker with code execution could plant a persistent implant that survives resets and updates, or push bad firmware to brick units. Disclosure with Danfoss is ongoing, so technical details and CVEs are withheld. The authors recommend removing internet exposure, using VPNs, private APNs or strict IP allowlists, and not relying on certifications such as IEC 62443-4-1 or on patches alone.",
+            "tags": [
+                "ICS",
+                "Memory safety",
+                "Embedded"
+            ],
+            "takeaways": [
+                "Unbounded string copies in network-reachable code remain a fast route to pre-authentication remote code execution.",
+                "Per-handler authentication checks tend to leave gaps; central enforcement is safer.",
+                "Missing stack canaries and position-independent code make exploitation of such bugs much easier.",
+                "A web application firewall component can itself be vulnerable, so it should not be the only barrier.",
+                "Unused secure boot allows persistence across factory resets and firmware updates, and enables bricking.",
+                "Reducing internet exposure matters more than waiting for patches on devices like these.",
+                "Cellular modems managed by integrators can hide exposed devices from asset inventories.",
+                "Process certifications do not prove that a product is secure."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-119",
+                    "kind": "weakness",
+                    "name": "Buffer Overflow",
+                    "text": "The product performs operations on a memory buffer, but it reads from or writes to a memory location outside the buffer's intended boundary.",
+                    "url": "https://cwe.mitre.org/data/definitions/119.html"
+                }
+            ],
+            "title": "Don't bother patching: multiple remote code execution vulnerabilities in Danfoss AK-SM800A",
+            "topic": "Security",
+            "url": "https://www.midnightblue.nl/blog/multiple-rce-danfoss-aksm800a",
+            "why": "A candid look at how quickly basic memory-safety flaws turn up in internet-exposed industrial controllers, and why patching alone is not a plan."
+        },
+        {
+            "category": "OSINT",
+            "level": "Middle",
+            "popularity": "Hacker News · 52 points (update post, 2026-11-14)",
+            "practice": [
+                "On your own phone, review which apps have location permission and whether your advertising ID is reset or limited, and note what changes.",
+                "Read the report's methodology section and outline how you would design a records-request campaign for a public procurement topic.",
+                "Using public procurement portals, practise finding contracts for a technology category and recording what the documents reveal.",
+                "Read a privacy policy of an app you use and trace where it says location data may be shared with third parties.",
+                "Write a short threat model of what a pattern-of-life analysis of your own device location data could reveal."
+            ],
+            "questions": [
+                {
+                    "answer": "Tracking code embedded in apps, and data broadcast in real-time bidding ad auctions, both usually passed on through brokers.",
+                    "question": "What are the two main ways ad data feeds a tool like Webloc?"
+                },
+                {
+                    "answer": "They tie location and profile records to a specific device and thus its user, so the data is not truly anonymous.",
+                    "question": "Why are advertising IDs a privacy problem?"
+                },
+                {
+                    "answer": "Desk research of contracts and filings, 96 freedom-of-information requests, journalist-supplied documents, and DNS, IP and URL telemetry.",
+                    "question": "Which research methods did the authors use?"
+                },
+                {
+                    "answer": "Webloc's current data sources, and some of Penlink's claims about consent and which products still exist.",
+                    "question": "What could the authors not confirm?"
+                },
+                {
+                    "answer": "New confirmed or reported customers, including Austria's interior ministry and agencies named by Bloomberg.",
+                    "question": "What does the update add?"
+                }
+            ],
+            "source": "Citizen Lab (Wolfie Christl et al.)",
+            "summary": "Citizen Lab's report examines Webloc, an ad-based geolocation tool from Cobwebs Technologies, now sold by Penlink. The team used open sources, procurement records, corporate filings and 96 freedom-of-information requests across Europe, plus browser, DNS and IP telemetry to map related servers. The main source on capabilities was a leaked 2021 technical proposal. The new update, tied to a Bloomberg investigation, adds more customers, including Austria's interior ministry, and reported buyers in several other countries.\n\nThe mechanism is described clearly. Location and profile data come from tracking code embedded in apps or from real-time bidding auctions, then flow through brokers. Mobile advertising IDs tie records to a device. Analysts can search areas, find devices seen in several places, view home and work patterns, and reportedly look back up to three years. The authors note IP and Wi-Fi inference as fallbacks when GPS is missing.\n\nFindings include use by Hungarian intelligence, El Salvador's police, US federal agencies and many US state and local bodies. The report raises legal doubts under European data protection law and civil-liberties concerns such as warrantless use and protest monitoring. Penlink disputes the findings and says some described products no longer exist. The authors say they could not verify the current data sources.",
+            "tags": [
+                "Surveillance",
+                "Adtech",
+                "Privacy"
+            ],
+            "takeaways": [
+                "Advertising data reaches surveillance buyers through app tracking code and real-time bidding auctions.",
+                "Mobile advertising IDs are not anonymous in practice, because they link location records to one person's device.",
+                "Home and work locations, and travel patterns, can be inferred from repeated device positions.",
+                "Public records, freedom-of-information requests and procurement documents can reveal covert products without hacking anything.",
+                "Infrastructure mapping through DNS and IP data can link a vendor's servers to its products, but it does not prove customers.",
+                "Refusals to confirm or deny are themselves a finding about transparency.",
+                "Vendor disclaimers should be treated as claims to test, and the report states which claims it could not verify."
+            ],
+            "terms": [
+            ],
+            "title": "Uncovering Webloc: security agencies worldwide found to use ad-based surveillance system",
+            "topic": "Security",
+            "url": "https://citizenlab.ca/research/analysis-of-penlinks-ad-based-geolocation-surveillance-tech/",
+            "why": "A rigorous example of mapping a hidden surveillance product from contracts, records requests and infrastructure traces, with a clear explanation of how ad data becomes location tracking."
+        },
+        {
+            "category": "Other",
+            "level": "Junior",
+            "popularity": "Lobste.rs · 15 points (security tag)",
+            "practice": [
+                "Search for your own site or handle and list any unfamiliar domains that reproduce your content.",
+                "Pick a public page, view its source, and compare two copies of it to practise spotting added scripts and tags.",
+                "Use public domain lookup records on a domain you own to see what registrar and name server data is visible.",
+                "Read a registrar's and a CDN's abuse policy and write out the steps for reporting a clone.",
+                "Set up a simple alert for your site's name or a unique phrase from your posts."
+            ],
+            "questions": [
+                {
+                    "answer": "By searching for the blog's name, which revealed a link on an unfamiliar domain.",
+                    "question": "How did the author find the clone?"
+                },
+                {
+                    "answer": "Only two Cloudflare scripts differed, plus a hidden link to a cloning tool and a verification meta tag.",
+                    "question": "What differences did the page source show?"
+                },
+                {
+                    "answer": "The author suspects it was to make the copy look authorised.",
+                    "question": "Why did the copier rehost images with a watermark?"
+                },
+                {
+                    "answer": "It would require publishing personal information and be costly to pursue.",
+                    "question": "Why was a DMCA takedown considered impractical?"
+                },
+                {
+                    "answer": "It stopped following the original, so it was a one-off scrape rather than a maintained mirror.",
+                    "question": "What does a stale clone tell you?"
+                }
+            ],
+            "source": "Matt Bee (mattbee.mataroa.blog)",
+            "summary": "The author searched for their own blog's name and found a post linked from an unfamiliar mataroa.site domain. Visiting it showed a full copy of their blog, not an official mirror. The clone was stale, stopping at an August post, with broken older links, comments, feed and standalone pages.\n\nInspecting the copy showed that its page source matched the original except for two Cloudflare scripts. Images were rehosted with a watermark showing the author's real address, perhaps to look authorised. The index page had a hidden link to a website-cloning tool and a verification tag tied to a possible SEO or ad platform. The domain was registered at Namecheap and proxied by Cloudflare.\n\nThe author filed an abuse report with Namecheap but doubted it would work, and could not complete Cloudflare's form. A DMCA notice would require revealing personal details and cost effort. The lessons are to monitor your name, inspect source for hidden extras, keep records, and expect friction.",
+            "tags": [
+                "Impersonation",
+                "Abuse reporting",
+                "Web"
+            ],
+            "takeaways": [
+                "Searching for your own site's name regularly is a cheap way to find clones.",
+                "Comparing a copy's page source with the original reveals what the copier added.",
+                "Hidden links and unfamiliar verification tags can point to the tooling and motive behind a clone.",
+                "Clones are often stale, which shows up in broken links, feeds and comments.",
+                "A site behind a proxy hides its real host, which complicates abuse reporting.",
+                "Registrar and proxy abuse forms can be unreliable, so keep records of every report.",
+                "Formal takedown routes may require disclosing personal details, which affects the decision.",
+                "Small sites are copied too, often for short-term search ranking gains."
+            ],
+            "terms": [
+            ],
+            "title": "Someone's impersonating this blog",
+            "topic": "Other",
+            "url": "https://mattbee.mataroa.blog/p/someones-impersonating-this-blog/",
+            "why": "A short, concrete case study that a beginner can follow, showing how to inspect a cloned site and what reporting friction looks like."
+        },
+        {
+            "category": "Web",
+            "level": "Middle",
+            "popularity": "Lobste.rs · 11 points",
+            "practice": [
+                "Compare, on your own accounts, how two messaging apps handle previews and note which party fetches the link.",
+                "Read the OpenGraph protocol and list which page tags a preview uses.",
+                "In a test chat you control, share a link to a page you host and review your own access logs to see who fetches it and from where.",
+                "Read the Matrix specification section on URL previews and summarise its privacy caveats.",
+                "Write a short comparison table of the three preview models covering who learns the link, who learns the IP address, and failure modes."
+            ],
+            "questions": [
+                {
+                    "answer": "The sender's device creates the preview, so the recipient never contacts the site.",
+                    "question": "How does Signal avoid exposing the recipient to the linked site?"
+                },
+                {
+                    "answer": "The homeserver operator can learn which links are shared, even in encrypted rooms, so clients often disable it there.",
+                    "question": "What is the privacy cost of Matrix's homeserver preview endpoint?"
+                },
+                {
+                    "answer": "Browser cross-origin rules block most arbitrary cross-site requests, so a server is needed.",
+                    "question": "Why can't web clients simply fetch any page themselves?"
+                },
+                {
+                    "answer": "That senders attach the preview to the message, similar to Signal's model.",
+                    "question": "What does MSC4095 propose?"
+                },
+                {
+                    "answer": "A privacy-preserving proxy on its own infrastructure that no longer relies on Cloudflare.",
+                    "question": "What is Sable testing now?"
+                }
+            ],
+            "source": "Sable (sable.moe)",
+            "summary": "The post explains the privacy side of link previews: who visits the linked page. Discord has its servers fetch the page, read the metadata, cache it and send the preview to clients. Signal builds the preview on the sender's device so the recipient never contacts the site, and Signal does not learn which sites are shared. A naive client-side fetch by the recipient could expose their IP address to the site operator.\n\nMatrix has used three approaches: a homeserver endpoint that fetches previews, which can let operators see links shared in encrypted rooms; preview bots, which are awkward in direct messages; and a proposal, MSC4095, in which the sender attaches the preview. Web clients are limited by browser cross-origin rules, so they need a server. Sable ended up with three different paths with inconsistent behaviour.\n\nSable moved preview generation into a standalone library, added scrapers and an OpenGraph-based extension for social posts, and is testing a privacy-preserving proxy on its own infrastructure rather than Cloudflare. It plans to make privacy implications clearer in the interface and, if results are good, to write proposals for the Matrix specification.",
+            "tags": [
+                "Privacy",
+                "Matrix",
+                "Messaging"
+            ],
+            "takeaways": [
+                "Whoever fetches a link preview learns something: the link, or the viewer's IP address.",
+                "Server-side previews centralise fetching but let the server see shared links.",
+                "Sender-side previews avoid recipient exposure but depend on the sender's client and attachment format.",
+                "In end-to-end encrypted rooms, server-side preview fetching can leak link content to the homeserver operator.",
+                "Browser cross-origin rules force web clients to use a proxy or server for arbitrary pages.",
+                "Multiple preview mechanisms in one client create inconsistent and confusing privacy behaviour.",
+                "A proxy shifts trust to its operator and must handle abuse and blocking."
+            ],
+            "terms": [
+            ],
+            "title": "Link Previews and You",
+            "topic": "Security",
+            "url": "https://sable.moe/en/blog/link-previews-and-you/",
+            "why": "It compares who fetches a link, and so who learns the recipient's IP address or the link itself, across Discord, Signal and Matrix."
+        }
+    ]
+}
