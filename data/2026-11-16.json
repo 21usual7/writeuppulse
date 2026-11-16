@@ -1,0 +1,341 @@
+{
+    "date": "2026-11-16",
+    "generatedAt": "2026-11-16T08:33:56",
+    "items": [
+        {
+            "category": "Web",
+            "level": "Middle",
+            "popularity": "Hacker News · 243 points; lobste.rs",
+            "practice": [
+                "Read the browser documentation on how extension pages are exposed to web content, and list which of your own extensions expose any.",
+                "In a test browser profile you own, study how an extension distinguishes messages from its own scripts and from web pages.",
+                "Take a small extension you wrote and add a message handshake. Then write down which messages are still accepted without one.",
+                "Read the published GitHub advisory for this issue and compare its description to the blog post.",
+                "Work through a lab on clickjacking and UI redress to see how overlays hide consent.",
+                "Review the input-validation rules of a filter or rule parser you know. List which characters could split one rule into two."
+            ],
+            "questions": [
+                {
+                    "answer": "The picker is an extension page that was reachable from web content, and it did not check that its messages came from the extension's own content script.",
+                    "question": "Why could a random web page talk to the element picker at all?"
+                },
+                {
+                    "answer": "A default filter rule causes an extension request that exposes the random per-install ID to a page hook.",
+                    "question": "How did the attacker learn the extension's internal ID?"
+                },
+                {
+                    "answer": "The unvalidated newline let a trusted scriptlet filter be added, and picker-created filters are trusted, so it ran script on any site.",
+                    "question": "What made the injected filter powerful?"
+                },
+                {
+                    "answer": "The picker's Create button had to be pressed. The attacker hid or overlaid the frame so the user would click it unknowingly.",
+                    "question": "Why was a user click still needed?"
+                },
+                {
+                    "answer": "A secret password is shared between the content script and the genuine picker, and the picker must send it in its first message.",
+                    "question": "How was it fixed?"
+                }
+            ],
+            "source": "iter.ca",
+            "summary": "The author found a one-click universal XSS in the Firefox MV2 build of uBlock Origin. The element picker is a page inside the extension. It accepted messages from any web page, not only from the extension. A malicious site could embed the picker in an invisible frame and drive it directly.\n\nThe chain has three parts. First, a default filter rule triggers an extension request that leaks the extension's per-install random ID to the page. Second, the picker's filter field did not reject a newline in the request-type option, so an attacker could append a second filter, a trusted scriptlet filter. Third, filters created through the picker stay trusted until the next recompile, so the injected script runs on the victim site of the attacker's choice. The user only has to click a hidden Create button that the attacker overlays with something enticing. The MV3 uBO Lite build had a similar but less serious issue.\n\nThe fix is a shared secret between the content script and the real picker. The picker must present it in its first message, so a hostile page can no longer drive it. The author says an AI model did most of the bug hunting and a second one wrote most of the proof-of-concept, but that they verified the result themselves.",
+            "tags": [
+                "XSS",
+                "browser extension",
+                "clickjacking"
+            ],
+            "takeaways": [
+                "Extension UI pages that web content can reach must authenticate who sends them messages.",
+                "A small information leak, such as an extension ID, can be the first link in a serious chain.",
+                "Missing input validation on one field, here newline handling, can let an attacker add whole new rules or commands.",
+                "A trust model of 'trusted until recompile' gives little protection if the attacker can trigger the recompile or act at once.",
+                "Invisible frames and overlays turn a harmless-looking click into a consent the user never gave.",
+                "The fix is a shared secret handshake between the real components, which is simple and effective.",
+                "AI-assisted bug hunting found a real issue, but human verification was still needed.",
+                "Manifest V3 versions can share a bug class with MV2 even when the impact is smaller."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-200",
+                    "kind": "weakness",
+                    "name": "Information Disclosure",
+                    "text": "The product exposes sensitive information to an actor that is not explicitly authorized to have access to that information.",
+                    "url": "https://cwe.mitre.org/data/definitions/200.html"
+                },
+                {
+                    "id": "CWE-79",
+                    "kind": "weakness",
+                    "name": "Cross-site Scripting",
+                    "text": "The product does not neutralize or incorrectly neutralizes user-controllable input before it is placed in output that is used as a web page that is served to other users.",
+                    "url": "https://cwe.mitre.org/data/definitions/79.html"
+                }
+            ],
+            "title": "Universal XSS in uBlock Origin from website-driven element picker",
+            "topic": "Security",
+            "url": "https://iter.ca/post/ubo-uxss/",
+            "why": "A clear, compact chain of small flaws in a very widely installed extension, with a simple and instructive fix."
+        },
+        {
+            "category": "OSINT",
+            "level": "Junior",
+            "popularity": "Hacker News · 243 points",
+            "practice": [
+                "List the short links in your own old posts or documents. Check where each one points now, using the service's public preview feature.",
+                "Pick a public archive of old posts and sample a small set of short links. Record how many still go where they originally did.",
+                "Write a short plan for how your team would find and replace third-party short links in its documents.",
+                "Read the terms of two link-shortening services and note what they promise about link reuse.",
+                "Practise writing a finding that separates observed facts from inferences, using the Bitly case as the example."
+            ],
+            "questions": [
+                {
+                    "answer": "The tweets were unchanged. The short links were re-registered on Bitly's side and now redirect elsewhere.",
+                    "question": "Why were the brand accounts not the problem?"
+                },
+                {
+                    "answer": "Bitly's public info pages showed creation dates many years after the original tweets.",
+                    "question": "What evidence suggested that the links had been re-created?"
+                },
+                {
+                    "answer": "The reuse mechanism is inferred from timestamps. Bitly has not confirmed how the links were taken or how many.",
+                    "question": "What is the main uncertainty in the article?"
+                },
+                {
+                    "answer": "Old links from trusted accounts can send people to phishing or fake crypto pages that look credible.",
+                    "question": "What fraud risk follows from this?"
+                },
+                {
+                    "answer": "List all short links in old posts, compare creation dates, fix or remove replaced ones, and use its own domain going forward.",
+                    "question": "What can an organisation do now?"
+                }
+            ],
+            "source": "ransomnews.com",
+            "summary": "On 15 November 2026 the author showed that old bit.ly links in famous accounts' tweets, including Burger King, McDonald's and Trump, had been re-created by outsiders and now point to unrelated or offensive pages. The accounts were not hacked. The links changed hands inside Bitly. One Burger King tweet from 2011 pointed to a Wikipedia page about concentration camps, and a quote of it reached about 2.2 million views.\n\nThe author checked 97 Bitly links in Trump's 2009 to 2013 tweets. Forty were unchanged, 49 had been re-created but led somewhere plausible, 7 led elsewhere and 1 was blocked. The key evidence is Bitly's public info page, which shows creation dates years after the tweets were posted. Bitly's own help pages say such back-halves cannot be reused. The mechanism is therefore an inference from timestamps, not a confirmed explanation. Bitly said it suspended the accounts involved and disabled the links within hours.\n\nThe practical risk is wider than embarrassment. Two links pointed to fake crypto-service domains, and verified accounts lend such links credibility. Anyone who embedded short links in posts, emails, PDFs or QR codes is exposed in the same way.",
+            "tags": [
+                "link hijacking",
+                "Bitly",
+                "supply chain"
+            ],
+            "takeaways": [
+                "A short link is a pointer owned by a third party. It can change owner and destination long after you publish it.",
+                "Old posts from trusted accounts can become attack surface without any account compromise.",
+                "Public metadata, such as the creation date on a link info page, can reveal tampering.",
+                "Sampling a known set of links, here 97, gives numbers that turn an anecdote into evidence.",
+                "The author separates what was measured from what was inferred, which is a good habit to copy.",
+                "Organisations should audit old short links and use a domain they control for new ones.",
+                "Readers should preview a link's destination before opening it and distrust sign-in or wallet prompts.",
+                "Platform statements such as 'back-halves cannot be reused' should be tested, not assumed."
+            ],
+            "terms": [
+            ],
+            "title": "Old Bitly links are being hijacked",
+            "topic": "Security",
+            "url": "https://ransomnews.com/burger-king-tweet-bitly-link-hijack-2026/",
+            "why": "A fresh, fast-moving incident that a beginner can follow, with a good lesson in measuring, then separating facts from inference."
+        },
+        {
+            "category": "Reverse",
+            "level": "Middle",
+            "popularity": "lobste.rs · 6 points",
+            "practice": [
+                "Read the ZIP format specification and write down what each field of an entry means, especially the compression method and the sizes.",
+                "Study the three earlier parser-differential cases named in the article and summarise what two parsers disagreed on in each.",
+                "In a lab you control, compare how two ZIP tools react to an archive with an unusual method value. Note the differences without using it on a real device.",
+                "Read how your analysis sandbox handles malformed samples, and list where a crash could hide a result.",
+                "Write a short severity argument for or against rating a persistent boot loop as High."
+            ],
+            "questions": [
+                {
+                    "answer": "One checks the declared uncompressed length only for stored entries. The other maps the declared size for any entry that is not deflated. Other method values slip between the two.",
+                    "question": "What exactly differs between the two libraries?"
+                },
+                {
+                    "answer": "A core service re-reads the same malformed app resources after each restart and crashes each time.",
+                    "question": "Why does the device end up in a boot loop?"
+                },
+                {
+                    "answer": "A banking dropper from the wild crashed their emulators, and they traced the failure to the parser.",
+                    "question": "How did the researchers find it?"
+                },
+                {
+                    "answer": "Persistent denial of service that may need a factory reset. It does not execute code or raise privileges.",
+                    "question": "What is the main impact, and what is it not?"
+                },
+                {
+                    "answer": "Accept only the stored and deflate compression methods and reject all others.",
+                    "question": "What fix do the authors suggest?"
+                }
+            ],
+            "source": "Bitdefender Labs",
+            "summary": "Bitdefender Labs describes GhostMap, a parser differential in how Android reads APK files. Two libraries disagree about a ZIP entry. libziparchive checks the declared uncompressed length only for entries marked as stored. libandroidfw maps the entry at its declared size whenever it is not marked as deflated. An entry with some other compression method falls between the two rules, so Android maps memory the file never supplied. Reading past the real end of the file makes the kernel kill the process with a bus error.\n\nThe team found it in August 2026 when a packed banking dropper crashed their analysis emulators. They traced the crash to Android's parser, not the malware. If the installer hits the file, the install fails. If a core service in system_server hits it, the service crashes, restarts and crashes again, causing a boot loop that survives reboots and safe mode and usually needs a factory reset. File managers and security scanners can also be crashed.\n\nThe bug gives no code execution or privileges, and no abuse has been seen. Google closed the first report as not reproducible, then said the issue would not get a security update. The article says it was unpatched at publication. It was reproduced on a Pixel 10 with Android 17 and affects Android 10 and later. The authors propose accepting only the stored and deflate methods.",
+            "tags": [
+                "Android",
+                "parser differential",
+                "APK"
+            ],
+            "takeaways": [
+                "Two components that parse the same file with different rules create a parser differential, a recurring bug class.",
+                "Master Key, Janus and BadPack are earlier Android examples of the same theme.",
+                "The finding began as an analysis problem: a malware sample that crashed the emulators.",
+                "A persistent crash loop in a system service can be as damaging as a code-execution bug, since data is lost.",
+                "Denial of service in a security scanner can help malware go unflagged.",
+                "Vendors may rate persistent crash loops lower than researchers think they deserve, which is a severity-policy debate.",
+                "Strict parsing, rejecting every value not explicitly expected, is the simplest defence.",
+                "Malformed files can crash analysis tools, so reverse engineers should expect hostile inputs."
+            ],
+            "terms": [
+            ],
+            "title": "GhostMap: The Android flaw that crashes your phone before you open the app",
+            "topic": "Security",
+            "url": "https://www.bitdefender.com/en-us/blog/labs/ghostmap-android",
+            "why": "It shows how an odd malware sample became a platform bug, and it teaches the parser-differential pattern very clearly."
+        },
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "lobste.rs · 8 points",
+            "practice": [
+                "Read how PHP's request lifecycle and its memory manager work, and sketch where a bailout could skip cleanup.",
+                "Work through an intentionally vulnerable heap exercise on a CTF platform that features a use-after-free, and describe each step in words.",
+                "Review the PHP configuration of your own test server and decide which features it does not need.",
+                "Study how address randomisation works and list three ways a memory read weakens it.",
+                "Compare this article's claims with the public advisories for the two CVEs it cites."
+            ],
+            "questions": [
+                {
+                    "answer": "A memory-exhaustion bailout jumps out of the parsing code and skips the cleanup that would reset the global pointers.",
+                    "question": "What creates the dangling pointers?"
+                },
+                {
+                    "answer": "PHP workers are long-lived, so the stale pointers remain for the next request the same worker handles.",
+                    "question": "Why does the bug span separate requests?"
+                },
+                {
+                    "answer": "A heap read first yields a heap address and then a function pointer from the PHP binary.",
+                    "question": "How is address randomisation defeated?"
+                },
+                {
+                    "answer": "The chain relies on a specific build, worker layout and low traffic, which keep the heap predictable.",
+                    "question": "Why is production exploitation harder than the demo?"
+                },
+                {
+                    "answer": "Keep PHP patched and disable the session upload-progress feature when it is not needed.",
+                    "question": "What are the main defensive steps?"
+                }
+            ],
+            "source": "djad04.github.io",
+            "summary": "An independent researcher gives a long, self-described personal analysis of a PHP exploit chain they call PHP2Shell, linked to two 2026 CVEs. It centres on PHP's session upload-progress feature, which parses multipart form data before the application script runs. An out-of-memory condition triggers PHP's long-jump bailout, which skips the cleanup code in the session and unserializer routines. Global pointers, such as the unserializer state and the session ID, then outlive the memory they point to.\n\nBecause PHP workers are long-lived, a later request handled by the same worker can meet those stale pointers, which gives a use-after-free. The write-up explains how a heap read reveals a heap address and then a function pointer in the PHP binary, defeating address randomisation. A final stage uses a forged array structure to redirect a cleanup routine's destructor pointer to an internal function that runs system commands. The author covers allocator behaviour, heap grooming and debugging in depth, and frames it as a CTF case study.\n\nThe author notes that the chain depends on a specific build, worker layout and quiet traffic, so it is much harder on a busy production server. Public offsets should not be treated as general. The defensive advice is to patch PHP and to disable the upload-progress feature where it is not needed. I read the first 100,000 of about 130,000 characters.",
+            "tags": [
+                "PHP",
+                "use-after-free",
+                "heap"
+            ],
+            "takeaways": [
+                "Error paths that jump out of a function can skip cleanup and leave stale global state.",
+                "Long-lived worker processes let state from one request affect the next.",
+                "A use-after-free that can be read gives an information leak, which defeats address randomisation.",
+                "Stale cleanup routines that trust pointers are a common source of exploitable bugs.",
+                "Allocator behaviour, such as reuse of freed memory, decides whether a chain is reliable.",
+                "Exploit reliability depends on the build and environment, so public offsets rarely transfer.",
+                "Disabling unneeded features is a cheap and effective defence.",
+                "The author states that this is their own understanding and invites corrections, so read it critically."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-200",
+                    "kind": "weakness",
+                    "name": "Information Disclosure",
+                    "text": "The product exposes sensitive information to an actor that is not explicitly authorized to have access to that information.",
+                    "url": "https://cwe.mitre.org/data/definitions/200.html"
+                },
+                {
+                    "id": "CWE-416",
+                    "kind": "weakness",
+                    "name": "Use After Free",
+                    "text": "The product reuses or references memory after it has been freed. At some point afterward, the memory may be allocated again and saved in another pointer, while the original pointer references a location somewhere within the new allocation. Any operations using the original pointer are no longer valid because the memory \"belongs\" to the code that operates on the new pointer.",
+                    "url": "https://cwe.mitre.org/data/definitions/416.html"
+                },
+                {
+                    "id": "CWE-787",
+                    "kind": "weakness",
+                    "name": "Out-of-bounds Write",
+                    "text": "The product writes data past the end, or before the beginning, of the intended buffer.",
+                    "url": "https://cwe.mitre.org/data/definitions/787.html"
+                }
+            ],
+            "title": "PHP2Shell — Deep Dive",
+            "topic": "Security",
+            "url": "https://djad04.github.io/php2shell-deep-dive/",
+            "why": "A rare, very detailed walk through a PHP memory-corruption chain from a stale pointer to a full exploit idea, with honest limits."
+        },
+        {
+            "category": "Other",
+            "level": "Junior",
+            "popularity": "Hacker News · 627 points",
+            "practice": [
+                "On a virtual machine you own, check which accounts have placeholder, locked or real password fields, and write down what each means.",
+                "Read the sshd documentation on password authentication and PAM and explain in a paragraph how the two interact.",
+                "Review the SSH logs on a test machine and decide which entries would show a password login to a passwordless account.",
+                "Compare how two C libraries document the return value of their password-hashing function on error.",
+                "Write a short checklist for patching a network daemon: upgrade, restart, verify the version, check logs."
+            ],
+            "questions": [
+                {
+                    "answer": "The crypt function returns an asterisk as its error result for overlong passwords, and the stored field for a passwordless account is also an asterisk, so they compare equal.",
+                    "question": "Why does the login succeed?"
+                },
+                {
+                    "answer": "Those with password authentication off, PAM in use, locked accounts, no SHA-style hashes, or cloud-init images.",
+                    "question": "Which configurations are not affected?"
+                },
+                {
+                    "answer": "Installing the new package leaves the old, vulnerable daemon running until it is restarted.",
+                    "question": "Why is restarting sshd important?"
+                },
+                {
+                    "answer": "Accepted-password entries for accounts that have no password.",
+                    "question": "What log evidence would suggest abuse?"
+                },
+                {
+                    "answer": "Set password authentication to no and restart sshd, keeping a session open while testing.",
+                    "question": "What is the workaround if you cannot upgrade?"
+                }
+            ],
+            "source": "alpinelinux.org",
+            "summary": "This is Alpine's advisory for an SSH login bypass. With a build of sshd that does not use PAM, a remote attacker could log in to an account that has no password, with one connection and no retries. The cause is a collision of two meanings of one character. The musl crypt function returns an asterisk to signal an error when the password is longer than 256 bytes. Accounts without a password also store an asterisk in the password field. The comparison therefore matches.\n\nThe attack needs an account with an asterisk in the password field, such as root in the base image or a key-only user. It also needs another local account with a SHA-based password hash, and a password between 257 and 1024 bytes. Systems with password authentication off, with PAM enabled, with locked accounts or with cloud-init images are not affected. Alpine 3.16 through 3.24 and edge were affected, and fixed packages were published for each. The advisory also gives detection hints, such as log entries for accepted passwords on accounts that have none.\n\nRemediation is to upgrade OpenSSH and restart the daemon, since a package upgrade alone does not replace the running process. If that is not possible, turn off password authentication. The advisory says the flaw was reported by Özgün Kültekin of Wakefield, no CVE had been assigned, and the upstream fix is in OpenSSH 10.6p2.",
+            "tags": [
+                "SSH",
+                "Alpine",
+                "authentication"
+            ],
+            "takeaways": [
+                "An error value that equals a legitimate stored value can make a failed check look like success.",
+                "Differences between C libraries, such as musl and glibc, can change security behaviour.",
+                "Disabling password login removes the whole attack, which shows the value of key-only SSH.",
+                "Upgrading a package does not restart the running service. Restart it as well.",
+                "Exposure depends on configuration, so read the 'not affected' list as carefully as the affected one.",
+                "Accounts with a placeholder password field are not the same as locked accounts.",
+                "Look in logs for password logins to accounts that should not have passwords.",
+                "If a login cannot be ruled out, treat the machine as compromised."
+            ],
+            "terms": [
+                {
+                    "id": "CAPEC-115",
+                    "kind": "pattern",
+                    "name": "Authentication Bypass",
+                    "text": "An attacker gains access to application, service, or device with the privileges of an authorized or privileged user by evading or circumventing an authentication mechanism. The attacker is therefore able to access protected data without authentication ever having taken place.",
+                    "url": "https://capec.mitre.org/data/definitions/115.html"
+                },
+                {
+                    "id": "T1087.001",
+                    "kind": "technique",
+                    "name": "Local Account",
+                    "text": "Adversaries may attempt to get a listing of local system accounts. This information can help adversaries determine which local accounts exist on a system to aid in follow-on behavior.",
+                    "url": "https://attack.mitre.org/techniques/T1087/001"
+                }
+            ],
+            "title": "Alpine Linux: openssh-server password authentication bypass",
+            "topic": "Other",
+            "url": "https://alpinelinux.org/posts/2026-11-05-openssh-password-authentication-bypass/",
+            "why": "A short, readable advisory that explains a nasty authentication bug and teaches sensible patching and detection habits."
+        }
+    ]
+}
