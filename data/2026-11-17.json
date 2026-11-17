@@ -1,0 +1,312 @@
+{
+    "date": "2026-11-17",
+    "generatedAt": "2026-11-17T11:43:23",
+    "items": [
+        {
+            "category": "Malware",
+            "level": "Middle",
+            "popularity": "Hacker News · 331 points, 143 comments",
+            "practice": [
+                "Pick a site you own and list every third-party script it loads. For each, write down who can change that script's content without you knowing.",
+                "Using a test site you control, design a CSP in prose that allows only the hosts you need. Predict which of this incident's payload behaviors it would stop and which it would not.",
+                "Read the CSP specification sections on trust propagation to scripts that trusted scripts load and on allowing eval. Explain why each widens the attack surface.",
+                "Write a short incident-response checklist for 'a trusted vendor script was malicious for nine hours': what to audit, rotate and tell customers.",
+                "Set up a monitoring idea for your own test site that alerts when a new script source or new data destination appears, and decide who reviews the alerts."
+            ],
+            "questions": [
+                {
+                    "answer": "It was delivered from Optimizely's own CDN with a valid certificate. Only the customer-editable project JavaScript field contained the attacker's loader.",
+                    "question": "Why did the injected code look trustworthy to browsers and filters?"
+                },
+                {
+                    "answer": "It stops exfiltration to attacker hosts. The crypto address swapping happens inside the page and needs no outbound request.",
+                    "question": "Why did restricting connect-src not fully protect users?"
+                },
+                {
+                    "answer": "Trusting scripts loaded by already-trusted scripts, and allowing eval, which let the inline fallback run.",
+                    "question": "Which CSP choices weakened protection in this incident?"
+                },
+                {
+                    "answer": "The skimmer read fields in the page's own forms. Card entry inside a cross-origin iframe is not reachable from the page's script.",
+                    "question": "Why were hosted payment iframes unaffected by the card skimmer?"
+                },
+                {
+                    "answer": "How the attacker gained write access to many unrelated customer projects, and how many cards, cookies and devices were compromised.",
+                    "question": "What does the article leave unanswered?"
+                }
+            ],
+            "source": "blog.report-uri.com (Scott Helme)",
+            "summary": "On 16 November 2026, attackers got malicious JavaScript served to visitors of about 178 organisations through Optimizely Web, an experimentation platform. Affected sites included Zoom, the BBC, CNN, GitLab, IKEA and HSBC. Customers load a snippet from Optimizely's CDN, and each snippet has a project-level JavaScript field that runs on every page. The attacker put a small loader in that field. The CDN served exactly what it was given, so the file still came from a trusted domain with a valid certificate. The article does not establish how the attacker got write access to so many unrelated customer projects.\n\nThe loader came in three variants, including an inline fallback that still ran if the external domain was blocked. The payload swapped crypto wallet addresses in page text, forms, clipboard and requests. It also skimmed card data typed into a site's own forms (hosted payment iframes were not affected), exfiltrated cookies and screenshots, and on older iPhones loaded iOS exploit chains in a hidden frame. The payload was rebuilt 26 times in one day. The author counted 188 infected snippets, probably an undercount, and saw roughly $7,000 of crypto stolen early on. Cleanup began in the evening and the attacker domains were put on hold the next morning.\n\nThe author also checked the Content Security Policies of 256 affected hosts. 68 had no CSP and only 24 (15%) blocked the payload. Protection came from a tight script-src allowlist. Trusting scripts that trusted scripts load, and allowing eval, both weakened it. Restricting connect-src blocked data theft but not the in-page address swapping.",
+            "tags": [
+                "supply-chain",
+                "javascript",
+                "csp"
+            ],
+            "takeaways": [
+                "Trusted third-party JavaScript can turn hostile without any breach of your own code or servers.",
+                "The attacker edited customer-controlled content on a legitimate CDN, so domain reputation and TLS checks saw nothing wrong.",
+                "Several loader variants, including an inline fallback, were built to survive simple domain blocking.",
+                "Address swapping happens entirely inside the page, so egress restrictions alone cannot stop it.",
+                "Only 15% of the affected hosts had a CSP that blocked the payload, and 68 had none.",
+                "A permissive script-src, trust propagation to scripts that trusted scripts load, and allowing eval each weakened CSP.",
+                "Hosted payment iframes kept card data away from the skimmer, which shows why payment isolation matters.",
+                "The payload was rebuilt many times a day, so static indicator lists age quickly. Watching for new scripts and new data destinations is more durable."
+            ],
+            "terms": [
+            ],
+            "title": "Optimizely compromised, served malware on Zoom, GitLab",
+            "topic": "Security",
+            "url": "https://blog.report-uri.com/worlds-largest-brands-infected-with-malware-via-optimizely/",
+            "why": "A live, timestamped case study of a supply-chain script injection hitting 178 big brands, with real data on which CSP setups helped."
+        },
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "Lobsters · 18 points; oss-security advisory",
+            "practice": [
+                "Read the advisory and draw a timeline of two CPUs handling two packets, marking where the stale reference and the reused object diverge.",
+                "In a lab VM you own, learn how to view receive queue counts and packet steering settings on your NIC, and note which of your machines would meet the precondition.",
+                "Read the kernel's documentation on SYN cookies and request sockets, and write a paragraph on why a request socket may lack a listener.",
+                "Study another ABA or reuse-after-free race in a networking stack (for example from a past CVE writeup) and compare the root cause to this one.",
+                "Draft a patch-priority argument for a fleet: which hosts are most exposed given direct reachability, queue counts and container density?"
+            ],
+            "questions": [
+                {
+                    "answer": "A stale lookup in the established-connection hash and the freeing and reallocation of a request socket in another receive context.",
+                    "question": "What two kernel events must overlap for the race to trigger?"
+                },
+                {
+                    "answer": "They hash to different receive queues, so the two operations run on different CPUs at once.",
+                    "question": "Why does mixing IPv4 fragments with normal TCP packets help the attacker?"
+                },
+                {
+                    "answer": "The stale lookup grabs a reference to a new SYN-cookie request that reuses the old slab address and has no listener attached, so the receive path dereferences null.",
+                    "question": "Why does the null-listener flow crash the kernel?"
+                },
+                {
+                    "answer": "The race needs packets processed concurrently in different receive contexts. One queue without packet steering removes that concurrency.",
+                    "question": "Why can a single-queue setup be a stopgap?"
+                },
+                {
+                    "answer": "It removes the vulnerable request-socket path but weakens protection against SYN floods.",
+                    "question": "What is the trade-off of disabling SYN cookies as a mitigation?"
+                }
+            ],
+            "source": "openwall.com oss-security (Hyunwoo Kim, @v4bel)",
+            "summary": "NoisyTCP (CVE-2026-99288) is a race condition in the Linux kernel's TCP receive path, reported and patched by Hyunwoo Kim and published to oss-security on 16 November 2026 after the distro embargo ended. It can be triggered by sending packets to an ordinary TCP listener, so default Nginx, Apache or SSH servers are exposed if an attacker can reach them directly. The bug came from a 2015 commit, so it was latent for about 11 years across nearly all distributions.\n\nThe race needs a lookup of an established-connection hash entry that has gone stale to run at the same moment another receive context frees and reallocates a request socket. The attacker spreads work across CPUs by exploiting the fact that IPv4 fragments and regular TCP packets hash to different receive queues. This requires a server with two or more receive queues or software packet steering. In the demonstrated flow, a stale lookup grabs a reference to a new SYN-cookie request that reuses the same tuple and slab address. That request has no listener attached, so the kernel dereferences a null listener and panics. In a container the whole host goes down. A second flow, involving a full child socket, could lead to a remote use-after-free, but it needs nested races and is much harder.\n\nReliability varies widely. On default-configured VMs the advisory reports seconds to a couple of minutes, but on a quiet bare-metal server with eight queues it took around 14 hours. The fix landed on 3 November 2026. Stopgaps are to disable SYN cookies per network namespace (which weakens flood protection) or to reduce the exposed interface to one receive queue with packet steering off.",
+            "tags": [
+                "linux-kernel",
+                "race-condition",
+                "tcp"
+            ],
+            "takeaways": [
+                "A race between a stale hash lookup and slab reuse is an ABA problem: the pointer looks the same but the object is new.",
+                "The attacker used IPv4 fragments versus normal TCP packets hashing to different receive queues to force concurrency.",
+                "Needing two or more receive queues or packet steering is a precondition that shapes who is exposed.",
+                "The demonstrated impact is a remote kernel panic. In containers it takes down the whole host.",
+                "Exploit time ranges from seconds on VMs to around 14 hours on quiet bare metal, so real-world risk depends on traffic and hardware.",
+                "The bug was latent for 11 years, which shows how long concurrency flaws can hide in core networking code.",
+                "Mitigations trade security for safety: turning off SYN cookies weakens flood protection, and SYN cookies are set per network namespace.",
+                "Coordinated disclosure here meant patch first (3 Nov), embargo with distros, then public advisory (16 Nov)."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-362",
+                    "kind": "weakness",
+                    "name": "Race Condition",
+                    "text": "The product contains a concurrent code sequence that requires temporary, exclusive access to a shared resource, but a timing window exists in which the shared resource can be modified by another code sequence operating concurrently.",
+                    "url": "https://cwe.mitre.org/data/definitions/362.html"
+                },
+                {
+                    "id": "CWE-416",
+                    "kind": "weakness",
+                    "name": "Use After Free",
+                    "text": "The product reuses or references memory after it has been freed. At some point afterward, the memory may be allocated again and saved in another pointer, while the original pointer references a location somewhere within the new allocation. Any operations using the original pointer are no longer valid because the memory \"belongs\" to the code that operates on the new pointer.",
+                    "url": "https://cwe.mitre.org/data/definitions/416.html"
+                }
+            ],
+            "title": "NoisyTCP",
+            "topic": "Security",
+            "url": "https://www.openwall.com/lists/oss-security/2026/11/15/2",
+            "why": "A rare pre-auth Linux kernel TCP race, latent for 11 years, explained with its exact preconditions and practical mitigations."
+        },
+        {
+            "category": "Reverse",
+            "level": "Senior",
+            "popularity": "Lobsters · 28 points",
+            "practice": [
+                "Read the Ghidra documentation on processor specifications and outline what you would need to define for an unsupported 8-bit CPU.",
+                "Take a small open-source firmware blob or public linux-firmware file for a device you own and practice labeling functions in a disassembler.",
+                "Practice a decompile-and-match exercise on a tiny binary you compile yourself with an old compiler, comparing output bytes to your C.",
+                "Explain in your own words how an inverted condition can hide a second bug, and think of a software example you have seen.",
+                "Read how interrupt handlers track state, and write a short note on why checking live hardware status versus saved flags can differ."
+            ],
+            "questions": [
+                {
+                    "answer": "A microcontroller whose firmware emulates the original Wii's Video Interface in software.",
+                    "question": "What is the DMCU and what does it do in the Wii U?"
+                },
+                {
+                    "answer": "They wrote a custom Ghidra processor spec for the 68HC11-style CPU and cross-checked with AMD firmware that uses a similar design.",
+                    "question": "Why was the author able to analyze it despite no Ghidra support?"
+                },
+                {
+                    "answer": "Two firmware typos: the IRQ handler checked the wrong state source, leaving events stuck, and the chroma-swap condition was inverted.",
+                    "question": "What caused the color bleed?"
+                },
+                {
+                    "answer": "If compiling the C with the original compiler yields identical bytes, you know the decompilation is faithful.",
+                    "question": "Why does byte-matching matter?"
+                },
+                {
+                    "answer": "The firmware configures the display viewport to simulate overscan, which crops up to 16 pixels.",
+                    "question": "What explains the cropping?"
+                }
+            ],
+            "source": "garyodernichts.blogspot.com (Gary)",
+            "summary": "The Wii U's Wii mode (vWii) has two visual flaws: output is force-cropped by up to 16 pixels, and colors bleed, with a green tint on the left edges of characters. The author traced both to the DMCU, a small microcontroller that emulates the original Wii's video interface in software. They extracted its firmware and loaded it in Ghidra, which lacked support for its 68HC11-family CPU, so they wrote a custom processor specification.\n\nTo understand the design, the author compared firmware for AMD Raven and Navi 12 GPUs from the public linux-firmware collection, which use a nearly identical DMCU and display controller interface. They then decompiled the Wii U firmware by hand into C, matching bytes with an old GCC 3.3.6 port and a modified decomp.me. Some functions matched byte for byte. The result was published as OpenDMCUFirm in 2025.\n\nThe cropping turned out to be the DMCU setting the display viewport to simulate overscan, fixable by changing values. The color bleed came from two firmware typos. In the interrupt handler, the code checked the hardware status register instead of stored event flags, so two events got stuck in a retrigger state and never ran again. Separately, the handler that sets a chroma-swap bit based on the image's horizontal origin had an inverted condition, which the author suspects Nintendo introduced as a workaround for the first bug. Fixing both removes the bleed, and the patches can be loaded through the latest evWii release.",
+            "tags": [
+                "firmware",
+                "ghidra",
+                "decompilation"
+            ],
+            "takeaways": [
+                "When Ghidra lacks your CPU, writing a processor specification is a viable path rather than a blocker.",
+                "Public firmware for related hardware (AMD GPUs) can serve as a Rosetta stone for an undocumented device.",
+                "Byte-matching decompilation with the original compiler version proves your C reproduces the shipped binary.",
+                "One bug can mask another: an inverted condition may be a workaround for a different defect.",
+                "Checking a hardware status register instead of stored event flags can leave events stuck forever.",
+                "Visual symptoms like edge color tint can map to a single bit being set the wrong way for a given pixel origin.",
+                "Some pieces stay unexplained (event handler 3's purpose), and honest writeups say so.",
+                "Publishing decompiled projects and patches makes the fix reusable by the community."
+            ],
+            "terms": [
+                {
+                    "id": "CAPEC-188",
+                    "kind": "pattern",
+                    "name": "Reverse Engineering",
+                    "text": "An adversary discovers the structure, function, and composition of an object, resource, or system by using a variety of analysis techniques to effectively determine how the analyzed entity was constructed or operates. The goal of reverse engineering is often to duplicate the function, or a part of the function, of an object in order to duplicate or \"back engineer\" some aspect of its functioning.",
+                    "url": "https://capec.mitre.org/data/definitions/188.html"
+                }
+            ],
+            "title": "Improving the Wii U's Wii Mode",
+            "topic": "Security",
+            "url": "https://garyodernichts.blogspot.com/2026/11/improving-wii-us-wii-mode.html",
+            "why": "A tidy reverse-engineering story: unknown microcontroller firmware, a custom Ghidra CPU spec, byte-matched decompilation, and two telling typos behind a visual bug."
+        },
+        {
+            "category": "OSINT",
+            "level": "Junior",
+            "popularity": "Hacker News · 344 points, 150 comments",
+            "practice": [
+                "Pick a ranking list such as a public top-sites dataset and look for entries that seem out of place. Write a short list of theories to test.",
+                "Learn how to read Certificate Transparency search results for a domain you own, and note what dates and names they reveal.",
+                "Compare backlink counts for one of your own sites across two free tools and write down why the numbers differ.",
+                "Write an investigation note for an odd domain from a safe source (for example a public blocklist), recording what evidence supports or kills each hypothesis.",
+                "Read about how Tranco combines multiple sources and explain why mixing providers reduces single-source error."
+            ],
+            "questions": [
+                {
+                    "answer": "It ranked 8th among .com sites in a popularity list, did not resolve in DNS, and had grown fastest in the Majestic Million's top 100.",
+                    "question": "What made the domain suspicious?"
+                },
+                {
+                    "answer": "Majestic reported about 241 million backlinks from millions of domains, while Ahrefs found only 53.",
+                    "question": "Which data points showed the backlink count was odd?"
+                },
+                {
+                    "answer": "It showed the domain's first certificate date, 11 November, which came after most of its backlinks had already appeared.",
+                    "question": "How did Certificate Transparency help?"
+                },
+                {
+                    "answer": "A Majestic employee said it was internal experimentation on an obscure domain that was not filtered out of public reports.",
+                    "question": "What was the actual explanation?"
+                },
+                {
+                    "answer": "Tranco still uses Majestic data, so it inherited the error.",
+                    "question": "Why does the Tranco ranking show it so high?"
+                }
+            ],
+            "source": "jack.cab",
+            "summary": "The author's backlink monitor reported a new link from a site that ranks popular pages by top-level domain. Its .com list showed a random-looking domain at rank 8, just behind giants like Microsoft and Google Tag Manager. It was also the fastest-growing domain in the Majestic Million's top 100. The domain did not resolve in DNS.\n\nThe author compared Majestic and Ahrefs. Majestic reported about 241 million nofollow backlinks from roughly 5.16 million referring domains, while Ahrefs found only 53. Certificate Transparency records showed the domain was first registered on 11 November, after most backlinks had appeared. The author downloaded the Majestic Million data and searched it directly, found six listed subdomains, and noted that Tranco ranks the domain 38 because it uses Majestic data. They weighed several theories: a copyright trap, a hack, an IPv6 counting loophole and cloaked spam sites, and found most unlikely.\n\nThe answer came from a Majestic employee, who said the domain was part of internal experimentation. The team had picked an obscure domain for testing and failed to filter it from public reports. The author's takeaway was simply: don't test in production.",
+            "tags": [
+                "investigation",
+                "domains",
+                "data-analysis"
+            ],
+            "takeaways": [
+                "A surprising ranking is a prompt for investigation, not an assumption of malice.",
+                "Comparing two independent data providers (Majestic and Ahrefs) quickly exposes a huge discrepancy.",
+                "Certificate Transparency records can show when a domain first came into use.",
+                "Downloading the raw dataset lets you verify claims instead of trusting a website's summary.",
+                "Derived rankings like Tranco inherit errors from their source data.",
+                "List hypotheses and eliminate them with evidence, as the author did with copyright traps and IPv6 loopholes.",
+                "The real cause was mundane: internal testing leaked into a public report.",
+                "Asking the data owner directly can resolve a mystery that data alone cannot."
+            ],
+            "terms": [
+            ],
+            "title": "What is w2rt6byl5nf1opmc-a.com?",
+            "topic": "Security",
+            "url": "https://jack.cab/blog/siterate",
+            "why": "A beginner-friendly investigation that shows how to question a strange data point, cross-check sources and test theories until the real answer turns up."
+        },
+        {
+            "category": "Other",
+            "level": "Middle",
+            "popularity": "Lobsters · 4 points (new, published 17 Nov 2026)",
+            "practice": [
+                "Read the SIP specification section on INVITE transactions and draw the three-way handshake, marking where Timer H applies.",
+                "Set up two softphones and a PBX on your own LAN, make a call and examine the capture to identify each message in the handshake.",
+                "Write a hypothesis table for a flaky call scenario: symptom, theory, test, result.",
+                "Read about AMR and common codecs, and note which would need negotiation for a mobile-oriented network.",
+                "Practice reading a capture to find which side stopped talking, using a sample trace from a public SIP tutorial."
+            ],
+            "questions": [
+                {
+                    "answer": "Asterisk sent 200 OK but never got an ACK, retransmitted until SIP Timer H fired, and the call ended with a 408.",
+                    "question": "Why did inbound calls end after about 32 seconds?"
+                },
+                {
+                    "answer": "The carrier's edge received the 200 OK and sent nothing back, so the problem was not network reachability.",
+                    "question": "What did the unfiltered packet capture establish?"
+                },
+                {
+                    "answer": "A call that failed on the PBX succeeded through a bridge endpoint, so the PBX's implementation also mattered.",
+                    "question": "Why was the number-portability theory for 487 errors questioned?"
+                },
+                {
+                    "answer": "A custom Asterisk build with added modules for AMR codec support and carrier-specific registration handling.",
+                    "question": "What was the practical fix?"
+                },
+                {
+                    "answer": "The exact reason the ACK was missing is never fully explained.",
+                    "question": "What is left unresolved in the post?"
+                }
+            ],
+            "source": "yashgarg.dev (Yash Garg)",
+            "summary": "After replacing Jio's fiber ONT with their own router, the author lost the landline and decided to self-host an Asterisk PBX that registers with Jio's IMS. Inbound calls dropped at about 32 seconds. Jio's INVITE got a 200 OK from Asterisk, but no ACK ever came back, so Asterisk kept retransmitting until the SIP timer expired. Some outbound calls to certain numbers also failed with a 487 and an invalid-SDP error.\n\nThe author worked through six hypotheses for the missing ACK, including identity headers, session timers, IPv6 listeners and a Record-Route rewriting bug. An unfiltered packet capture showed Jio's edge received the 200 OK and sent nothing back, which placed the silence inside the carrier's session border controller. The Record-Route bug was real and fixed, but it did not cure the problem. For the 487 failures, the author first blamed number portability, but a temporary bridge test showed a call that failed on the PBX succeeded through another endpoint, so the PBX's own implementation mattered.\n\nThe outcome was a Nix-packaged Asterisk build with three added modules for AMR codec negotiation and Jio-specific registration quirks. Inbound and outbound calls then worked, including previously failing numbers. The post is candid that it never fully explains why the ACK was missing.",
+            "tags": [
+                "sip",
+                "voip",
+                "debugging"
+            ],
+            "takeaways": [
+                "A missing ACK after a 200 OK ends in a timer expiry and a 408, which explains the fixed call-drop time.",
+                "An unfiltered packet capture can prove whether the network or the far end is silent.",
+                "Test one hypothesis at a time, and keep a record of what each one ruled out.",
+                "A real bug that is fixed may not be the bug causing the symptom.",
+                "Comparing behavior across different endpoints (a bridge) can disprove a convenient theory such as 'it's the carrier'.",
+                "Carriers' IMS setups often need codec and registration quirks that generic PBX defaults don't handle.",
+                "Registration retries can trigger lockouts, so debugging loops need rate awareness.",
+                "Honest writeups admit what remains unexplained."
+            ],
+            "terms": [
+            ],
+            "title": "Where did the ACK go?",
+            "topic": "Other",
+            "url": "https://yashgarg.dev/posts/where-did-the-ack-go/",
+            "why": "A hands-on telecom debugging log showing how to test hypotheses with packet captures when a carrier's black box won't talk back."
+        }
+    ]
+}
