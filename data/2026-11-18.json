@@ -1,0 +1,326 @@
+{
+    "date": "2026-11-18",
+    "generatedAt": "2026-11-18T08:07:26",
+    "items": [
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "Hacker News · 723 points; lobste.rs · 28",
+            "practice": [
+                "Read the OpenJDK advisory and the vendor notes for your JDK distribution, and write down which of your own services run on affected CPUs.",
+                "In a test VM you own, check which CPU features your hosts expose and work out which of your machines would take the vulnerable code path.",
+                "Study how intrinsics replace Java methods in HotSpot by reading the JDK source for a simple intrinsic, and list the ways such a replacement can diverge from the Java reference.",
+                "Practice reasoning about mask-based vector stores: on paper, work out what happens when a computed length is negative and is converted to an unsigned mask.",
+                "Build an inventory of the Java applications in your lab and note which would parse attacker-supplied Base64, to practice judging reachability."
+            ],
+            "questions": [
+                {
+                    "answer": "The faulty code is a native, hand-written intrinsic in the JVM that bypasses normal Java bounds checks. It writes out of bounds from inside the runtime itself.",
+                    "question": "Why does Java's memory safety not protect against this bug?"
+                },
+                {
+                    "answer": "Certain padded tail forms make the computed output length negative. A negative length yields an all-ones write mask, so a full 64-byte vector is stored instead of a few bytes.",
+                    "question": "What triggers the oversized write?"
+                },
+                {
+                    "answer": "OpenJDK 17.0.6 and newer, plus downstream builds, running on x86-64 CPUs with AVX-512 VBMI. ARM64 is not affected.",
+                    "question": "Which hardware and software is affected?"
+                },
+                {
+                    "answer": "They only disrupt timing for some exploits. A single complete request can still work against some targets, and WebSocket traffic after the upgrade skips body buffering.",
+                    "question": "Why are request-buffering proxies not a complete defense?"
+                },
+                {
+                    "answer": "Disable the Base64 intrinsic or restrict the JVM to AVX2 with runtime flags, then apply the vendor patch. The AVX flag must not be used on ARM.",
+                    "question": "What interim mitigations are described?"
+                }
+            ],
+            "source": "calif.io (Quang Luong)",
+            "summary": "Calif.io describes a memory-corruption bug in OpenJDK's hardware-accelerated Base64 decoder. On x86-64 CPUs with AVX-512 VBMI, the JVM uses a hand-written routine (an intrinsic). In its handling of the final characters and padding, the output length can drop below zero. That produces an all-ones write mask, so the routine writes a full 64-byte vector instead of a few bytes. The write lands past the end of the output buffer and corrupts neighboring heap objects before Java rejects the malformed input. The same flaw can also leak heap contents, Heartbleed-style.\n\nThe researcher found it while auditing HotSpot intrinsics and crypto-adjacent APIs with an AI coding agent. Most of the agent's early findings were unreachable. Persistent prompting surfaced this one in about an hour, and a first working exploit took about two more hours. The post reports pre-authentication RCE on products such as Keycloak, Jira, Confluence, Artifactory, Jenkins and PingFederate, and post-authentication RCE on others. A Java client that connects to a malicious TLS server is also at risk. The exploit chains are withheld, and the authors say each one needs per-application heap grooming and timing work.\n\nOpenJDK and Oracle shipped patches on 2026-11-17. Until patched, you can disable the Base64 intrinsic or cap the JVM at AVX2. Request buffering by a reverse proxy helps only in some cases. ARM64 hosts are not affected.",
+            "tags": [
+                "OpenJDK",
+                "AVX-512",
+                "heap corruption"
+            ],
+            "takeaways": [
+                "The bug sits in a JIT intrinsic, a hand-optimized native routine that replaces Java code, so memory-safe Java gives no protection.",
+                "The root cause is a length computed after padding that goes negative and turns into a mask that writes a whole vector.",
+                "Exploitability depends on hardware: only x86-64 CPUs with AVX-512 VBMI (recent Intel Xeon, AMD Zen 4 and newer) are affected.",
+                "Reachability is what makes it serious. Base64 decoding is used in auth tokens, uploads and TLS-adjacent parsing, so many products inherit the risk.",
+                "Exploitation is not universal. It needs heap grooming and timing control tailored to each application.",
+                "Interim mitigations are runtime flags that turn off the intrinsic or AVX-512. A proxy that buffers request bodies is only a partial defense.",
+                "Downstream JDK builds (Corretto, Temurin, Zulu, and others) all inherit the bug, so patching means checking each vendor's build.",
+                "An AI agent plus a human auditor found and weaponized the bug quickly. This shows how cheap intrinsic and JIT audits have become."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-787",
+                    "kind": "weakness",
+                    "name": "Out-of-bounds Write",
+                    "text": "The product writes data past the end, or before the beginning, of the intended buffer.",
+                    "url": "https://cwe.mitre.org/data/definitions/787.html"
+                }
+            ],
+            "title": "Java4Shell: RCE in OpenJDK when processing Base64",
+            "topic": "Security",
+            "url": "https://calif.io/java4shell/",
+            "why": "A fresh, widely discussed memory-corruption bug in a JIT intrinsic that reaches many Java products, with clear root-cause reasoning."
+        },
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "Hacker News · 344 points (Phrack 73 release thread); lobste.rs · 42",
+            "practice": [
+                "Read the kernel documentation for the vDSO and for memory sealing, and write a one-page explanation of how they interact with namespaces.",
+                "In a throwaway VM you control, inspect which kernel config options your distribution enables for checkpoint/restore and system-mapping sealing.",
+                "Draw a diagram of page-table levels and mark where a single permission bit protects a shared read-only page.",
+                "Compare how container runtimes with different isolation models (shared kernel versus userspace kernel) handle shared kernel mappings, using their public docs.",
+                "Practice with an intentionally vulnerable kernel module from a CTF platform to learn how slab reuse is reasoned about, without targeting any real system."
+            ],
+            "questions": [
+                {
+                    "answer": "Its physical pages are shared across namespaces, so changing them affects processes on the host as well as inside the container.",
+                    "question": "Why is the vDSO a useful target for container escape?"
+                },
+                {
+                    "answer": "One that lets a freed slab page be reused as a page table, and one that can modify a page-table entry, such as an arbitrary increment that sets the write bit.",
+                    "question": "What two primitives does the chain need?"
+                },
+                {
+                    "answer": "The change lives only in memory, so it never writes to a file and never triggers write-back warnings that on-disk modification can cause.",
+                    "question": "How does the technique avoid some detection?"
+                },
+                {
+                    "answer": "Sealing system mappings (kernel 6.15) stops the vDSO from being relocated. It breaks software that depends on moving system mappings, such as CRIU and gVisor.",
+                    "question": "Which mitigation does the author highlight, and what is its cost?"
+                },
+                {
+                    "answer": "The demo simulates the initial memory-corruption primitive with a debugger, so the figure doesn't cover a full real-world chain.",
+                    "question": "What caveat applies to the reliability claim?"
+                }
+            ],
+            "source": "Phrack 73 (andersonc0d3)",
+            "summary": "The article presents a post-exploitation technique for escaping a container on Linux. The vDSO is a small kernel-provided ELF library mapped into every process, and its physical pages are shared across namespaces. The author's chain starts from a memory-corruption bug that lets a freed slab page be reused as a page table. The attacker then relocates the vDSO mapping so its physical pages are referenced by an attacker-controlled page-table entry. A second primitive flips that entry's write bit. Once the vDSO is writable, backdooring it affects every process on the host, including those outside the container.\n\nThe demo simulates the initial primitive with a kernel debugger instead of using a real bug chain. The author reports very high reliability over hundreds of thousands of runs, and no need for a KASLR bypass at this step. The overwrite lives only in memory, so it avoids the file write-back detection that on-disk tampering can trigger. It needs a vDSO build that matches the target kernel and a kernel with the checkpoint/restore option, which most kernels enable.\n\nOn mitigation, kernel 6.15 added sealing for system mappings, which blocks moving the vDSO. It conflicts with tools that rely on relocation, such as CRIU and gVisor. Hardened kernels that disable checkpoint/restore are not affected.",
+            "tags": [
+                "container escape",
+                "Linux kernel",
+                "vDSO"
+            ],
+            "takeaways": [
+                "The vDSO is one of the few kernel-owned memory regions visible in every namespace, which makes it a bridge from a container to the host.",
+                "Read-only protection for the vDSO rests on a single page-table bit, so a page-table write primitive defeats it.",
+                "Turning a freed slab page into a page table is the key step. It converts a limited bug into control of memory mappings.",
+                "Relocating the vDSO through remap-style calls lets the attacker point its physical pages at a page table they control.",
+                "A memory-only backdoor avoids the file write-back signals that on-disk persistence leaves.",
+                "The sealing option for system mappings (kernel 6.15) blocks the relocation, but it breaks legitimate tools such as CRIU, gVisor and rr.",
+                "The demo simulates the first primitive, so real-world reliability depends on the bug you start from.",
+                "Kernel build options matter: hardened kernels that drop checkpoint/restore support remove the attack surface."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-787",
+                    "kind": "weakness",
+                    "name": "Out-of-bounds Write",
+                    "text": "The product writes data past the end, or before the beginning, of the intended buffer.",
+                    "url": "https://cwe.mitre.org/data/definitions/787.html"
+                }
+            ],
+            "title": "Escaping from a Docker container through vDSO",
+            "topic": "Security",
+            "url": "https://phrack.org/issues/73/escaping-from-a-docker-container-through-vdso_md.html",
+            "why": "A novel kernel-level view of why namespaces leak, built on shared vDSO pages and page-table control, with concrete mitigation trade-offs."
+        },
+        {
+            "category": "Pwn",
+            "level": "Middle",
+            "popularity": "Hacker News · 344 points (Phrack 73 release thread); lobste.rs · 42",
+            "practice": [
+                "Set up a Windows test VM you own and learn how Driver Verifier and special pool are enabled, then read a crash dump from a sample driver.",
+                "Read the source of an open-source driver or service and list every field that is read more than once from a shared buffer.",
+                "Write a short prose threat model for a driver with both a buffered path and a fast path. Note where each copies or does not copy user data.",
+                "Work through a kernel-pool challenge on a CTF platform to learn pool layout and object grooming ideas.",
+                "Review integer-overflow-before-allocation patterns in a training codebase and describe, in words, how you would add a safe size check."
+            ],
+            "questions": [
+                {
+                    "answer": "It was read from a user-writable buffer four times, so another thread could change it between the allocation and the copy, making the copy longer than the allocation.",
+                    "question": "Why was the reparse-buffer size a race condition?"
+                },
+                {
+                    "answer": "The Fast I/O path passed the user buffer straight to the handler, while the normal IRP path made a kernel copy.",
+                    "question": "Why did the user buffer stay writable in the first bug?"
+                },
+                {
+                    "answer": "A fixed header is added to a 32-bit length. With the maximum length the sum wraps around to a small number, so the allocation is tiny but the copy is huge.",
+                    "question": "How does the second bug cause an overflow?"
+                },
+                {
+                    "answer": "Driver Verifier's special pool, which places allocations at page boundaries so an overrun faults immediately.",
+                    "question": "What helped make the crashes reproducible?"
+                },
+                {
+                    "answer": "Fetch untrusted values once, check arithmetic before allocating, and apply the same protections on every path that accepts a request.",
+                    "question": "What general coding rule do both bugs illustrate?"
+                }
+            ],
+            "source": "Phrack 73 (Lucas Tay)",
+            "summary": "A malware reverse engineer plays a Windows kernel challenge in PhrackCTF2025, which covers use-after-free bugs, named pipes and heap spraying. Months later, while looking for a file-system driver for a personal project, the author reads the source of WinFsp and notices a field that is read several times. That observation leads to a time-of-check/time-of-use bug (CVE-2026-3006). A later AI-assisted bug-hunting experiment finds a second bug, an integer truncation (CVE-2026-7162).\n\nThe first bug comes from a reparse-point buffer size read four times from a user-writable buffer: for a bounds check, for validation, for the allocation and for the copy. A racing thread can change it between allocation and copy. It is reachable because the Fast I/O path hands the driver the raw user buffer, while the normal path copies it. The second bug adds a fixed header to a 32-bit length. With the maximum length the sum wraps to a tiny allocation, but the copy uses the full length. Both overflow non-paged pool, and the author used named-pipe grooming to place a victim object next to the overflow. Driver Verifier's special pool made the crashes deterministic. The maintainer shipped quick fixes.",
+            "tags": [
+                "Windows kernel",
+                "TOCTOU",
+                "integer overflow"
+            ],
+            "takeaways": [
+                "CTF skills transfer to real code. Kernel-pool and named-pipe techniques from a CTF applied to a real driver.",
+                "Reading source for values that are fetched more than once is a cheap way to find TOCTOU bugs.",
+                "Copy user-controlled fields into a local variable once, then validate and use only that copy.",
+                "A buffered I/O method can be bypassed if another dispatch path, such as Fast I/O, passes raw user pointers.",
+                "Always check arithmetic on user-supplied sizes before allocating, and use the same validated size for the copy.",
+                "Driver Verifier's special pool turns subtle heap overflows into immediate, diagnosable crashes.",
+                "Pool grooming with named pipes places a controllable victim object next to the overflowing chunk.",
+                "The author used an AI harness as a second pair of eyes, and it found a bug the author wasn't looking for."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-367",
+                    "kind": "weakness",
+                    "name": "Time-of-check Time-of-use (TOCTOU) Race Condition",
+                    "text": "The product checks the state of a resource before using that resource, but the resource's state can change between the check and the use in a way that invalidates the results of the check.",
+                    "url": "https://cwe.mitre.org/data/definitions/367.html"
+                },
+                {
+                    "id": "CWE-416",
+                    "kind": "weakness",
+                    "name": "Use After Free",
+                    "text": "The product reuses or references memory after it has been freed. At some point afterward, the memory may be allocated again and saved in another pointer, while the original pointer references a location somewhere within the new allocation. Any operations using the original pointer are no longer valid because the memory \"belongs\" to the code that operates on the new pointer.",
+                    "url": "https://cwe.mitre.org/data/definitions/416.html"
+                }
+            ],
+            "title": "From PhrackCTF to Two WinFsp 0-days",
+            "topic": "Security",
+            "url": "https://phrack.org/issues/73/from-phrackctf-to-two-winfsp-0-days_md.html",
+            "why": "Shows how CTF skills turn into real Windows driver bugs, with two clean root-cause lessons on double fetches and size arithmetic."
+        },
+        {
+            "category": "Pwn",
+            "level": "Junior",
+            "popularity": "Hacker News · 344 points (Phrack 73 release thread); lobste.rs · 42",
+            "practice": [
+                "Read the article and write a timeline of the events in your own words, marking the point where the mistake entered the code.",
+                "Study the difference between a checksum, a hash and a MAC using an educational crypto course, and explain why only a MAC resists tampering.",
+                "Practice reading integer-width bugs on an intentionally vulnerable training platform, focusing on how a narrower type changes loop or counter behavior.",
+                "Read about ASLR and write a short note on how it would have changed the economics of per-distribution offset lists.",
+                "Check the OpenSSH release notes for old advisories and practice mapping each one to a root-cause category."
+            ],
+            "questions": [
+                {
+                    "answer": "It used CRC32 for packet integrity, which does not stop deliberate manipulation.",
+                    "question": "What was the original weakness in SSH1?"
+                },
+                {
+                    "answer": "Maintainers changed a counter in the detector from 32-bit to 16-bit, which broke its internal logic and created a memory-corruption bug.",
+                    "question": "How did the fix become the vulnerability?"
+                },
+                {
+                    "answer": "OpenSSH, Cisco and others merged the altered patch without re-verifying it.",
+                    "question": "Why did the bug spread so widely?"
+                },
+                {
+                    "answer": "The payload had to arrive in one read, so attackers filled the remote buffer and sent a final fragment that delivered it all at once.",
+                    "question": "Why did the exploit need TCP fragmentation?"
+                },
+                {
+                    "answer": "Leaked exploit binaries were sometimes trojanized, so running them can compromise the user.",
+                    "question": "What lesson applies to people who download public exploit code?"
+                }
+            ],
+            "source": "Phrack 73 (lcamtuf, scut, dvorak, scrippie, portal, gera, skyper)",
+            "summary": "This history piece tells how a small flaw in SSH1 became a mass-exploited remote vulnerability. In 1998, CoreSDI found a weakness: SSH1 protected packets with CRC32, which catches accidental corruption but not deliberate tampering. They sent a patch that added an attack-detector function. The maintainers altered the patch, changing one counter from a 32-bit to a 16-bit type. That change made the detector itself unsafe. Other projects, including OpenSSH and Cisco, merged the altered patch and spread the flaw widely.\n\nIn 2000 a fuzzing run exposed the crash. Several groups wrote private exploits, and OpenSSH shipped a fix in November 2000. The exploit overwrote part of a stack return address. It had to survive the CRC check, deliver its payload in a single read by using TCP fragmentation, and use per-distribution offsets that attackers traded as valuable assets. Real-world use grew through 2001, and CERT warned about in-the-wild attacks. Later, leaked exploit binaries were trojanized, which hurt the people who ran them.",
+            "tags": [
+                "SSH",
+                "history",
+                "integer types"
+            ],
+            "takeaways": [
+                "A one-line type change, from 32 to 16 bits, turned a protective function into an exploitable bug.",
+                "CRC32 detects accidents, not attackers. Integrity against an adversary needs a cryptographic MAC.",
+                "Downstream projects copied the patch without re-verifying it, so one mistake spread across the ecosystem.",
+                "Fuzzing found the crash, and the crashes were also a signal for defenders, as grsecurity showed.",
+                "Without ASLR, exploit offsets per distribution and version were reusable and valuable.",
+                "The gap between a fix and widespread patching lasted months or years, and attackers used it.",
+                "Leaked exploit binaries can be backdoored, so running someone else's exploit is a risk for the person running it.",
+                "Security-critical patches need careful review, not just a check that functionality still works."
+            ],
+            "terms": [
+                {
+                    "id": "CAPEC-494",
+                    "kind": "pattern",
+                    "name": "TCP Fragmentation",
+                    "text": "An adversary may execute a TCP Fragmentation attack against a target with the intention of avoiding filtering rules of network controls, by attempting to fragment the TCP packet such that the headers flag field is pushed into the second fragment which typically is not filtered.",
+                    "url": "https://capec.mitre.org/data/definitions/494.html"
+                }
+            ],
+            "title": "HISTORY: The 2000 SSH1 exploit that broke the Internet",
+            "topic": "Security",
+            "url": "https://phrack.org/issues/73/history-the-2000-ssh1-exploit-that-broke-the-internet_md.html",
+            "why": "An approachable first-hand history of how one patched-wrong integer type became a mass-exploited bug, with lessons that still apply."
+        },
+        {
+            "category": "Cloud Security",
+            "level": "Middle",
+            "popularity": "lobste.rs · 8",
+            "practice": [
+                "Read the Red Hat advisories linked from the article and summarize in your own words how the key server decides to trust a request.",
+                "Study the token claims in the OAuth and registry token docs, and list which claims should be checked for scope and purpose.",
+                "In a registry you run in your own lab, review how signing keys are listed, and plan an audit for keys with no expiry.",
+                "Practice finding wildcard-escape problems by reading how a sample app in a training lab builds LIKE queries.",
+                "Write a short incident-response checklist for a leaked or planted registry signing key."
+            ],
+            "questions": [
+                {
+                    "answer": "The key server did not verify that the token had been issued for key rotation, so any trusted-signed token with a matching audience passed.",
+                    "question": "What check was missing in CVE-2026-123710?"
+                },
+                {
+                    "answer": "The /v2/auth endpoint issued signed tokens to anonymous callers and let them pick the audience, so those tokens satisfied the key server.",
+                    "question": "Why did anonymous tokens matter?"
+                },
+                {
+                    "answer": "The namespace name is used in a LIKE pattern without escaping, so an underscore acts as a wildcard and matches other tenants' names.",
+                    "question": "How does the robot-account bug work?"
+                },
+                {
+                    "answer": "Until the fixed build is deployed the attacker can reinstall a key by repeating the abuse.",
+                    "question": "Why is deleting a rogue key not enough?"
+                },
+                {
+                    "answer": "It adds the rotation check, requires an expiry on keys added through the key server, stops callers from choosing the audience and fixes the robot account search.",
+                    "question": "What did the upstream fix change?"
+                }
+            ],
+            "source": "The Hacker News (research by Red Hat's Dave O'Connor)",
+            "summary": "Two critical flaws were disclosed in Red Hat Quay, a container registry. The first, CVE-2026-123710 (CVSS 9.8), is in the key server. A key-replacement request must carry a token signed by a trusted key with the right audience and issuer, but the server never checks that the token was issued for key rotation. The /v2/auth endpoint hands out such tokens to anonymous callers and lets the caller choose the audience. An attacker can add their own signing key with no expiry, then forge tokens for any repository. The planted key survives restarts, and the attacker can delete the keys the real instances use.\n\nThe second, CVE-2026-110697 (CVSS 9.9), is in robot-account search. The namespace name is placed in an SQL LIKE pattern without escaping wildcards. An underscore matches any single character, so a user who can create a namespace can match another tenant's robot accounts and obtain their decrypted tokens.\n\nRed Hat shipped fixes for eight Quay 3 branches. The upstream change adds the missing rotation check, requires an expiry on keys added through the key server, and stops callers from choosing the token audience. Disabling anonymous access does not close the first flaw. Interim steps are blocking the /keys endpoint at the proxy, auditing for keys with no expiry, removing unknown service keys and rotating robot tokens. The article is news coverage that links to the Red Hat sources.",
+            "tags": [
+                "container registry",
+                "token validation",
+                "multi-tenancy"
+            ],
+            "takeaways": [
+                "A token that is validly signed is not proof it was issued for the purpose at hand. The purpose or scope claim must be checked.",
+                "Letting a client choose a token's audience lets it get tokens that fit other checks.",
+                "A signing-key store that accepts new keys is a high-value target, and added keys should have a mandatory expiry.",
+                "Persistent trust anchors planted by an attacker survive restarts, so cleanup needs a patch first or the key comes back.",
+                "Unescaped wildcards in SQL LIKE patterns, such as the underscore, can break tenant isolation.",
+                "Multi-tenant isolation flaws can expose other tenants' credentials, which are often decrypted on return.",
+                "Turning off anonymous access is not a full mitigation here, since any valid account can still abuse the first flaw.",
+                "Detection ideas: audit key-creation events with no expiry and review service keys you don't recognize."
+            ],
+            "terms": [
+            ],
+            "title": "Critical Red Hat Quay Flaw Lets Attackers Read and Overwrite All Private Container Images in a Registry",
+            "topic": "Security",
+            "url": "https://thehackernews.com/2026/11/critical-red-hat-quay-flaw-lets.html",
+            "why": "A compact case study in token-scope validation and SQL wildcard bugs that break trust in a container registry, with concrete audit steps."
+        }
+    ]
+}
