@@ -1,0 +1,340 @@
+{
+    "date": "2026-11-19",
+    "generatedAt": "2026-11-19T08:04:07",
+    "items": [
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "Lobsters · 69 points",
+            "practice": [
+                "Read the HTTP/2 specification's section on flow control and write down, in your own words, how connection and stream windows should be accounted for.",
+                "In your own test environment, review how your nginx servers are built and listed: which have HTTP/2, HTTP/3, mirror or mail proxy enabled, and which version each package really ships.",
+                "Write a short audit checklist for signed versus unsigned comparisons in bounds checks, then apply it to a small open-source C project you pick.",
+                "On a VM you own, list which rarely used kernel modules are loadable and decide which you would block, noting why a blocklist differs from unloading.",
+                "Design detection ideas for long-lived, heavy-inbound connections and worker-spawned processes using your own logs, and note their false positives."
+            ],
+            "questions": [
+                {
+                    "answer": "Credit for queued data is returned twice during stream cancellation, pushing the send window past its maximum. An unsigned wraparound in the later check then accepts the value, and a negative length becomes a huge copy.",
+                    "question": "What is the root cause of CVE-2026-123007?"
+                },
+                {
+                    "answer": "Only two of the five bugs need HTTP/2. The resolver, QUIC and mail proxy use-after-frees are triggered through other features.",
+                    "question": "Why does disabling HTTP/2 not fully protect an nginx server?"
+                },
+                {
+                    "answer": "It adds a Linux SCTP use-after-free that leaks kernel addresses and gives an arbitrary kernel function call. That can also reach the host kernel from inside a container.",
+                    "question": "How does the chain go from nginx worker to root?"
+                },
+                {
+                    "answer": "Distributions backport fixes without changing the reported nginx version, so you have to compare against the package advisory.",
+                    "question": "Why are version strings unreliable for patch checks here?"
+                },
+                {
+                    "answer": "The triggering HTTP/2 frames are not logged as requests and TLS hides them. Only indirect signals such as crashes or unexpected process spawns are available.",
+                    "question": "What makes detection hard?"
+                }
+            ],
+            "source": "Xint (Theori) — xint.io",
+            "summary": "Xint reports five independent nginx vulnerabilities, plus a Linux kernel SCTP flaw that can be chained with any of them to reach root. The most important is an HTTP/2 flow-control bug (CVE-2026-123007). During stream cancellation, queued send-window credit is returned twice, so the connection window exceeds its legal maximum. A later bounds check uses mixed signed and unsigned arithmetic and wraps around, so it passes. That yields a negative distance that is read as a huge unsigned copy length. The other four bugs are use-after-free flaws in the resolver with mirror subrequests, HTTP/2 draining, QUIC draining, and the mail proxy auth path.\n\nThe chain is described only at a high level. The client controls the HTTP/2 windows and withholds reads, so the accounting error can be triggered. The oversized copy is shaped by glibc's backward-copy behavior so it touches only small regions. That gives both heap corruption and leaked pointers, which defeats ASLR. A cleanup callback is then overwritten to run code as the worker. The SCTP use-after-free leaks kernel addresses and gives an arbitrary kernel call, which reaches root, including from inside a container. The authors validated this on AWS, GCP and Azure, and fixes ship in nginx 1.31.9.\n\nThe post also covers mitigations and why each is partial, plus detection ideas and a disclosure timeline.",
+            "tags": [
+                "nginx",
+                "use-after-free",
+                "privilege-escalation"
+            ],
+            "takeaways": [
+                "One accounting bug in a decade-old HTTP/2 path affected every official release from 1.9.5 through 1.31.8.",
+                "Mixing signed and unsigned arithmetic in a bounds check lets a wrapped value pass validation.",
+                "A single bug can give both a memory leak and a corruption primitive, which is what makes ASLR bypass practical.",
+                "Worker-level RCE becomes host compromise when an unneeded kernel module such as SCTP is reachable.",
+                "Disabling HTTP/2 only blocks two of the five nginx bugs. Mitigations are tied to configuration, so check each one.",
+                "Reloading nginx is not enough, because old workers keep serving existing sessions. A restart is needed.",
+                "Distros backport fixes without changing version strings, so check vendor advisories rather than the banner.",
+                "HTTP/2 control frames are not logged as requests and TLS hides them. Detection relies on indirect signals such as long-lived heavy connections, worker crashes and execve from a worker UID."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-416",
+                    "kind": "weakness",
+                    "name": "Use After Free",
+                    "text": "The product reuses or references memory after it has been freed. At some point afterward, the memory may be allocated again and saved in another pointer, while the original pointer references a location somewhere within the new allocation. Any operations using the original pointer are no longer valid because the memory \"belongs\" to the code that operates on the new pointer.",
+                    "url": "https://cwe.mitre.org/data/definitions/416.html"
+                }
+            ],
+            "title": "nginx2root",
+            "topic": "Security",
+            "url": "https://xint.io/blog/nginx2root-remote-code-execution",
+            "why": "It shows how five nginx bugs and one kernel bug chain from a worker process to root, with honest notes on where each mitigation falls short."
+        },
+        {
+            "category": "Pwn",
+            "level": "Middle",
+            "popularity": "Hacker News · 1254 points",
+            "practice": [
+                "Build a diagram of the connection lifecycle states (reusable, active, closing) for any event-driven server and mark where a pointer could outlive its object.",
+                "Study the HTTP/2 frame types named here (HEADERS, GOAWAY, WINDOW_UPDATE) in the RFC and explain what each does.",
+                "In your own lab, inventory your nginx versions and compare each with the fixed versions, including vendor backports.",
+                "Draft a monitoring rule idea for unusual WINDOW_UPDATE volume on long-lived connections, and discuss its false positives.",
+                "Practice reading CVSS 4.0 vectors by scoring a flaw like these two and comparing your result with the published 9.2."
+            ],
+            "questions": [
+                {
+                    "answer": "A reusable-marked connection is later closed under slot pressure while a request still references it. A failing GOAWAY build then frees the connection memory early.",
+                    "question": "How does CVE-2026-123633 lead to a use-after-free?"
+                },
+                {
+                    "answer": "Canceled-stream accounting lets the send window exceed its maximum. An unsigned subtraction wraps, and the oversized value becomes a negative length and an out-of-bounds copy.",
+                    "question": "What goes wrong in CVE-2026-123007?"
+                },
+                {
+                    "answer": "The attacker must leak addresses, shape the heap and handle differences between builds. Both flaws are memory-safety bugs.",
+                    "question": "Why is exploitation considered difficult?"
+                },
+                {
+                    "answer": "Turn HTTP/2 off in affected server blocks, reload or restart, and check that old worker processes have exited. Re-enable after patching.",
+                    "question": "What is the interim mitigation?"
+                },
+                {
+                    "answer": "nginx OSS 1.30.7 (stable) and 1.31.9 (mainline), plus matching NGINX Plus releases.",
+                    "question": "Which versions fix the issues?"
+                }
+            ],
+            "source": "Wiz Research (Nir Ohfeld, Tomer Schwartz) — wiz.io",
+            "summary": "Wiz Research describes two critical unauthenticated RCE flaws in nginx's HTTP/2 implementation, CVE-2026-123633 and CVE-2026-123007, both CVSS 4.0 9.2. Several teams found them independently and reported them to F5, which shipped coordinated fixes on 18 Nov 2026.\n\nCVE-2026-123633 is a use-after-free. A connection with a partial HEADERS frame and no active streams is marked reusable. When the rest of the frame arrives, it is not taken off that list. Under connection-slot pressure while proxying upstream, nginx can close it. If building the GOAWAY frame fails, the error path frees memory that the in-flight request still uses. It was present for about six years and mostly matters for reverse proxies. CVE-2026-123007 is an integer underflow in send-window accounting. Returning allowance for canceled streams can push the counter past the protocol maximum. An unsigned subtraction then wraps and the check accepts further increases. This eventually causes an out-of-bounds copy in the TLS send path. Wiz confirmed an ASLR bypass on official builds with plain static content, and it has been present since 1.9.5.\n\nExploitation is hard but realistic, and Wiz withheld its exploits. Fixes are nginx 1.30.7 and 1.31.9. Temporarily, turn HTTP/2 off and restart.",
+            "tags": [
+                "nginx",
+                "HTTP/2",
+                "memory-safety"
+            ],
+            "takeaways": [
+                "Two independent HTTP/2 bugs were fixed in one coordinated release and found by several teams in parallel.",
+                "A connection marked reusable in one state but not removed from that list when the state changes is a classic lifetime bug.",
+                "Error paths such as a failed GOAWAY build are where freed objects get left referenced.",
+                "The unsigned subtraction in the window check wrapped, so the check accepted bad values.",
+                "Memory-safety bugs need a leak and heap shaping, but a read primitive removes ASLR as an obstacle.",
+                "Packaged builds are likely first targets because they are uniform.",
+                "As a stopgap, disable HTTP/2 on affected server blocks, then restart and confirm old workers exited.",
+                "CDNs or WAFs that terminate HTTP/2 may partly shield the origin, but this depends on the implementation."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-119",
+                    "kind": "weakness",
+                    "name": "Buffer Overflow",
+                    "text": "The product performs operations on a memory buffer, but it reads from or writes to a memory location outside the buffer's intended boundary.",
+                    "url": "https://cwe.mitre.org/data/definitions/119.html"
+                },
+                {
+                    "id": "CWE-191",
+                    "kind": "weakness",
+                    "name": "Integer Underflow (Wrap or Wraparound)",
+                    "text": "The product subtracts one value from another, such that the result is less than the minimum allowable integer value, which produces a value that is not equal to the correct result.",
+                    "url": "https://cwe.mitre.org/data/definitions/191.html"
+                },
+                {
+                    "id": "CWE-416",
+                    "kind": "weakness",
+                    "name": "Use After Free",
+                    "text": "The product reuses or references memory after it has been freed. At some point afterward, the memory may be allocated again and saved in another pointer, while the original pointer references a location somewhere within the new allocation. Any operations using the original pointer are no longer valid because the memory \"belongs\" to the code that operates on the new pointer.",
+                    "url": "https://cwe.mitre.org/data/definitions/416.html"
+                }
+            ],
+            "title": "Unauthenticated remote code execution in Nginx",
+            "topic": "Security",
+            "url": "https://www.wiz.io/blog/nginx-http2-rce-vulnerabilities",
+            "why": "It gives a clear root-cause explanation of two critical nginx HTTP/2 flaws, along with practical mitigation and detection advice."
+        },
+        {
+            "category": "Reverse",
+            "level": "Junior",
+            "popularity": "Hacker News · 129 points",
+            "practice": [
+                "Pick a small crackme from a CTF platform and keep a notes file with the structure, imports and open questions as you go.",
+                "Write three hypotheses about what a function in that crackme does, and for each decide how you would confirm it with logging or a debugger.",
+                "In a lab VM, compare the same tiny program in a decompiler and a plain disassembler to see what each hides.",
+                "Practice reading an AI tool's explanation of a function and verify each claim against the disassembly.",
+                "Reverse a simple file format from your own application's saved files and document its fields in prose."
+            ],
+            "questions": [
+                {
+                    "answer": "They preserve context across compaction or handoff and reduce circular reasoning.",
+                    "question": "Why keep findings in Markdown files?"
+                },
+                {
+                    "answer": "Record a testable hypothesis, design a probe or logging experiment, record the result, and repeat.",
+                    "question": "What is the hypothesis-debugging loop?"
+                },
+                {
+                    "answer": "When disassembly alone can't answer the question, for example when behavior depends on runtime data.",
+                    "question": "When should you move from static to dynamic analysis?"
+                },
+                {
+                    "answer": "They fall into narrow approaches and need human steering.",
+                    "question": "What weakness of agents does the author note?"
+                },
+                {
+                    "answer": "Its strict compiler gives agents quick, precise feedback, at the cost of slower builds.",
+                    "question": "Why use Rust for the hack implementations?"
+                }
+            ],
+            "source": "ioma8 — slowchronicle.com",
+            "summary": "The author describes a practical workflow for using an AI coding agent to reverse engineer binaries, with desktop programs, firmware and protocols as targets. First identify the binary type and choose a decompiler. Then have the agent keep all findings in Markdown notes so it stays oriented after context compaction and doesn't go in circles. Next map the structure: main functions, branching and imports.\n\nWhen static analysis stalls, switch to dynamic methods: debugging, logging, emulators or a different strategy. The most distinctive idea is hypothesis debugging. The agent writes down a testable hypothesis, designs a probe, records the result and repeats. This replaces guessing. Tools include Ghidra via an MCP bridge, radare2, Python for quick probes and Rust for implementations, because the compiler gives sharp feedback.\n\nThe author lists hobby results such as device protocol mapping and custom firmware for several gadgets. They admit the agent gets stuck in narrow approaches, that human steering and reading its reasoning traces are still needed, and that the speed claims are not measured.",
+            "tags": [
+                "LLM",
+                "Ghidra",
+                "methodology"
+            ],
+            "takeaways": [
+                "Persistent Markdown notes keep an agent, or you, oriented across long sessions.",
+                "Treat every stuck point as a testable hypothesis with an experiment and a recorded result.",
+                "Static analysis has limits. Switch to debugging or logging when it stalls.",
+                "Simple CLI tools can be easier for agents to use than powerful GUIs.",
+                "Read the agent's reasoning traces to spot blind paths and redirect it, for example toward strings instead of cross-references.",
+                "A strict compiler gives fast, precise feedback to an agent writing code.",
+                "Human experience still decides whether the agent's conclusions are right.",
+                "The post gives no quantitative evidence, so treat its speed claims as anecdotal."
+            ],
+            "terms": [
+                {
+                    "id": "CAPEC-188",
+                    "kind": "pattern",
+                    "name": "Reverse Engineering",
+                    "text": "An adversary discovers the structure, function, and composition of an object, resource, or system by using a variety of analysis techniques to effectively determine how the analyzed entity was constructed or operates. The goal of reverse engineering is often to duplicate the function, or a part of the function, of an object in order to duplicate or \"back engineer\" some aspect of its functioning.",
+                    "url": "https://capec.mitre.org/data/definitions/188.html"
+                }
+            ],
+            "title": "LLM assisted reverse engineering",
+            "topic": "Security",
+            "url": "https://www.slowchronicle.com/posts/llm-assisted-reverse-engineering",
+            "why": "It is an approachable, repeatable workflow for reverse engineering with an AI agent, built around notes and testable hypotheses."
+        },
+        {
+            "category": "Reverse",
+            "level": "Middle",
+            "popularity": "Lobsters · 37 points",
+            "practice": [
+                "On a Windows VM you own, read the diagnostic data viewer settings and note which categories are enabled.",
+                "Practice static tracing in a decompiler on a small program: find a list of strings and follow it to the functions that compare against them.",
+                "Design a harmless experiment, such as renaming your own test program, to check whether name-based detection exists in some software you own.",
+                "Write a short privacy assessment of what a coarse usage bitmap could reveal about you or your team.",
+                "Compare the telemetry defaults of two operating systems on your own machines and record the differences."
+            ],
+            "questions": [
+                {
+                    "answer": "By running it in a VM, triggering the matchers with renamed programs, and inspecting persisted state and the DiagTrack upload queue.",
+                    "question": "How was the collection confirmed beyond reading strings?"
+                },
+                {
+                    "answer": "A bitmap for each window showing which agent or tool categories were seen, not a list of names or any content.",
+                    "question": "What exactly is reported?"
+                },
+                {
+                    "answer": "It subscribes to existing Windows events and matches executable names.",
+                    "question": "How does the component notice a tool running?"
+                },
+                {
+                    "answer": "When optional diagnostic data is allowed, which was the default on the tested clean install.",
+                    "question": "When is it uploaded?"
+                },
+                {
+                    "answer": "Decline optional diagnostics at setup or turn off optional diagnostic data in Privacy settings.",
+                    "question": "How can a user stop it?"
+                }
+            ],
+            "source": "xusheng.dev",
+            "summary": "The author found that a Windows 11 component, MissionControlAggregator.dll, contains lists of coding agents and developer tools and records which of them have run. An AI assistant helped search recent Windows binaries for undocumented features. The author then used Binary Ninja to trace executable names to matcher functions and mapped the flow. The aggregator subscribes to existing Windows events rather than scanning processes.\n\nRuntime testing on a Windows 11 ARM64 VM confirmed it runs under the DiagTrack service. Renamed copies of a built-in program, named after an agent and a compiler, triggered the matchers, so detection is by executable name alone. The author also inspected persisted state, forced a report and checked the upload queue.\n\nThe report is a bitmap of categories, with four CLI-agent slots, five desktop-agent slots and twelve developer-tool categories. No prompt text or source code was found. It is queued for upload when optional diagnostic data is allowed, which was the default on a clean install. It can be disabled in Privacy settings or at setup.",
+            "tags": [
+                "Windows",
+                "telemetry",
+                "Binary Ninja"
+            ],
+            "takeaways": [
+                "A string list in a system DLL is a lead, not a finding. Verify it end to end.",
+                "Tracing from static strings to matchers to the event source explains how data is collected.",
+                "Renaming a harmless program is a cheap, safe way to test name-based detection.",
+                "Check the persisted state and upload queue to confirm what actually leaves the machine.",
+                "The report is a coarse bitmap rather than names, but usage metadata can still be sensitive.",
+                "Defaults decide exposure: optional diagnostic data was on in a default setup.",
+                "The user-level fix is to turn off optional diagnostic data.",
+                "Name-based matching can be fooled either way, so it is weak evidence."
+            ],
+            "terms": [
+            ],
+            "title": "Windows 11 collects data on which coding agents and dev tools you use",
+            "topic": "Security",
+            "url": "https://xusheng.dev/posts/windows-coding-agent-telemetry/",
+            "why": "It is a compact example of going from a string list in a system DLL to a verified, end-to-end finding about what leaves the machine."
+        },
+        {
+            "category": "Other",
+            "level": "Middle",
+            "popularity": "Hacker News · 172 points",
+            "practice": [
+                "Inventory every Ruby version used in your own projects, containers and CI images, and mark which are fixed.",
+                "Read about how regex engines compile patterns and note where length calculations occur.",
+                "Practice classifying each of the seven bug types as a read, write or lifetime issue and describe the likely impact in prose.",
+                "Look up the GHSA entries later and compare them with the CVEs when assigned.",
+                "Plan an upgrade path for an end-of-life runtime in a test environment you control."
+            ],
+            "questions": [
+                {
+                    "answer": "The regex engine (compilation, case-insensitive matching, to_s) and string case conversion.",
+                    "question": "Which areas of Ruby are affected?"
+                },
+                {
+                    "answer": "Ruby 4.0.10, 3.4.13 and 3.3.14.",
+                    "question": "Which versions fix the issues?"
+                },
+                {
+                    "answer": "They are end-of-life and receive no fix, so you must upgrade.",
+                    "question": "What about Ruby 3.2 and earlier?"
+                },
+                {
+                    "answer": "They were requested but not yet assigned, so GHSA identifiers are used.",
+                    "question": "Why are there no CVE IDs in the advisory?"
+                },
+                {
+                    "answer": "Heap overflows, a double free, integer overflows leading to overflows, and out-of-bounds reads.",
+                    "question": "What bug classes appear?"
+                }
+            ],
+            "source": "ruby-lang.org",
+            "summary": "The Ruby maintainers disclosed seven memory-safety vulnerabilities in the regular expression engine and in string case conversion. Several are heap buffer overflows or double frees. Others are integer overflows that lead to overflows, and out-of-bounds reads. The advisory says some have proofs of concept that can reach remote code execution.\n\nThree affect case conversion, a one-byte heap overflow and an integer overflow leading to a heap overflow. The rest affect regex compilation, case-insensitive matching and Regexp#to_s. Credits include an Ada Logics researcher working with Anthropic, and other independent reporters. CVE IDs were still pending, so GHSA IDs are used.\n\nAffected are Ruby 3.3.13 and earlier, 3.4.0 to 3.4.12 and 4.0.0 to 4.0.9. Fixes are 4.0.10, 3.4.13 and 3.3.14. Ruby 3.2 and earlier are end-of-life and get no fix. The advisory gives only vulnerability classes, not code-level analysis, so this is mainly a patching and triage read.",
+            "tags": [
+                "Ruby",
+                "memory-corruption",
+                "advisory"
+            ],
+            "takeaways": [
+                "Regex engines and text transforms are large C code bases where length and integer arithmetic errors accumulate.",
+                "Any app that compiles or matches regexes built from untrusted input is more exposed.",
+                "An off-by-one overflow of a single byte can still be enough for heap corruption.",
+                "Seven bugs in one release show how a single audit can find several related flaws.",
+                "End-of-life Ruby versions get no patches, so upgrading is the only fix.",
+                "Advisories may use GHSA IDs before CVEs are assigned, so track both.",
+                "Check that your runtime, base images and CI images are all on fixed versions.",
+                "The advisory is not a root-cause writeup, so it is a starting point for study."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-119",
+                    "kind": "weakness",
+                    "name": "Buffer Overflow",
+                    "text": "The product performs operations on a memory buffer, but it reads from or writes to a memory location outside the buffer's intended boundary.",
+                    "url": "https://cwe.mitre.org/data/definitions/119.html"
+                },
+                {
+                    "id": "CWE-122",
+                    "kind": "weakness",
+                    "name": "Heap-based Buffer Overflow",
+                    "text": "The product writes past the end of a buffer that was allocated on the heap.",
+                    "url": "https://cwe.mitre.org/data/definitions/122.html"
+                }
+            ],
+            "title": "Multiple vulnerabilities in Regexp and String case conversion",
+            "topic": "Other",
+            "url": "https://www.ruby-lang.org/en/news/2026/11/18/multiple-vulnerabilities-in-regexp-and-string/",
+            "why": "It lists seven memory-safety bugs in Ruby's regex and case-conversion code with affected and fixed versions, so you can triage and patch."
+        }
+    ]
+}
