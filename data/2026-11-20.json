@@ -1,0 +1,318 @@
+{
+    "date": "2026-11-20",
+    "generatedAt": "2026-11-20T08:34:06",
+    "items": [
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "Hacker News · 393 points (front page, 2026-11-19)",
+            "practice": [
+                "Read the Ruby advisory and the upstream fix commit, and write a short note explaining in your own words why the old check was too small.",
+                "On paper, work out the buffer size for several input lengths and how many special characters it takes to exceed it, to see how slack space hides off-by-one bugs.",
+                "Audit a project you own for places where output is sized as input length plus a constant, and list which transformations could expand the data.",
+                "In your own lab, check which Ruby versions your self-hosted apps bundle and whether the vendor has published a fixed build.",
+                "Read about how heap allocators place neighbouring chunks, and write what a one-byte overwrite could affect in general terms."
+            ],
+            "questions": [
+                {
+                    "answer": "Upcasing ß in a single-byte encoding writes two bytes (\"SS\"), but the loop only verified space for one. Enough such characters exceed the buffer, which is input length plus 20 bytes.",
+                    "question": "What is the root cause of the overflow?"
+                },
+                {
+                    "answer": "They use a different case-mapping code path. The faulty loop is in the legacy single-byte encoding handlers.",
+                    "question": "Why are UTF-8 strings unaffected?"
+                },
+                {
+                    "answer": "Request data is routinely treated as strings and passed through case operations, so an attacker can supply the crafted input before any login.",
+                    "question": "Why is the bug reachable without authentication in Rails?"
+                },
+                {
+                    "answer": "Products that bundle their own Ruby need the vendor to ship a rebuilt release, and some had none yet. Ruby 3.2 and older have no fix at all.",
+                    "question": "Why is upgrading Ruby not enough for some operators?"
+                },
+                {
+                    "answer": "To give major vendors time to ship patches before working exploit details are public.",
+                    "question": "Why might the authors delay their proof of concept?"
+                }
+            ],
+            "source": "Veria Labs (verialabs.com)",
+            "summary": "Veria Labs describes CVE-2026-132825, a one-byte heap overflow in Ruby's string case conversion. For most single-byte encodings, which have no capital ß, upcasing the character must produce two bytes (\"SS\"). The write loop checks for room for only one byte. The output buffer is sized as input length plus a fixed 20 bytes of slack, so enough ß characters push the result one byte past the end. The same loop appears in several ISO-8859 and Windows-125x encodings and dates back to Ruby 2.4.0. It is reachable through upcase, swapcase, case-fold downcase and case-insensitive comparison. UTF-8 strings take a different path and are not affected.\n\nThe post says the flaw is reachable before authentication in Rails and classic-style Sinatra by default, and in self-hosted products that bundle Ruby. Fixed releases are 4.0.10, 3.4.13 and 3.3.14. Ruby 3.2 and older are end-of-life with no fix. GitLab, Mastodon, OpenProject and the Discourse base image have patched builds. GitHub Enterprise Server and Chatwoot had none when the post was updated. The authors credit other reporters (Ada Logics, Anthropic, and a researcher working with OpenAI) for the underlying primitive. They say they will hold their remote-code-execution proof of concept until 25 November 2026 or later, so the post focuses on mechanism, affected versions and patching.",
+            "tags": [
+                "Ruby",
+                "heap overflow",
+                "Rails"
+            ],
+            "takeaways": [
+                "A bounds check must match the worst-case output size, not the common case. Here one input character can become two output bytes.",
+                "Buffers sized as input length plus fixed slack are fragile when the output can grow faster than the input.",
+                "Legacy encoding paths get far less review than the UTF-8 path, and this bug lived only there for years.",
+                "A single out-of-bounds byte can be enough for serious exploitation, because the attacker controls buffer size through input length.",
+                "Bundled runtimes in self-hosted products can stay vulnerable long after the upstream fix, so operators must track vendor releases.",
+                "End-of-life language versions get no patch, so the only option is upgrading.",
+                "Coordinated disclosure can include a delayed proof of concept to give defenders time to patch."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-122",
+                    "kind": "weakness",
+                    "name": "Heap-based Buffer Overflow",
+                    "text": "The product writes past the end of a buffer that was allocated on the heap.",
+                    "url": "https://cwe.mitre.org/data/definitions/122.html"
+                }
+            ],
+            "title": "Ruby2ßhell: Pre-authentication RCE on stock Rails",
+            "topic": "Security",
+            "url": "https://verialabs.com/ruby2shell/",
+            "why": "A clear, current example of how a tiny bounds-check mismatch in a mainstream runtime becomes a pre-auth web-framework risk."
+        },
+        {
+            "category": "Web",
+            "level": "Middle",
+            "popularity": "Covered in The Hacker News weekly recap (2026-11); original post by Sam Curry and Shubham Shah, no point count seen",
+            "practice": [
+                "In your own test environment, set up two layers (a reverse proxy and an app server) and study in the specs how each normalizes paths, noting where they could differ.",
+                "Review OAuth authorization-code flow documentation and sketch where a stolen session could be exchanged for tokens.",
+                "Inventory the admin consoles of a lab stack you own and confirm none use default credentials.",
+                "Practise on an intentionally vulnerable lab (such as a deliberately vulnerable web app) with path-based access-control bypass exercises.",
+                "Write a checklist of what should be revoked when an account's email or password changes."
+            ],
+            "questions": [
+                {
+                    "answer": "They used a path the WAF classified as a static file while the servlet container and OpenIDM interpreted it differently, so it reached the hidden console.",
+                    "question": "How did the researchers get past the WAF?"
+                },
+                {
+                    "answer": "Its configuration interface allowed a scheduled job with inline script, which installed a small command endpoint.",
+                    "question": "How did the console lead to code execution?"
+                },
+                {
+                    "answer": "The tokens issued during the session stayed valid, and the owner's own session was not revoked either.",
+                    "question": "Why did restoring the original email not undo the access?"
+                },
+                {
+                    "answer": "Removing or restricting the Felix console and replacing default credentials.",
+                    "question": "What defence would have stopped the first step?"
+                },
+                {
+                    "answer": "It can mint valid sessions for any account it manages, which then pass downstream checks like the vehicle service.",
+                    "question": "Why does an identity platform compromise matter so much?"
+                }
+            ],
+            "source": "Sam Curry (samcurry.net)",
+            "summary": "Shubham Shah and Sam Curry chained weaknesses in the ForgeRock identity platform used by two unnamed automakers. A WAF at the edge judged request paths before the backend normalized them. They found a path the WAF treated as a static file but that Jetty and OpenIDM routed to a hidden Apache Felix web console. That console was protected only by default administrator credentials. Its configuration interface allowed a scheduled job running inline script, which installed a small command endpoint on the identity server.\n\nFrom the server they found a valid OpenIDM administrator credential in the environment and reached customer records through localhost, bypassing the WAF. They changed a test account's email and password, completed the normal login with a one-time code sent to their own address, and exchanged the OAuth code for app tokens. Those tokens gave the same vehicle access as the owner's app, including location and remote commands. They also showed that a client-supplied push-notification token could suppress owner alerts, and that tokens survived restoring the email. Both automakers fixed the problem about two hours after the reports, per the post. The researchers confirmed vehicle actions only with the owner present, on US accounts.",
+            "tags": [
+                "identity",
+                "WAF bypass",
+                "automotive"
+            ],
+            "takeaways": [
+                "Parser differentials between a WAF and the backend are a classic way to reach hidden paths.",
+                "Default credentials on an administrative console can undo layers of perimeter defence.",
+                "A compromised identity provider means compromise of every downstream service it authenticates.",
+                "Reaching internal APIs over localhost from a compromised host sidesteps public-facing filters.",
+                "Existing sessions and tokens should be invalidated when an account's email or password changes.",
+                "Client-supplied values like push tokens need server-side verification.",
+                "Sensitive actions such as vehicle control should require fresh re-authentication.",
+                "Fast vendor response (two hours here) shows how much clear, well-scoped reports help."
+            ],
+            "terms": [
+            ],
+            "title": "Hacking Two Automakers",
+            "topic": "Security",
+            "url": "https://samcurry.net/forgerock",
+            "why": "A well-structured end-to-end chain that shows how small configuration lapses compound across edge, identity and API layers."
+        },
+        {
+            "category": "Malware",
+            "level": "Middle",
+            "popularity": "Listed in The Hacker News weekly recap (2026-11); no point count seen",
+            "practice": [
+                "In a macOS test VM you control, list LaunchAgent locations and write down how you would spot a suspicious label or oddly large argument field.",
+                "Draft a detection rule in plain language for a shell spawned from Terminal that fetches content and hands it to an interpreter.",
+                "Read about the ClickFix social-engineering pattern and write a short user-awareness note for non-technical colleagues.",
+                "Study how public blockchain RPC lookups look in network logs and decide how you would baseline them in your own lab.",
+                "Write an incident-response checklist for a macOS host covering evidence preservation, persistence hunting and credential reset order."
+            ],
+            "questions": [
+                {
+                    "answer": "The user pastes a command into Terminal (ClickFix), which downloads a script and runs it through an interpreter.",
+                    "question": "What is the initial infection step?"
+                },
+                {
+                    "answer": "The loader reads the C2 hostname from a Polygon smart contract, so operators can change C2 without updating the malware.",
+                    "question": "What is EtherHiding as used here?"
+                },
+                {
+                    "answer": "Through a per-user LaunchAgent whose arguments hold the base64-encoded loader.",
+                    "question": "How does Phexia persist?"
+                },
+                {
+                    "answer": "Terminal-spawned shells piping downloads into osascript or bash, and Polygon RPC calls coming from script process trees.",
+                    "question": "Name two detection ideas from the post."
+                },
+                {
+                    "answer": "Deleting the file alone leaves the loaded job running, so the persistence would survive.",
+                    "question": "Why unload jobs before deleting plists?"
+                }
+            ],
+            "source": "WithSecure W/Labs",
+            "summary": "WithSecure analyses Phexia, a modular macOS backdoor and infostealer sold to several threat actors and seen in ClickFix campaigns since late 2025. The victim pastes a command into Terminal, which fetches a shell script that runs an AppleScript dropper. The dropper installs a per-user LaunchAgent that keeps the loader, stored base64-encoded in the plist, so no readable script lands on disk. From May 2026 the loader asks a smart contract on the Polygon blockchain for the current C2 hostname (EtherHiding), so operators can change servers without touching deployed malware.\n\nThe backdoor validates user passwords through a fake prompt, steals browser data, keychain material, password-manager extension data and Safari cookies, stages them in temporary folders and uploads them. It also deploys a Monero miner and sends an application inventory, likely used to select tasks. The post lists indicator types and detection ideas: Terminal-spawned shells piping downloads into interpreters, odd LaunchAgent labels (including a masquerading Apple-style prefix from October 2026), Polygon RPC calls from script processes, and archives staged then uploaded. It ends with response guidance: preserve evidence, find all persistence, unload jobs before deleting, reset credentials and revoke sessions, and rebuild if scope is unclear.",
+            "tags": [
+                "macOS",
+                "infostealer",
+                "ClickFix"
+            ],
+            "takeaways": [
+                "ClickFix works by getting the user to run the first stage themselves, avoiding many download protections.",
+                "Storing the loader inside a persistence plist avoids leaving a readable script on disk.",
+                "Blockchain-based C2 lookup lets operators rotate servers without updating implants.",
+                "Legitimate public RPC hostnames are only suspicious when contacted by non-browser processes, so detect on process context.",
+                "Fake password prompts plus local validation let stealers confirm credentials before taking them.",
+                "Masquerading labels (an Apple-style prefix) are a cheap evasion that defenders can still hunt for.",
+                "Reinfection can leave several builds running, so incident response must find all persistence.",
+                "Old C2 domains can stay live after the contract changes, so keep historical indicators in scope."
+            ],
+            "terms": [
+                {
+                    "id": "T1036",
+                    "kind": "technique",
+                    "name": "Masquerading",
+                    "text": "Adversaries may attempt to manipulate features of their artifacts to make them appear legitimate or benign to users and/or security tools. Masquerading occurs when the name or location of an object, legitimate or malicious, is manipulated or abused for the sake of evading defenses and observation.",
+                    "url": "https://attack.mitre.org/techniques/T1036"
+                }
+            ],
+            "title": "Phexia: macOS backdoor and infostealer delivered via ClickFix",
+            "topic": "Security",
+            "url": "https://www.withsecure.com/en/resources-hub/w-labs/phexia-macos-malware/",
+            "why": "A compact, defender-oriented teardown of a current macOS stealer, with concrete behaviours to hunt."
+        },
+        {
+            "category": "Blue Team",
+            "level": "Junior",
+            "popularity": "Listed in security press roundups (2026-11); no point count seen",
+            "practice": [
+                "Read the OAuth 2.0 device authorization grant specification and write a plain-language walkthrough of who sees what at each step.",
+                "In a test Microsoft 365 tenant you own, find where device-code sign-ins show in sign-in logs and what fields distinguish them.",
+                "Draft a short user-awareness message explaining why an unexpected code request should be verified out of band.",
+                "Review conditional access options in your own test tenant and list how you would limit device-code flow.",
+                "Make a post-compromise checklist covering MFA methods, devices, app consents and mailbox rules."
+            ],
+            "questions": [
+                {
+                    "answer": "They enter the attacker-generated device code on Microsoft's real login page and complete MFA, approving the attacker's pending session.",
+                    "question": "What does the victim actually do that gives the attacker access?"
+                },
+                {
+                    "answer": "The body held only a Google short link and redirect, not the phishing domain, and redirects happened server-side almost instantly.",
+                    "question": "Why did the email evade link reputation checks?"
+                },
+                {
+                    "answer": "Programmatic user agents such as python-requests or node, and ASN or region changes within the same session.",
+                    "question": "Name two sign-in log signals Huntress suggests."
+                },
+                {
+                    "answer": "Restricting device-code authentication with conditional access where it is not needed, plus phishing-resistant MFA.",
+                    "question": "What is the strongest preventive control?"
+                },
+                {
+                    "answer": "Rogue MFA methods, unknown registered devices, unauthorized app consents, suspicious mailbox rules and unusual outbound mail.",
+                    "question": "What should responders check after compromise?"
+                }
+            ],
+            "source": "Huntress",
+            "summary": "Huntress describes an October 2026 phishing attack on a construction-sector company. A spear-phishing email from a typosquatted domain impersonated a senior executive. Its link was wrapped in Microsoft Safe Links and routed through a Google short link and redirect, so the email body never showed the phishing domain. The landing page was a fake Teams meeting scheduler. When the victim continued, the attacker's backend started a genuine Microsoft device-code sign-in and displayed the code as a \"Booking Reference\". The victim copied it, pasted it into Microsoft's real device login page and completed MFA, which approved the attacker's session.\n\nThe kit was stored as encrypted content decrypted in the browser, so scanners that do not run JavaScript saw only a blob. It had fallback modes, and the attacker logged in through a residential proxy to look like ordinary traffic. Huntress detected and contained the incident early. The post explains the device-code flow and gives detection ideas (unusual authentication client indicators, programmatic user agents, ASN or region changes in one session, unmanaged devices, rogue MFA methods, mailbox rules) and mitigations such as restricting device-code flow, phishing-resistant MFA and user training.",
+            "tags": [
+                "phishing",
+                "OAuth",
+                "Microsoft 365"
+            ],
+            "takeaways": [
+                "Device code phishing abuses a legitimate OAuth flow, so the victim signs in on a real Microsoft page.",
+                "MFA completed by the victim still approves the attacker's session.",
+                "Wrapping the code in a booking workflow makes the request look like routine scheduling.",
+                "Layered redirects through trusted services hide the malicious domain from reputation checks.",
+                "Encrypting the kit in-page blocks scanners that do not execute JavaScript.",
+                "Residential proxies make attacker sign-ins look like normal consumer traffic.",
+                "Conditional access that limits device-code flow removes the whole technique where it is not needed.",
+                "After a suspected compromise, check MFA methods, registered devices, app consents and mailbox rules."
+            ],
+            "terms": [
+                {
+                    "id": "CAPEC-163",
+                    "kind": "pattern",
+                    "name": "Spear Phishing",
+                    "text": "An adversary targets a specific user or group with a Phishing (CAPEC-98) attack tailored to a category of users in order to have maximum relevance and deceptive capability. Spear Phishing is an enhanced version of the Phishing attack targeted to a specific user or group. The quality of the targeted email is usually enhanced by appearing to come from a known or trusted entity.",
+                    "url": "https://capec.mitre.org/data/definitions/163.html"
+                },
+                {
+                    "id": "T1566",
+                    "kind": "technique",
+                    "name": "Phishing",
+                    "text": "Adversaries may send phishing messages to gain access to victim systems. All forms of phishing are electronically delivered social engineering. Phishing can be targeted, known as spearphishing. In spearphishing, a specific individual, company, or industry will be targeted by the adversary. More generally, adversaries can conduct non-targeted phishing, such as in mass malware spam campaigns.",
+                    "url": "https://attack.mitre.org/techniques/T1566"
+                }
+            ],
+            "title": "Crafty Microsoft Teams Booking Flow Disguises Device Code Phishing",
+            "topic": "Security",
+            "url": "https://www.huntress.com/blog/crafty-microsoft-teams-booking-flow-disguises-device-code-phishing",
+            "why": "It makes a confusing, widely abused auth flow easy to understand and gives practical detection and prevention steps."
+        },
+        {
+            "category": "Other",
+            "level": "Middle",
+            "popularity": "Listed in The Hacker News weekly recap (2026-11); no point count seen",
+            "practice": [
+                "Read about how firmware update packages are structured and write how you would identify a simple repeating-key obfuscation, using a firmware image from a device you own or a public training image.",
+                "Study command injection in an intentionally vulnerable lab and note how each case lets input reach a shell.",
+                "Write a short threat-model note for any building-control device on your own network, covering exposure and segmentation.",
+                "Review what setuid means in Linux documentation and list safe design alternatives.",
+                "Design a credential scheme for a device that avoids deriving secrets from MAC address or date, and explain why."
+            ],
+            "questions": [
+                {
+                    "answer": "It is computed from the MAC address and date with no server-side secret, and the MAC is leaked by an unauthenticated endpoint.",
+                    "question": "Why is the daily administrator password weak?"
+                },
+                {
+                    "answer": "They took it from vendor update packages and removed light XOR obfuscation, whose key could be recovered from known file headers.",
+                    "question": "How did VulnCheck get at the firmware?"
+                },
+                {
+                    "answer": "Any injection that reaches it runs with root privileges.",
+                    "question": "What makes a setuid-root interpreter dangerous?"
+                },
+                {
+                    "answer": "The vendor declared the product end of software support in March 2026.",
+                    "question": "Why will the current-firmware issues probably stay unpatched?"
+                },
+                {
+                    "answer": "The claims are VulnCheck's own without vendor confirmation, and the disclosure timeline contains an internal date inconsistency.",
+                    "question": "What caveat does the post carry?"
+                }
+            ],
+            "source": "VulnCheck",
+            "summary": "VulnCheck disclosed 14 vulnerabilities in the XWEB EVO, a refrigeration supervisor sold by Copeland (formerly Dixell). They recovered firmware from vendor update packages that were only lightly obfuscated with a repeating XOR key, then reproduced each flaw to root on rebuilt images. Older builds had an unauthenticated command-execution endpoint in a setuid-root CGI, injection in the login fields before the password check, a hardcoded administrator password and a setuid-root Lua interpreter that turns any injection into root. Current 5.8.8 firmware computes the administrator password daily from the device's MAC address and the date with no secret, while an unauthenticated information endpoint leaks the MAC. The root password follows the same pattern, so the path runs from IP address to root.\n\nTwo flaws were being exploited within hours of their CVE records going public, before any public proof of concept, apparently by opportunistic scanners. The post ties this to an October 2026 attack on French supermarket refrigeration. The vendor ended software support in March 2026, so the current-firmware findings will likely stay unfixed, and VulnCheck estimates about 1,663 reachable hosts. The post's disclosure timeline has an internal date inconsistency, and the claims are VulnCheck's own, without independent vendor confirmation.",
+            "tags": [
+                "embedded",
+                "firmware",
+                "ICS"
+            ],
+            "takeaways": [
+                "User input reaching a shell call is still the most common root cause in embedded devices.",
+                "A setuid-root interpreter turns small injection bugs into full compromise.",
+                "Credentials derived from public values like a MAC address and the date are effectively no secret.",
+                "Authentication logic that runs input before checking credentials can be bypassed.",
+                "Lightly obfuscated firmware, like a repeating XOR key, is easy to unpack by known file headers.",
+                "End-of-support devices stay online and invisible to many threat feeds.",
+                "Exploitation can start within hours of a CVE appearing, before any public proof of concept.",
+                "Industrial and building-control devices should sit behind a VPN, not on the public internet."
+            ],
+            "terms": [
+            ],
+            "title": "Unauthenticated Root Vulnerabilities in Copeland XWEB EVO",
+            "topic": "Other",
+            "url": "https://www.vulncheck.com/blog/copeland-xweb-evo-unauthenticated-root",
+            "why": "It shows the full path from firmware extraction to root and to real in-the-wild exploitation on a device class that is rarely scrutinized."
+        }
+    ]
+}
