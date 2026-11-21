@@ -1,0 +1,289 @@
+{
+    "date": "2026-11-21",
+    "generatedAt": "2026-11-21T09:10:46",
+    "items": [
+        {
+            "category": "Blue Team",
+            "level": "Senior",
+            "popularity": "Trending in security news on Nov 19-20 (SecurityWeek, Rapid7, The Hacker News coverage); no point count seen",
+            "practice": [
+                "In your own vSphere lab, read the hardening and logging guidance and write down which management ports should be reachable from where.",
+                "Draw a diagram of the attack chain in the report and mark where an EDR, egress filter or remote syslog would have broken it.",
+                "Write detection ideas in plain language for management-API SSH enablement and new root keys on a hypervisor, then check which log sources would show them.",
+                "Read about SAML trust and signing keys, and list what a defender would need to do to rotate them after a suspected compromise.",
+                "Review your own lab for appliances that cannot run an endpoint agent and decide how you would monitor them instead."
+            ],
+            "questions": [
+                {
+                    "answer": "Predictable UUIDv1 timestamp generation in the SRP-6a authentication flow over DCE/RPC lets an attacker recover the session key without knowing a password.",
+                    "question": "What is the root cause of CVE-2026-123890?"
+                },
+                {
+                    "answer": "It lets the attacker forge valid assertions for any user, which skips password and MFA checks and keeps working as long as the key is not rotated.",
+                    "question": "Why is stealing the SAML signing key so damaging?"
+                },
+                {
+                    "answer": "They used vCenter-held ESXi credentials, enabled root SSH, and browsed VMFS volumes to extract Windows guest files such as the AD database.",
+                    "question": "How did the actor reach ESXi guests' data?"
+                },
+                {
+                    "answer": "It has no port-level granularity, is managed through an interface an attacker can reach, gives no remote logs of denied traffic, and filters only inbound traffic.",
+                    "question": "What weaknesses does Mandiant list in the default vCenter appliance firewall?"
+                },
+                {
+                    "answer": "It was used for post-compromise privilege expansion, not just initial access.",
+                    "question": "What is notable about how the zero-day was used?"
+                }
+            ],
+            "source": "Google Threat Intelligence Group / Mandiant (cloud.google.com)",
+            "summary": "GTIG and Mandiant describe how a suspected PRC-nexus espionage actor, ARMORY CASTLE, used a second zero-day, CVE-2026-123890, against VMware vCenter after first getting in through a BeyondTrust Remote Support zero-day. The bug is an unauthenticated session-key disclosure in the SRP-6a login exchange over DCE/RPC on the vmdir service (TCP 2012). Predictable UUIDv1 timestamps let an attacker recover the shared key without a password and get an administrator session. It affects vCenter 7.x and 8.x, and Broadcom disclosed it on Nov 19.\n\nThe intrusion moved from the first appliance to Linux hosts that had no EDR, planted JSP webshells, and gained root through a SUID change. A custom Go tool, BONESAW, then exploited the bug, copied the vmdir database, extracted the SAML signing key, and created a backdoor account. With the key the actor forged SAML assertions (a Golden SAML), which bypasses MFA, and made an SSO administrator. The actor then enabled SSH through the appliance management API, took the vCenter master key, and pivoted to ESXi. There it read VMFS volumes to pull Active Directory database files from Windows guests. Persistence came from a Slack-based Go backdoor and a modified Dropbear SSH server.\n\nThe report notes the shift to using a zero-day after compromise, to widen access, instead of only for the first foothold. It ends with hunting guidance and a hardening approach based on default-deny firewall rules at kernel level, egress filtering and remote logging.",
+            "tags": [
+                "vCenter",
+                "threat intelligence",
+                "zero-day"
+            ],
+            "takeaways": [
+                "The vmdir flaw leaks the SRP-6a session key because UUIDv1 timestamps are predictable, so the exchange can be broken with no password.",
+                "Stealing the vCenter STS SAML signing key allows forged assertions that bypass MFA and impersonate any user.",
+                "Attackers favored Linux appliances with no EDR as stepping stones, so unmanaged appliances are a blind spot.",
+                "The actor used a zero-day after initial access to widen privileges, not only to get in.",
+                "vCenter compromise leads to ESXi and then to offline copies of AD data from guest disks, with no need to touch the domain controller directly.",
+                "The default VCSA firewall is managed through the same interface an attacker can reach, logs no denied traffic and ignores egress.",
+                "Hunt for management-API SSH enablement, new root authorized keys on ESXi, unexpected SUID changes and odd SSH banners.",
+                "Build timestamps suggest the exploit tooling existed before the earlier related CVE was disclosed, so assume exposed vCenter hosts may already be compromised."
+            ],
+            "terms": [
+            ],
+            "title": "ARMORY CASTLE Exploits vSphere",
+            "topic": "Security",
+            "url": "https://cloud.google.com/blog/topics/threat-intelligence/armory-castle-exploits-vsphere",
+            "why": "A rare, detailed look at an espionage actor using a fresh zero-day, from appliance foothold to hypervisor data theft, with concrete defensive advice."
+        },
+        {
+            "category": "Malware",
+            "level": "Middle",
+            "popularity": "Covered by The Hacker News on Nov 19-20; no point count seen",
+            "practice": [
+                "Read the report and sort every indicator into a short-lived type (hash, domain) or a stable behavior, then explain why.",
+                "In a Windows test VM you own, review how DLL sideloading is logged and write a detection idea for system library names loading from user directories.",
+                "Practice reading a firewall rule list on a lab machine and spotting rules with names that don't match their purpose.",
+                "Enable script block logging in a lab and look at what in-memory PowerShell execution leaves behind.",
+                "Make an inventory of lab machines that lack endpoint management and decide how you would watch them."
+            ],
+            "questions": [
+                {
+                    "answer": "They changed hashes, infrastructure, paths, config formats and ciphers, but kept the same methods and behaviors.",
+                    "question": "What did the operators change after the first report, and what did they keep?"
+                },
+                {
+                    "answer": "It does not beacon out. It listens on TCP 5060, adds a firewall rule with a Windows-looking name, and waits for the operator with a short handshake.",
+                    "question": "How does the passive variant work?"
+                },
+                {
+                    "answer": "Because each recompile changes the hash, while sideloading, mutual TLS, SMB staging and in-memory execution remain constant.",
+                    "question": "Why does the report favor behavior-based detection?"
+                },
+                {
+                    "answer": "Files were staged on an unmanaged SMB-reachable host, copied over by a script, and a run key imitating OneDrive gave persistence using valid domain credentials.",
+                    "question": "How was lateral movement done in the recent case?"
+                }
+            ],
+            "source": "Bitdefender Labs (Bogdan Zavadovschi)",
+            "summary": "Bitdefender follows up its 2025 report on the EggStreme fileless framework, used mainly against Philippine government targets. After exposure, the operators rotated hashes, domains and IPs and changed file paths and config formats. They kept their methods, though, spending effort on tools and not on tradecraft.\n\nThe post tracks the changes. Configuration protection moved from RC4 to AES. The loader went through several ciphers, ending in custom ones that the author says add little real protection. The agent switched from gRPC to raw TCP with mutual TLS plus an extra AES layer, and the keylogger was dropped. Capabilities are chosen per build from one codebase, which explains the fast rebuild cadence. A passive variant never beacons out. It listens on TCP 5060 and adds a firewall rule named to look like Windows networking.\n\nThe report shows a lateral-movement case through an unmanaged host reachable over SMB, with a run key imitating OneDrive. It ends with detections built on stable behaviors, such as sideloading, SMB staging and in-memory execution, and not on hashes.",
+            "tags": [
+                "APT",
+                "fileless",
+                "DLL sideloading"
+            ],
+            "takeaways": [
+                "When defenders publish indicators, operators rotate them, so hashes, domains and IPs have a short life.",
+                "Behaviors stay stable across rebuilds: DLL sideloading, mutual TLS, SMB staging and in-memory .NET or PowerShell execution.",
+                "Build-time modularity lets one codebase produce many variants by swapping ciphers and modules.",
+                "Custom ciphers can still defeat static signatures without adding real protection.",
+                "A passive agent that listens for the operator avoids outbound beacon detection but needs an inbound firewall rule.",
+                "System DLL names loaded from outside system directories are a good sideloading signal.",
+                "Unmanaged hosts reachable over SMB make good staging points, so inventory them.",
+                "Capture process memory before remediation, because configuration may only be visible at runtime."
+            ],
+            "terms": [
+            ],
+            "title": "EggStreme Malware: Rebuilt Under Scrutiny",
+            "topic": "Security",
+            "url": "https://www.bitdefender.com/en-au/blog/businessinsights/eggstreme-malware-revises-architecture-infrastructure",
+            "why": "It shows what a threat actor does after being publicly exposed, and what that means for how you write detections."
+        },
+        {
+            "category": "Web",
+            "level": "Middle",
+            "popularity": "Actively exploited, in CISA KEV since Nov 3; widely covered by BleepingComputer and The Hacker News; no point count seen",
+            "practice": [
+                "In a WordPress instance you own, find where the updater stages files and confirm that the directory is not reachable over HTTP.",
+                "Read the changelog diff for the 7.1.4 fix and explain in your own words what each of the three changes does.",
+                "Study the term TOCTOU and write two other everyday examples where checking a condition and acting on it are separate steps.",
+                "Use a deliberately vulnerable web lab to practice reasoning about temp directories and web-accessible staging areas.",
+                "Write a short checklist for safely updating a production CMS, covering backups, blocking paths and verification."
+            ],
+            "questions": [
+                {
+                    "answer": "The staging copy contains the setup script, which only looks for a config file inside the staging tree and so believes the site is not configured.",
+                    "question": "Why does the setup flow start during an update?"
+                },
+                {
+                    "answer": "The updater copies staged files over the live ones, and the config file was not on its skip list.",
+                    "question": "How does the attacker's config reach the live site?"
+                },
+                {
+                    "answer": "It is extracted by the old updater code, so the random-name and index-file fixes don't protect it.",
+                    "question": "Why is the first update to 7.1.4 still risky?"
+                },
+                {
+                    "answer": "Block web access to the upgrade directory at the web server level, verify it returns forbidden, or update manually outside the web root.",
+                    "question": "What mitigation does the post recommend before updating?"
+                }
+            ],
+            "source": "Picus Security (Umut Bayram)",
+            "summary": "The post explains a race condition in the WordPress core updater. During an update, the new core is extracted into a staging directory under the upgrade folder. That staging copy includes the setup script. The setup script checks only for a config file inside the staging tree, not the live one, so it sees the site as unconfigured and offers an unauthenticated install flow.\n\nAn attacker who reaches that flow can supply database details they control, and the installer writes a new config file into the staging tree. When the updater copies files to the live site, its skip list does not include the config file, so the attacker's file overwrites the real one. The site then points to an empty attacker database, who creates the first admin and can run code through plugin upload. The staging path is predictable in many versions, which makes the timing window usable.\n\nVersion 7.1.4 adds a random suffix to the working directory, keeps an index file to block listing, and skips the config file during copy. The first update to 7.1.4 still runs old code, so the post recommends blocking web access to the upgrade directory beforehand and updating manually.",
+            "tags": [
+                "WordPress",
+                "race condition",
+                "TOCTOU"
+            ],
+            "takeaways": [
+                "The updater's staging copy of WordPress is a full, reachable application, including setup code.",
+                "The setup check looked only inside the staging tree, so it wrongly judged the site as unconfigured.",
+                "The attack overwrites a file the update logic didn't know to protect, because the skip list came from core checksums.",
+                "Predictable temporary directory names turn a short window into a practical attack.",
+                "Fixes layered three ways: random names, no directory listing and a protected config file.",
+                "The update that installs the fix runs the old vulnerable code, so an upgrade can itself be the exposure.",
+                "Block web access to the upgrade directory before updating, and do not rely on files inside that directory, since the old updater deletes them.",
+                "Version-by-version analysis of staging paths shows which ranges are directly exploitable and which need a path leak."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-362",
+                    "kind": "weakness",
+                    "name": "Race Condition",
+                    "text": "The product contains a concurrent code sequence that requires temporary, exclusive access to a shared resource, but a timing window exists in which the shared resource can be modified by another code sequence operating concurrently.",
+                    "url": "https://cwe.mitre.org/data/definitions/362.html"
+                },
+                {
+                    "id": "CWE-367",
+                    "kind": "weakness",
+                    "name": "Time-of-check Time-of-use (TOCTOU) Race Condition",
+                    "text": "The product checks the state of a resource before using that resource, but the resource's state can change between the check and the use in a way that invalidates the results of the check.",
+                    "url": "https://cwe.mitre.org/data/definitions/367.html"
+                }
+            ],
+            "title": "CVE-2026-119977: When Updating WordPress Becomes the Vulnerability",
+            "topic": "Security",
+            "url": "https://www.picussecurity.com/resource/blog/cve-2026-119977-when-updating-wordpress-becomes-the-vulnerability",
+            "why": "A clear, step-by-step case study of a TOCTOU logic flaw in software that runs a huge share of the web, and one that is exploited now."
+        },
+        {
+            "category": "Cloud Security",
+            "level": "Junior",
+            "popularity": "Covered by The Hacker News on Nov 12; no point count seen",
+            "practice": [
+                "In a test GitHub organization you own, review which workflow files can be edited by whom and what secrets they can read.",
+                "Read how GitHub OIDC trust conditions work, and write down which claims a cloud role should require.",
+                "In a personal cloud sandbox, list your IAM roles and check each trust policy for broad or external principals.",
+                "Look at the branch protection settings on a practice repo and see whether required checks are tied to a specific app.",
+                "Make a short incident checklist for a leaked CI secret that includes cloud-side persistence checks."
+            ],
+            "questions": [
+                {
+                    "answer": "To test whether the stolen account could write to a repository before deploying the payload.",
+                    "question": "What was the purpose of the probe pull request?"
+                },
+                {
+                    "answer": "The payload adds cloud-side access, such as a rewritten AWS trust policy or Azure federated credentials, that continues to work after tokens change.",
+                    "question": "Why does rotating secrets not fully clean up?"
+                },
+                {
+                    "answer": "It posted forged success statuses using the required check names, and the rules matched on name, not on who posted them.",
+                    "question": "How did the payload get past required status checks?"
+                },
+                {
+                    "answer": "Gaps in the workflow run numbering can reveal deleted runs.",
+                    "question": "How can defenders spot that a run happened if logs were deleted?"
+                }
+            ],
+            "source": "Aikido Security",
+            "summary": "Aikido analyzes a campaign that began Nov 10, in which stolen credentials for 4,837 GitHub accounts were used to open probe pull requests in 61,764 repositories, then plant a secret-stealing script in writable ones. The payload arrived as a workflow edit disguised as a cache refresh, as an npm install hook, or as a throwaway workflow on a short-lived branch. The attacker reverted changes within minutes and deleted run logs, so a gap in run numbering is often the only trace.\n\nThe script is a single readable shell file that collects CI secrets, tokens and credential files, then tries to turn them into cloud access. It swaps GitHub's OIDC tokens for AWS, GCP and Azure sessions. For persistence it rewrites an AWS role trust policy to allow any account, creates long-lived keys, and adds Azure federated credentials that point back to the repository. It also posts forged status checks to get past branch protection, which matches on check names.\n\nThe post lists indicators and a response plan: treat every secret reachable from affected workflows as compromised, rotate broadly, and audit cloud accounts for the persistence changes.",
+            "tags": [
+                "CI/CD",
+                "GitHub Actions",
+                "cloud persistence"
+            ],
+            "takeaways": [
+                "Stolen developer credentials can be as dangerous as a software bug, and a single probe pull request can mean the account is compromised.",
+                "CI runners hold many secrets at once, so one malicious workflow edit can expose cloud, package and AI service credentials.",
+                "OIDC federation is convenient but gives an attacker who controls a workflow a way to get cloud sessions without stored keys.",
+                "Trust-policy rewrites and federated credentials survive secret rotation, so rotation alone is not remediation.",
+                "Branch protection that matches check names can be fooled by forged status checks from another source.",
+                "Deleted run logs leave gaps in run numbering, which is a useful clue.",
+                "Audit for unexpected trust policies, new access keys and unfamiliar federated credentials after any CI compromise.",
+                "Self-hosted runners expose extra metadata and configuration compared with hosted ones."
+            ],
+            "terms": [
+            ],
+            "title": "wfx-loot: Compromised GitHub accounts push CI secret stealer to tens of thousands of repositories",
+            "topic": "Security",
+            "url": "https://www.aikido.dev/blog/compromised-github-accounts-push-ci-secret-stealer-to-tens-of-thousands-of-repositories",
+            "why": "A readable, well-organized story that teaches CI/CD risk and cloud persistence without needing exploit-development background."
+        },
+        {
+            "category": "Other",
+            "level": "Senior",
+            "popularity": "Hacker News · 104 points, 37 comments",
+            "practice": [
+                "Draw a skiplist and a B+tree holding the same dozen keys and count pointers per entry in each.",
+                "Read about cache lines and write down how many cache misses a lookup needs in each structure.",
+                "Pick one command from the benchmark list and explain from the design why it did or did not improve.",
+                "Think about how a workload with large members versus tiny members would change the memory savings.",
+                "Read about SIMD comparisons and describe in prose how comparing four-byte features helps narrow a search."
+            ],
+            "questions": [
+                {
+                    "answer": "Every node is a separate allocation with backward pointers, forward pointers and span values, about 37 bytes of overhead per node, and scattered nodes cause cache misses.",
+                    "question": "Why was the skiplist costly?"
+                },
+                {
+                    "answer": "Inner nodes hold a shared prefix and four-byte features, so SIMD comparisons can often choose a child without reading full anchor strings.",
+                    "question": "What makes fbtree faster at routing?"
+                },
+                {
+                    "answer": "Random inserts leave more partially filled nodes.",
+                    "question": "Why did random inserts save less memory than sequential ones?"
+                },
+                {
+                    "answer": "Pops, score lookups and range-by-score were close to flat, since other costs dominate them.",
+                    "question": "Which operations changed little?"
+                }
+            ],
+            "source": "Valkey blog (Rain Valentine and Dragos Andriciuc)",
+            "summary": "The Valkey team explains why large sorted sets are moving from a skiplist to a high-fanout B+ tree variant called fbtree in Valkey 9.2. Each skiplist node is a separate allocation with extra pointers and span data, costing about 37 bytes per node before the member, and scattered nodes cause dependent cache misses.\n\nThe new structure packs up to 61 entries per node, stores the score and member together, and uses feature-based routing with SIMD comparisons in inner nodes. Leaves are doubly linked for range scans, end leaves are cached to keep pops constant-time, and range deletes remove runs directly.\n\nWith 5 million 20-byte members, index overhead drops by about 43 percent for sequential inserts and 36 percent for random ones. Score updates and mixed add/remove improved the most, while range and pop operations barely changed. The authors say these results come from a pre-merge branch and urge users to test the release candidate with their own workloads.",
+            "tags": [
+                "data structures",
+                "databases",
+                "performance"
+            ],
+            "takeaways": [
+                "Per-node allocations and pointers can cost more memory than the data they index.",
+                "Cache misses from dependent pointer chasing can dominate the cost of a theoretically efficient structure.",
+                "Packing many entries into one node cuts both memory and cache misses.",
+                "Routing on short fixed-size features lets SIMD pick a child without reading full strings.",
+                "Linked leaves keep range scans from climbing the tree.",
+                "Gains depend on member size and insertion order, so workload testing matters.",
+                "Operations bounded by other costs, such as returning results or hashtable lookups, see little benefit.",
+                "The internal change shows up externally in the encoding name, which tooling may check."
+            ],
+            "terms": [
+            ],
+            "title": "From skiplist to B+tree: Valkey kills the skiplist, cuts sorted set overhead by up to 43%",
+            "topic": "Other",
+            "url": "https://valkey.io/blog/from-skiplist-to-b+tree/",
+            "why": "A concrete, measured data-structure redesign with honest caveats, good for anyone who cares about memory layout and cache behavior."
+        }
+    ]
+}
