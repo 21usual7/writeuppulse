@@ -1,0 +1,305 @@
+{
+    "date": "2026-11-22",
+    "generatedAt": "2026-11-22T08:58:58",
+    "items": [
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "Hacker News · 108 points, 47 comments; lobste.rs · 2 points",
+            "practice": [
+                "Inventory which software on a test system you own calls Ghostscript, such as image libraries, print services and document converters, and draw the data flow from upload to renderer.",
+                "Read the Ghostscript release notes and the CVE entry, then write a short threat model of why a font loader written in an interpreted language needs privileged operations.",
+                "Study the PostScript save and restore semantics in the language reference and explain in your own words how a stale reference could occur.",
+                "Check the installed Ghostscript version on your own machines against the fixed release and note how your distribution tracks backports.",
+                "Design a defense-in-depth plan for an upload feature in a lab app you control: sandboxing, restricted file types, and removing unneeded delegates from converter policies."
+            ],
+            "questions": [
+                {
+                    "answer": "Many web apps, mail clients, wikis and print servers pass user-supplied files to Ghostscript for conversion or thumbnails, so an attacker can deliver the document over the network.",
+                    "question": "Why was a CVE scored with a local attack vector treated as remotely exploitable?"
+                },
+                {
+                    "answer": "It used a privileged store operation without validating operand types before a copy that could fail, so an error handler could feed it attacker-chosen operands.",
+                    "question": "What was the original flaw in the font helper?"
+                },
+                {
+                    "answer": "A local object is stored in a dictionary that persists across a restore. The restore frees the object, but the dictionary keeps the reference, which later points at reused memory.",
+                    "question": "How does the use-after-free arise?"
+                },
+                {
+                    "answer": "Change native function pointers and the path-control state, which turned off the file-access restrictions of the sandbox.",
+                    "question": "What did the corrupted memory let the attacker do?"
+                },
+                {
+                    "answer": "The first validated operands before the failing step. The later one rewrote the helper in C so it no longer needs the privileged operation.",
+                    "question": "How did the first patch differ from the later one?"
+                }
+            ],
+            "source": "pwn.ai (Paulos Yibelo)",
+            "summary": "The writeup describes a use-after-free in Ghostscript's Type 1 font loading code, which is partly written in PostScript. A helper in that code needs a privileged internal store operation to write into protected dictionaries. It does not check operand types before a copy step that can fail. A crafted document can trigger that failure and use its own error handler to supply operands, so the privileged write runs with attacker-chosen values.\n\nThe write puts a local object into a dictionary that survives a restore. After the restore frees the object, the dictionary keeps the reference. When that memory is reused, the reference points at live interpreter data. This gives a write-what-where primitive, which can alter native function pointers and then the path-control state. That disables the file-access checks the sandbox mode relies on and leads to command execution as the renderer's account.\n\nThe authors found the entry points by tracing file-processing dependencies. Image libraries and applications hand files with trusted extensions to Ghostscript, so a bug in Ghostscript becomes remotely reachable. They report command execution through a Debian CUPS print server, Roundcube thumbnails, WordPress uploads and plugins, MediaWiki, DokuWiki and others. The fix is in Ghostscript 10.08.0, which validates operands and moves the helper into C. Distribution coverage was uneven as of mid-November.",
+            "tags": [
+                "Ghostscript",
+                "use-after-free",
+                "file upload"
+            ],
+            "takeaways": [
+                "A local-vector CVE score can understate risk when many applications pipe untrusted files into the vulnerable component.",
+                "The bug chains several layers: a privileged operation reachable after an error, a handler the document controls, and a reference that outlives its object.",
+                "Error handlers in an interpreter are attack surface, because they let a document change state mid-operation.",
+                "Saves and restores in PostScript manage memory, so a reference stored in a persistent dictionary can go stale.",
+                "The sandbox was bypassed by corrupting interpreter state, not by finding a missing check.",
+                "Finding the remote path meant working backward from conversion pipelines such as image libraries, print servers and CMS thumbnailers.",
+                "The first patch closed the error path. The durable fix removed the dependency on the privileged operation by moving the helper into C.",
+                "Patch coverage varied by distribution, so check your own packages instead of assuming a fix."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-416",
+                    "kind": "weakness",
+                    "name": "Use After Free",
+                    "text": "The product reuses or references memory after it has been freed. At some point afterward, the memory may be allocated again and saved in another pointer, while the original pointer references a location somewhere within the new allocation. Any operations using the original pointer are no longer valid because the memory \"belongs\" to the code that operates on the new pointer.",
+                    "url": "https://cwe.mitre.org/data/definitions/416.html"
+                }
+            ],
+            "title": "Upload2Shell (CVE-2026-125396)",
+            "topic": "Security",
+            "url": "https://pwn.ai/upload2shell/research.html",
+            "why": "It shows how one interpreter bug becomes remotely reachable through the many apps that hand uploaded files to Ghostscript."
+        },
+        {
+            "category": "Blue Team",
+            "level": "Middle",
+            "popularity": "Hacker News · 4 points (Dragos story); Ars Technica coverage on lobste.rs · 9 points",
+            "practice": [
+                "Create free canary tokens in a test account you own and place them in a sandbox document, then watch for the alert and practice the triage steps.",
+                "Write an incident runbook for what to do when a canary credential is used, including who rotates which secrets.",
+                "Map your own AI workflow's request path and list every party that could see a prompt, including routers and plugins.",
+                "Review the audit logs of an empty test cloud account you own and learn to spot user agents and call patterns that indicate enumeration.",
+                "Draft a policy for what an agent may include in its context, and test whether secret filtering catches fake key formats in your own lab."
+            ],
+            "questions": [
+                {
+                    "answer": "Every prompt gets unique hostnames, URLs and keys, so the first access to one of them points to that exact prompt, model, router and setting.",
+                    "question": "How does the canary design identify where a leak happened?"
+                },
+                {
+                    "answer": "It usually governs only the first provider. Downstream hops can ignore it, be affected by bugs, or share data on purpose.",
+                    "question": "Why is a privacy flag such as zero data retention not a guarantee?"
+                },
+                {
+                    "answer": "Checked that they were live, searched storage and secrets, and tried to enable model access, create API keys and add users to persist.",
+                    "question": "What did attackers do with stolen cloud keys?"
+                },
+                {
+                    "answer": "Sellers can log requests and read or resell them, and some prices are possible only through stolen or unmetered credentials.",
+                    "question": "What is the risk of cheap inference marketplaces?"
+                },
+                {
+                    "answer": "Seed your own canaries in agent and pipeline context, and enable secret filtering. Using a first-tier provider directly also reduces exposure.",
+                    "question": "Name two defensive steps from the article."
+                }
+            ],
+            "source": "Dragos (HD Moore)",
+            "summary": "Dragos sent about two million AI prompts over five months, each carrying unique bait URLs and fake credentials that no legitimate system should use. Any later access showed that someone in the AI ecosystem had read the prompt. They began with Thinkst Canarytokens and then built a service that derives unique hostnames, URLs and cloud keys per prompt, backed by empty, fully logged accounts. They also traced the router hops each request passed through.\n\nThe results show three kinds of exposure. At least three hosting providers were breached and had prompt data stolen, including some marked zero data retention. Attackers tested the stolen keys within hours and then looked for data and tried to gain persistence. Resellers on an inference marketplace logged prompts and waited. A Chinese AI lab, and some US providers, fetched secret links from prompts that were flagged as not to be collected.\n\nThe lesson is that a privacy flag usually binds only the first hop. Dragos recommends self-hosting for sensitive work, using first-tier providers directly, choosing router upstreams carefully, seeding your own canaries in agent context, and enabling secret filtering.",
+            "tags": [
+                "canary tokens",
+                "AI supply chain",
+                "threat detection"
+            ],
+            "takeaways": [
+                "Canary credentials turn silent data theft into an observable event, because any use is an alert.",
+                "Unique per-prompt bait lets you tie a leak to a specific model, router and privacy setting.",
+                "Providers did not know they were breached until they were told, so detection by customers can beat internal detection.",
+                "Attackers tested stolen keys within hours, then enumerated storage and secrets and tried to create persistence.",
+                "Zero data retention and no-collection flags may only apply to the first hop in a router chain.",
+                "Marketplace sellers can undercut prices and log prompts, so the leak follows the seller, not the platform.",
+                "AI agents send whatever they can read, so credentials in context are likely to leak.",
+                "Attacker tooling, including an LLM-driven pentest framework, left user agents that defenders can add to detections."
+            ],
+            "terms": [
+            ],
+            "title": "Three breaches, endless leaks: Your AI supply chain needs canaries",
+            "topic": "Security",
+            "url": "https://www.dragos.com/blog/ai-supply-chain-security-canary-tokens",
+            "why": "A five-month, two-million-prompt canary experiment gives hard evidence of where AI prompts leak, and a cheap detection technique you can copy."
+        },
+        {
+            "category": "Pwn",
+            "level": "Middle",
+            "popularity": "Hacker News · 247 points, 98 comments; lobste.rs · 3 points",
+            "practice": [
+                "Read the advisory and sketch in prose the lifecycle of the buffer pointer in each function, marking where the context goes stale.",
+                "Review a small C codebase you own for patterns where a grown buffer is reassigned only at the end of a function.",
+                "Build one of your own test programs with an allocator-checking tool such as AddressSanitizer and observe how early-return ownership mistakes are reported.",
+                "Use a dependency scanner on a lab system you own to find which applications link GPGME and whether any are static.",
+                "Read about how double-free detection works in a common allocator and explain why intervening allocations can hide it."
+            ],
+            "questions": [
+                {
+                    "answer": "A reallocated buffer pointer is not saved into the context until the end, so an early return such as a read error leaves a freed pointer in the context that is freed again later.",
+                    "question": "What conditions cause the double free?"
+                },
+                {
+                    "answer": "Anything using GPGME before 2.3.0, including mail and XMPP clients, Samba, Flatpak and Gpg4win, in shared or static form.",
+                    "question": "Who is affected?"
+                },
+                {
+                    "answer": "They embed the vulnerable code, so updating the shared library does not help and they must be rebuilt against the fixed version.",
+                    "question": "Why do statically linked programs need special handling?"
+                },
+                {
+                    "answer": "An OpenPGP key whose user ID is crafted to be very long.",
+                    "question": "What input triggers the flaw?"
+                },
+                {
+                    "answer": "GitLab needed to update earlier because of a separate bug, so the coordinated date was moved up.",
+                    "question": "Why did disclosure happen earlier than planned?"
+                }
+            ],
+            "source": "GnuPG project (Werner Koch)",
+            "summary": "The advisory describes a double free in GPGME, the library many mail clients, XMPP clients, Samba and Flatpak use to talk to GnuPG. It affects all versions before 2.3.0, whether shared, DLL or statically linked. It is triggered by an OpenPGP key with a crafted, very long user ID.\n\nThe bug is in two internal functions that read status lines and key listings from gpg. They start with a 1024-byte buffer and reallocate it as needed. After reallocation they use the new pointer but save it back into the context only at the end. If a function returns early, such as on a read error, the context keeps a stale pointer, and the memory is freed twice when the context is released. Allocations in between can stop the allocator from catching the double free.\n\nThe advisory says the bug can leak data from applications, for example via signed data, and that remote code execution cannot be ruled out. The fix is GPGME 2.3.1, or the Gpg4win 5.1.2 DLL on Windows. Static builds must be rebuilt, and a patch is attached for old versions. GitLab reported the issue on 12 November, and disclosure was moved up from 25 November because of a separate bug.",
+            "tags": [
+                "GPGME",
+                "double free",
+                "memory safety"
+            ],
+            "takeaways": [
+                "The root cause is a pointer cached locally after realloc and stored in shared state only at the end, which leaves stale state on early returns.",
+                "Early-exit paths in buffer-growth code are a classic place for ownership bugs.",
+                "Untrusted data such as a key's user ID can drive allocation behavior, which makes a parsing library an attack surface.",
+                "Allocator double-free checks can miss the bug when other allocations happen between the two frees.",
+                "A library used by many applications multiplies impact, and statically linked copies need rebuilds, not just a package update.",
+                "The advisory does not claim code execution but says it cannot be ruled out.",
+                "Disclosure dates can move when a related issue forces vendors to patch early.",
+                "The fix and a backport patch were published together, which helps old deployments."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-415",
+                    "kind": "weakness",
+                    "name": "Double Free",
+                    "text": "The product calls free() twice on the same memory address.",
+                    "url": "https://cwe.mitre.org/data/definitions/415.html"
+                }
+            ],
+            "title": "GnuPG Security Advisory for GPGME (T8557, CVE-2026-129975)",
+            "topic": "Security",
+            "url": "https://lists.gnupg.org/pipermail/gnupg-announce/2026q4/000517.html",
+            "why": "A short, precise advisory that shows a textbook stale-pointer double free in a library used by mail clients, Samba and Flatpak."
+        },
+        {
+            "category": "Reverse",
+            "level": "Middle",
+            "popularity": "Hacker News · 227 points, 146 comments",
+            "practice": [
+                "Take a small program you wrote, build it in a lab, and inspect its header and sections in a hex viewer to find padding that could hold extra code.",
+                "Practice identifying a standalone binary's purpose using only strings, imports and a disassembler, then compare your reasoning steps with the article's.",
+                "On a safe sample or CTF crackme, study how import-name hashing works and how an analyst recovers the names by hand.",
+                "Estimate the token cost of dumping binaries of a few sizes and think about chunking strategies.",
+                "Do a CTF reversing challenge and write down which parts a model would do well and where you would verify its claims."
+            ],
+            "questions": [
+                {
+                    "answer": "An LLM reads and writes executable bytes directly, with no compiler, assembler, disassembler or execution in between.",
+                    "question": "What does Machine Code Programming mean here?"
+                },
+                {
+                    "answer": "A local relay removed all tools from requests and audited the event stream, and a live check showed the model did not read a file, run a command or fetch a URL.",
+                    "question": "How did the authors verify the model had no tool access?"
+                },
+                {
+                    "answer": "A public sandbox report matched the server address and URL, and all 13 API hashes were recomputed and matched.",
+                    "question": "How was the malware conclusion validated?"
+                },
+                {
+                    "answer": "Token cost of hex, a small sample with single runs, and checks made after the run.",
+                    "question": "What are the main limitations?"
+                },
+                {
+                    "answer": "The model used header-defined padding as executable space, put new code there, and redirected existing instructions into it.",
+                    "question": "How did patching work technically?"
+                }
+            ],
+            "source": "George Xenos and Sotiris Giannopoulos",
+            "summary": "The authors test whether a general-purpose LLM can work on compiled x86-64 executables from raw bytes alone, given as a hex dump with no tools, disassembler or execution. A relay stripped every tool from each request and audited the events, and each program got one attempt.\n\nFrom hex alone the model identified four programs, including a stripped static build of FreeBSD ministat, and found a real bug in one option. It added a feature to three binaries with small same-length byte edits that passed hidden tests. It also wrote three complete ELF files from a written spec, all matching reference output. For an unlabeled 4.6 KB Windows binary it called it a download-and-execute stager, and the address, URL and all 13 API hashes it named were confirmed afterward. An open-weight model reached a similar result, at higher cost.\n\nThe authors suggest that disassemblers might be optional for LLMs and could speed malware triage. Limits are serious: hex is token-expensive, the largest test was 67 KB, each result is a single run, and the malware checks were made after the fact.",
+            "tags": [
+                "LLM",
+                "binary analysis",
+                "malware triage"
+            ],
+            "takeaways": [
+                "The experiments are small and early, not a formal benchmark.",
+                "Tools were removed and audited, which makes the claim that the model read the bytes directly more credible.",
+                "Patching works by turning padding into executable space, placing new code there and redirecting existing instructions.",
+                "Writing a program from scratch cost far more output than patching.",
+                "Recomputing API hashes independently gave a firm check on the malware claim.",
+                "Common hashing routines in public tooling may have helped the model, so the result may not generalize.",
+                "Context cost is the main limit: a 67 KB file used about 163,000 tokens.",
+                "An open-weight model reached a similar conclusion but with more reasoning and less accuracy."
+            ],
+            "terms": [
+            ],
+            "title": "Programming in the Machine Code Space",
+            "topic": "Security",
+            "url": "https://sgiannopoulos.github.io/blog/machine-code-programming/",
+            "why": "It tests, with audited no-tool runs, whether an LLM can read, patch and write executables straight from hex, and is candid about the limits."
+        },
+        {
+            "category": "Other",
+            "level": "Junior",
+            "popularity": "Hacker News · 551 points, 265 comments",
+            "practice": [
+                "On your home network, measure throughput in both directions and compare wired and Wi-Fi paths to practice isolating asymmetry.",
+                "Read a USB specification overview on bursts and packet sizes and explain why waiting for host acknowledgements limits throughput.",
+                "Learn what Ethernet flow control does and list its trade-offs.",
+                "Use ping loss percentages under load on your own network to practice telling link loss from application slowness.",
+                "Write a short debugging log template with hypothesis, test, result and next step, and use it on a real slow-network problem."
+            ],
+            "questions": [
+                {
+                    "answer": "The bottleneck was the adapter draining data toward the host, which only applies to traffic flowing to the Mac.",
+                    "question": "Why was only download speed affected?"
+                },
+                {
+                    "answer": "Pings failed about 10% of the time through the display during downloads but never over Wi-Fi, and a fixed-rate test showed drops from about 2 Gbps.",
+                    "question": "How did the author show packets were lost?"
+                },
+                {
+                    "answer": "Small USB bursts of four packets plus the hub's wait for the host go-ahead let the adapter drain slower than incoming data, so its buffer overflowed.",
+                    "question": "What is the root cause?"
+                },
+                {
+                    "answer": "It can add latency for other devices like a gaming PC.",
+                    "question": "Why not just keep flow control on?"
+                },
+                {
+                    "answer": "A 5 Gbps adapter with a newer chip and a larger burst size.",
+                    "question": "What fixed it?"
+                }
+            ],
+            "source": "Tymscar Blog (Oscar Molnar)",
+            "summary": "The author has a 2.5 Gbps connection, but downloads through the Ethernet adapter of a Studio Display measured only about 600 Mbps, while uploads were near full speed. Plugged straight into the Mac, the same adapter reached about 2.2 Gbps. The ISP found no fault and another laptop behaved the same.\n\nThe investigation was methodical. Pings during downloads showed about 10% loss through the display and none over Wi-Fi, while macOS logs showed no dropped frames. A vendor driver and router flow control helped, but flow control adds latency for other devices. A fixed-rate UDP test showed loss starting around 2 Gbps, with the Mac's receive rate plateauing near 168,000 frames per second.\n\nThe cause is that the RTL8156B adapter sends only four 1 KB packets per USB burst, then waits about 7.6 microseconds for the host's go-ahead through the monitor's hub. A burst takes about 8.2 microseconds, so the adapter drains at roughly 2 Gbps while data arrives at 2.5. The buffer overflows and retransmissions slow downloads. A 5 Gbps adapter using the RTL8157 chip, with a burst size of 8, lost no frames to about 2.4 Gbps, which fixed the problem.",
+            "tags": [
+                "networking",
+                "debugging",
+                "USB"
+            ],
+            "takeaways": [
+                "Isolate by changing one variable at a time: device, connection path, driver and load.",
+                "Asymmetric results, with good upload and bad download, point to a bottleneck on one direction of the path.",
+                "Packet loss that shows no errors in OS logs may be happening before the OS sees the frames.",
+                "A controlled fixed-rate traffic test finds the exact point where loss begins.",
+                "Router flow control can mask drops but adds latency for other devices.",
+                "USB burst size and hub round-trip time can cap throughput for a network adapter.",
+                "A simple hardware swap can be the best fix once the root cause is known.",
+                "Comparing against a similar working device, here an SSD, helped narrow down the cause."
+            ],
+            "terms": [
+            ],
+            "title": "My monitor was cutting my download speed by 75%",
+            "topic": "Other",
+            "url": "https://blog.tymscar.com/posts/studiodisplayethernet/",
+            "why": "A beginner-friendly model of methodical debugging that ends in a surprising hardware root cause."
+        }
+    ]
+}
