@@ -1,0 +1,304 @@
+{
+    "date": "2026-11-23",
+    "generatedAt": "2026-11-23T16:27:23",
+    "items": [
+        {
+            "category": "Other",
+            "level": "Junior",
+            "popularity": "Hacker News · 52 points, 36 comments",
+            "practice": [
+                "Read the Bluetooth Core Specification sections on LE pairing and write a short comparison of Just Works, Passkey Entry and Numeric Comparison. Note which ones resist an active man-in-the-middle.",
+                "Take a BLE device you own, such as a fitness band or smart bulb, and list its advertised services and characteristics with a standard phone scanner app. Note which ones look writable without pairing.",
+                "Review the threat model of a device you own that has a companion app. List which secrets could end up inside the app package and why that breaks the design.",
+                "Build a short checklist of what a safety-critical wireless command needs: authentication, freshness, integrity and a safe failure state. Apply it to the three CVEs in this post.",
+                "Read the CISA coordinated vulnerability disclosure guidance and draft a disclosure timeline for a hypothetical finding in your own lab, with the dates you would agree up front."
+            ],
+            "questions": [
+                {
+                    "answer": "It accepted unauthenticated writes from any Bluetooth device in range, and nearly any value triggered braking at an adjustable force.",
+                    "question": "Why was the brake-control function so dangerous?"
+                },
+                {
+                    "answer": "Commands had no nonce, sequence number or session token, and the last command stayed readable on the device. A captured or observed command could therefore be sent again.",
+                    "question": "Why does the replay issue matter even if an attacker cannot read live traffic?"
+                },
+                {
+                    "answer": "It relied on Just Works pairing, CRC32-only integrity checks and a decryption key embedded in the public app. None of these prove the update came from the vendor.",
+                    "question": "What was wrong with the firmware update channel?"
+                },
+                {
+                    "answer": "First-time pairing now requires a physical brake-pedal sequence, and update mode requires an authenticated, bonded connection. The firmware was still unsigned, and the ELBC 2000 was left unpatched.",
+                    "question": "What did the vendor's fix change, and what remained weak?"
+                },
+                {
+                    "answer": "Coordination stalled after the fix, with a long vendor silence and a CISA authorisation requirement, so publication was repeatedly delayed.",
+                    "question": "Why did the researchers say a patch did not close the disclosure process?"
+                }
+            ],
+            "source": "elementdigital.com.au (Element Digital)",
+            "summary": "The researchers studied Bluetooth trailer brake controllers (Elecbrakes EB2, VM1 and the older ELBC 2000). The lead researcher's in-car remote connected to a stranger's trailer controller without any prompt. That led them to decompile the companion Android app, using AI tools to help, and to build a browser-based Bluetooth tool. They tested on their own equipment on private land and found the core problems in about four hours.\n\nThree CVEs came out of it. The brake-control function needed no pairing or authentication, so any device in range could apply the brakes at a chosen force. Commands carried no nonce or session token, so they could be replayed. The firmware update channel used Just Works pairing, CRC32-only integrity checks and a decryption key shipped in the public app. Braking stops when the attacker disconnects, but forceful braking on a moving tow vehicle could cause a jackknife.\n\nThe vendor shipped fixed firmware for the current models about seven weeks after notification. The fix requires a physical brake-pedal sequence for first-time pairing. The old ELBC 2000 was initially left out and stayed unpatched at publication. Much of the post covers how slow post-patch coordination was, including a 53-day silence and a CISA rule requiring vendor authorisation to publish. Fixed firmware was still unsigned at the time of the second review.",
+            "tags": [
+                "bluetooth",
+                "iot",
+                "disclosure"
+            ],
+            "takeaways": [
+                "Physical proximity over Bluetooth should never be treated as authorisation for a safety-critical action.",
+                "Just Works pairing gives almost no protection against an active attacker.",
+                "Commands without a nonce, counter or session binding can be replayed, and state left readable on the device makes this easier.",
+                "A CRC checks for corruption, not tampering. Firmware needs signatures verified by the bootloader.",
+                "A decryption key shipped inside a public app is not a secret.",
+                "Mobile companion apps are the easiest way to learn a device's protocol, and decompiling them is a standard first step.",
+                "Vendors need a security contact and an inventory of every shipped model, including discontinued ones.",
+                "A fix does not end disclosure. Agree dates early and budget real time for coordination."
+            ],
+            "terms": [
+            ],
+            "title": "Brake Check: Hijacking Trailer Brakes over Bluetooth",
+            "topic": "Other",
+            "url": "https://elementdigital.com.au/blog/brake-check-trailer-brakes-over-bluetooth/",
+            "why": "A readable, end-to-end story of a real-world Bluetooth safety flaw, from the first odd connection to a slow disclosure."
+        },
+        {
+            "category": "Blue Team",
+            "level": "Junior",
+            "popularity": "lobste.rs · 5 points (posted Nov 22)",
+            "practice": [
+                "In a throwaway repository you own, design a workflow that reacts to comments and list every place where attacker-controlled text could reach a shell step. Then describe how you would pass it safely.",
+                "Read GitHub's documentation on pull_request_target and write a one-page explanation of when it is legitimately needed and what a safe design looks like.",
+                "Audit the workflows in one of your own repositories. Make a table of which triggers each uses, which secrets each can reach and whether untrusted code is ever checked out.",
+                "Read the PSF's Alpha-Omega documentation and the three incident reports it mentions. Draw a timeline of how each attack moved from trigger to release.",
+                "Practice the audit-then-enforce idea by writing a plan to restrict triggers in a small organization you control, including how you would find affected repositories first."
+            ],
+            "questions": [
+                {
+                    "answer": "It runs with a read/write token and access to secrets, so if the workflow runs fork-supplied code, an outsider gets those credentials.",
+                    "question": "Why is pull_request_target riskier than the plain pull request trigger?"
+                },
+                {
+                    "answer": "Comment text was inserted directly into a shell script, so one crafted comment could push a malicious commit and tag that the release pipeline then published.",
+                    "question": "How did the elementary-data compromise work in principle?"
+                },
+                {
+                    "answer": "Set the policy, check what it would block, fix or migrate the affected repositories, then enforce it.",
+                    "question": "What is the recommended rollout for an organization-wide policy?"
+                },
+                {
+                    "answer": "It plans to block pull_request_target by default in public repositories.",
+                    "question": "What change is GitHub making on December 2, 2026?"
+                },
+                {
+                    "answer": "Rotate it, remove malicious releases and move to Trusted Publishers.",
+                    "question": "What should maintainers do after a token is exposed?"
+                }
+            ],
+            "source": "Python Software Foundation blog",
+            "summary": "The PSF explains how it removed risky GitHub Actions triggers from its organizations. The post focuses on two triggers: pull_request_target, which runs with a read/write token and access to secrets, and issue_comment, which anyone can fire by commenting. A workflow that checks out and runs a fork's pull request code, or pastes comment text into a shell step, lets an outsider run code with the project's credentials.\n\nIt cites three PyPI-related incidents: Ultralytics (December 2024), LiteLLM and Telnyx (March 2026, traced back through a Trivy compromise) and elementary-data (April 2026, where one crafted comment led to a malicious release). GitHub plans to block pull_request_target by default in public repositories from December 2, 2026. Team and Enterprise organizations can already disable these triggers with one policy.\n\nThe PSF staff applied the event policy to the psf, python and pypi organizations. They set the policy, checked what it would block, migrated the remaining repositories that still used insecure triggers, and only then enforced it. The post itself is short on tooling detail, and the technical documentation is on the Alpha-Omega blog.",
+            "tags": [
+                "github-actions",
+                "supply-chain",
+                "ci-cd"
+            ],
+            "takeaways": [
+                "pull_request_target is dangerous because it runs with secrets while the code it handles can come from an untrusted fork.",
+                "The unsafe and safe versions of a workflow can differ by a line or two, so review is hard.",
+                "Never check out and run untrusted pull request code in a workflow that has secrets.",
+                "Never place comment or issue text directly into a shell step. Treat it as attacker input.",
+                "An organization-level policy restricting triggers beats fixing repositories one by one.",
+                "Roll out in order: set the policy, audit what it would block, migrate, then enforce.",
+                "After an incident, rotate tokens, yank bad releases and move to Trusted Publishers.",
+                "GitHub is moving to make this safer by default from December 2, 2026."
+            ],
+            "terms": [
+            ],
+            "title": "De-fanging dangerous triggers in GitHub Actions across an organization",
+            "topic": "Security",
+            "url": "https://pyfound.blogspot.com/2026/11/de-fanging-dangerous-triggers-in-github.html",
+            "why": "A practical, beginner-friendly explanation of why two CI triggers led to real PyPI supply-chain compromises and how a large organization locked them down."
+        },
+        {
+            "category": "Web",
+            "level": "Middle",
+            "popularity": "lobste.rs · 67 points",
+            "practice": [
+                "Read the YAML 1.2.2 spec section on indentation of flow nodes inside block collections and restate the rule in your own words.",
+                "Take a workflow file in a repository you own and run it through two different YAML parsers. Note any differences in how they report errors or structure.",
+                "Write a short list of ways a parser disagreement between a linter and a runner could hide a problem. Check each against zizmor's documentation.",
+                "Look at the YAML test suite's structure and find which quoting styles each indentation test covers.",
+                "Write a one-page design note on when a security tool should be strict versus lenient with input that the target platform accepts."
+            ],
+            "questions": [
+                {
+                    "answer": "A multi-line single-quoted scalar under a block mapping whose continuation or closing line is not indented deeper than the parent key.",
+                    "question": "What exactly does GitHub's parser accept that the spec forbids?"
+                },
+                {
+                    "answer": "A linter using a strict parser may reject or misread a workflow that GitHub still executes, so the audit may not cover what actually runs.",
+                    "question": "Why might this matter to security tooling?"
+                },
+                {
+                    "answer": "It covered only the double-quoted form, and the single-quoted form still has an exemption.",
+                    "question": "Why did a 2020 fix not solve it?"
+                },
+                {
+                    "answer": "The official YAML test suite appears to exercise the rule only with double-quoted strings.",
+                    "question": "Why does the author suspect the gap went unnoticed?"
+                },
+                {
+                    "answer": "Whether to follow the spec or match the platform, and the choice should be explicit and documented.",
+                    "question": "What should tool authors decide when a platform deviates from the spec?"
+                }
+            ],
+            "source": "yossarian.net (William Woodruff)",
+            "summary": "The post documents a parser quirk. GitHub Actions accepts a multi-line, single-quoted flow scalar nested under a block mapping even when the closing line is not indented deeper than the parent key. The YAML 1.2.2 spec forbids this, so a conforming parser should reject it, and GitHub's runner does not.\n\nThe author traces the likely cause. GitHub's parser appears to be YamlDotNet, and Actions seems to use version 5.3.0 from 2018. The newest release still exempts single-quoted scalars from the indentation check. A 2020 patch fixed the double-quoted case only, probably because the official YAML test suite covers just that form.\n\nThe post does not discuss security directly, but the implication is clear. Workflow linters such as zizmor must parse files the way GitHub does. If a strict parser rejects a file that GitHub runs, a tool may skip it or analyze a different structure than the one executed. The author first changed a conforming parser to accept the quirk, then reverted that change.",
+            "tags": [
+                "parsers",
+                "yaml",
+                "github-actions"
+            ],
+            "takeaways": [
+                "Whether GitHub accepts a file does not mean the file is valid YAML.",
+                "Any gap between how a security tool parses a file and how the runner does is a blind spot.",
+                "The bug likely survived because the spec test suite covered only one quoting style.",
+                "A rule that applies to several syntactic forms needs tests for each form.",
+                "The parser appears to be an old YamlDotNet version, and upgrading would not remove the quirk.",
+                "Tools should follow the spec by default, and platform-specific leniency should be an explicit, documented choice.",
+                "Test analysis tools against spec edge cases, not only real-world files."
+            ],
+            "terms": [
+            ],
+            "title": "GitHub Actions accepts invalid YAML",
+            "topic": "Security",
+            "url": "https://yossarian.net/til/post/github-actions-accepts-invalid-yaml/",
+            "why": "A short, sharp example of how a parser disagreement between a CI platform and its security linters can create a blind spot."
+        },
+        {
+            "category": "Pwn",
+            "level": "Middle",
+            "popularity": "lobste.rs · 2 points (also seen in the security tag feed, Nov 20)",
+            "practice": [
+                "Read the MP4 or ISO base media file format overview and draw the atom tree for a simple file, marking which size fields would need updating if one atom changed.",
+                "Study the GitHub Security Lab article on corpus generation that inspired this work and compare its approach with this post.",
+                "Work through a fuzzing tutorial that uses an intentionally buggy parser, and observe how coverage grows with and without structure awareness.",
+                "Write a short plan for a harness against a nested file format you know, listing what to mutate, what to recompute and what to leave inconsistent.",
+                "Read how OSS-Fuzz builds are configured and list what would cause a plugin set to be excluded from fuzzing."
+            ],
+            "questions": [
+                {
+                    "answer": "Atoms nest and carry size fields covering descendants. Random byte changes break those sizes, so inputs are rejected before reaching deep parsing code.",
+                    "question": "Why do ordinary mutational fuzzers struggle with MP4?"
+                },
+                {
+                    "answer": "Non-MP4 inputs failed early and stopped earning coverage, so the fuzzer stayed on MP4 and ran faster.",
+                    "question": "What did restricting the pipeline achieve?"
+                },
+                {
+                    "answer": "It holds variable-size decoding metadata and uses manual pointer arithmetic and ad hoc bounds checks, which are common sources of memory bugs.",
+                    "question": "Why target the stsd atom?"
+                },
+                {
+                    "answer": "It balances validity, which reaches deep code, against mismatches, which trigger bugs.",
+                    "question": "Why does the custom mutator sometimes leave sizes wrong?"
+                },
+                {
+                    "answer": "Only one atom was mutated, templates were static, only video and audio tracks were covered, and the demuxer was tested outside the full pipeline.",
+                    "question": "What limits did the author name?"
+                }
+            ],
+            "source": "Atredis Partners blog",
+            "summary": "The author set out to find bugs in GStreamer's MP4 demuxer (qtdemux) by reaching code that generic fuzzing rarely touches. MP4 files are trees of atoms whose size fields cover their children. A byte-level mutator breaks those sizes, so most inputs die at early structural checks.\n\nThey worked in three stages. A stock discoverer harness, built locally because OSS-Fuzz excluded the Good plugin set, ran for roughly 16 to 24 CPU-weeks and found five bugs. Restricting the pipeline to a source, qtdemux and a sink kept coverage feedback on MP4 and found one more. Finally, a structure-aware harness mutated only the stsd sample description atom, spliced it into static video and audio templates, recomputed the ancestor sizes and used a custom mutator that sometimes left sizes and counts inconsistent on purpose. That found three more bugs, including two division-by-zero crashes and a global buffer overread.\n\nFixes shipped in GStreamer 1.26.2, 1.28.1 and 1.28.2, and maintainers replied within 24 hours. The author lists limits: only one atom was mutated, templates were static, and the demuxer was tested in isolation. The work was done without LLMs, and the author argues AI agents can now help build custom fuzzers and review code.",
+            "tags": [
+                "fuzzing",
+                "gstreamer",
+                "memory-safety"
+            ],
+            "takeaways": [
+                "Format-agnostic fuzzers waste most of their effort on inputs that fail early validation.",
+                "Restricting the pipeline stops coverage feedback from rewarding non-target formats.",
+                "Structure-aware mutation keeps the outer file valid so the fuzzer reaches deep parsers.",
+                "Deliberately leaving a size or count inconsistent some of the time finds mismatch bugs that always-valid output misses.",
+                "Code with manual pointer arithmetic and ad hoc bounds checks, like variable-size metadata atoms, is a good target.",
+                "Check what the continuous fuzzing service actually builds. Here OSS-Fuzz had no MP4 coverage.",
+                "Confidential reporting to a responsive maintainer team gets fixes shipped and backported.",
+                "Name a harness's limits explicitly, because they show where the next round should go."
+            ],
+            "terms": [
+            ],
+            "title": "Crafting Targeted MP4 Fuzzers",
+            "topic": "Security",
+            "url": "https://atredis.com/blog/2026/11/16/crafting-targeted-mp4-fuzzers/",
+            "why": "It shows step by step how moving from a stock harness to a structure-aware one turned up more bugs in a well-fuzzed media parser."
+        },
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "lobste.rs · 4 points (seen in the security tag feed)",
+            "practice": [
+                "Read the PostgreSQL documentation on composite types and prepared statements, and write down which steps happen at prepare time and which at execute time.",
+                "Read the PostgreSQL source documentation on Datum and type OIDs and explain in a paragraph how a function knows how to interpret a value.",
+                "On a disposable local database you own, observe when the server re-plans a prepared statement after related schema changes.",
+                "Read the upstream commit message and release notes for the six CVEs and map each to the category of bug it fixes.",
+                "Write a short variant-analysis plan: given one type-confusion root cause, list other places where metadata and data could drift apart."
+            ],
+            "questions": [
+                {
+                    "answer": "A composite type's field types can change after a prepared statement stores data, and the stored bytes are not converted, so they are later read under the wrong type.",
+                    "question": "What is the root cause of CVE-2026-6460?"
+                },
+                {
+                    "answer": "It is a generic 8-byte value with no type of its own, and the type is known only through OID and catalog metadata that code trusts.",
+                    "question": "Why is a Datum a weak point for type safety?"
+                },
+                {
+                    "answer": "Forcing a mismatched output function through the internal language needed superuser rights.",
+                    "question": "Why did the first experiment not count as a real vulnerability?"
+                },
+                {
+                    "answer": "Reinterpreted data is treated as a pointer to an expanded object's callback table, so the attacker can influence which internal function runs.",
+                    "question": "How does confusion turn into control-flow influence?"
+                },
+                {
+                    "answer": "It added versioning for composite attributes so layout changes cannot silently affect values created under an older layout.",
+                    "question": "How did upstream fix the problem?"
+                }
+            ],
+            "source": "mehmetince.net (Mehmet Ince)",
+            "summary": "The author found a type-confusion bug in PostgreSQL core that they say is about 22 years old. A composite type's field types can be changed after a prepared statement is created but before it runs. The stored bytes are not converted, so later code reads old data under the new type's rules. The article says a low-privileged role could trigger a crash this way.\n\nThe path began with a memory-corruption bug in the pg_clickhouse extension. That raised questions about how PostgreSQL represents values: a Datum is an untyped 8-byte carrier, and its meaning comes only from the type OID and catalog metadata. An experiment forcing a mismatched output function crashed the backend but needed superuser rights. A conversation about the gap between parsing and execution then pointed to altering composite types between prepare and execute.\n\nThe author describes exploitation only at a high level. Stale bytes are reinterpreted as a pointer to an expanded object's callback table, which influences control flow. A related array confusion leaks a pointer as an integer to help defeat ASLR. These combine into remote code execution on affected builds. The upstream fix versions composite attributes so layout changes cannot silently affect older values. It came with five other CVEs and 21 variant cases, and managed providers were told privately.",
+            "tags": [
+                "postgresql",
+                "type-confusion",
+                "memory-corruption"
+            ],
+            "takeaways": [
+                "A generic 8-byte Datum carries no type, so correctness depends on metadata staying consistent with data.",
+                "Schema changes between prepare and execute create a window where data and metadata can disagree.",
+                "Output functions trust that they were selected correctly and do not verify the bytes they read.",
+                "Type confusion becomes code execution when the confused bytes are treated as a pointer to a callback table.",
+                "Leaking a pointer through a type mismatch can defeat ASLR without a separate bug.",
+                "A bug in an extension can lead a researcher into a deeper flaw in core.",
+                "Systematic variant analysis found 21 related cases after the first report, so one root cause rarely stands alone.",
+                "Managed database providers inherit core risk, which makes private coordination across vendors necessary."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-787",
+                    "kind": "weakness",
+                    "name": "Out-of-bounds Write",
+                    "text": "The product writes data past the end, or before the beginning, of the intended buffer.",
+                    "url": "https://cwe.mitre.org/data/definitions/787.html"
+                },
+                {
+                    "id": "CWE-843",
+                    "kind": "weakness",
+                    "name": "Type Confusion",
+                    "text": "The product allocates or initializes a resource such as a pointer, object, or variable using one type, but it later accesses that resource using a type that is incompatible with the original type.",
+                    "url": "https://cwe.mitre.org/data/definitions/843.html"
+                }
+            ],
+            "title": "How I Ended Up Turning a 22-Year-Old PostgreSQL Type-Confusion Primitive into RCE (CVE-2026-6460)",
+            "topic": "Security",
+            "url": "https://mehmetince.net/part-3-6-how-i-ended-up-turning-a-22-year-old-postgresql-type-confusion-primitive-into-rce-cve-2026-6460/",
+            "why": "A senior-level look at how a 22-year-old design assumption in PostgreSQL's value handling became a remote code execution path, with notes on variant hunting."
+        }
+    ]
+}
