@@ -1,0 +1,319 @@
+{
+    "date": "2026-11-24",
+    "generatedAt": "2026-11-24T11:40:28",
+    "items": [
+        {
+            "category": "Reverse",
+            "level": "Senior",
+            "popularity": "Hacker News · 105 points, 9 comments",
+            "practice": [
+                "Read the article and draw the boot chain as a diagram, marking where each signature check happens and where each one is skipped.",
+                "List which checks in a secure-boot design you know of are bound to a hardware key, and who can produce valid data for them.",
+                "Study the public CVE record for the FreeType CFF overflow and write a short note on why a font parser is a good attack surface.",
+                "Read the freemyipod and Rockbox documentation to learn how a flash translation layer maps logical to physical NAND blocks.",
+                "In your own embedded or QEMU lab, write down how you would budget space for a staged loader under a hard size limit."
+            ],
+            "questions": [
+                {
+                    "answer": "It relied on swapping firmware directory entries so the OS ran under disk-mode policy, which skips the resource signature check. Disk mode had to be picked on each restart.",
+                    "question": "Why did the previous approach need a computer or buttons at every boot?"
+                },
+                {
+                    "answer": "A FirmwareStatus value in an authenticated private NAND record tells the bootloader to skip the resource-signature check in normal boot.",
+                    "question": "What is the new bypass?"
+                },
+                {
+                    "answer": "Its 16-byte tag depends on a SHA-1 hash encrypted with a device-specific hardware AES key, so only the device can compute it.",
+                    "question": "Why does the record need on-device code execution to forge?"
+                },
+                {
+                    "answer": "Execution starts inside a corrupted call frame with the OS hardware state still live, so a small stub must reset the hardware before the larger loader runs. The font also caps total payload size.",
+                    "question": "Why is the payload split into two stages?"
+                },
+                {
+                    "answer": "A shortcut that skips verification can combine with a parser flaw into persistent compromise.",
+                    "question": "What is the general lesson about boot policy?"
+                }
+            ],
+            "source": "viktorkrapivin.com (Viktor Krapivin)",
+            "summary": "Krapivin wanted Rockbox to boot on an iPod nano 5G on its own. Earlier public work needed a computer or a button sequence on every start. The known chain relies on two weaknesses. Disk-mode boot skips the signature check on the resource image that normal boot performs. Separately, a 2010 FreeType CFF stack overflow in the font parser gives code execution when a crafted font is loaded.\n\nThe new finding is a second bypass in the normal boot path. The bootloader reads a FirmwareStatus value from an authenticated record in a private NAND partition, and one value makes it skip the resource-signature check. The record's tag is tied to a device-specific hardware AES key. So it has to be generated on the device, which the font exploit makes possible. The author adapted the older emCORE framework with a NAND driver, flash translation layer access and hardware AES. A host tool writes the record once, and later boots need no host.\n\nThe font leaves room for only a 27,874-byte payload, so the code is split into two stages. A small stub quiesces interrupts, timers, DMA, caches and the MMU. A compact loader then reads the FAT partition and jumps into Rockbox. The result is a cold battery boot straight into Rockbox. The same private-data trick works on the nano 7G.",
+            "tags": [
+                "embedded",
+                "secure-boot",
+                "firmware"
+            ],
+            "takeaways": [
+                "Skipping repeated verification for speed can become an attack surface once a parser bug exists.",
+                "A tag that must be created on the device is only as strong as the code-execution boundary around it.",
+                "A one-time code-exec bug can be made permanent by writing to an authenticated but writable storage record.",
+                "Hardware-keyed AES lets a device sign data for itself, which helps an attacker who already runs code on it.",
+                "Payload size limits (about 27 KB here) force a staged design with a small stub and a larger loader.",
+                "Before running a payload from a corrupted call frame, quiesce interrupts, DMA, caches and the MMU.",
+                "Keeping the main kernel on the FAT partition means it can be updated without touching the exploit.",
+                "Old, well-documented bugs such as a 2010 FreeType CVE stay useful on devices that are never patched."
+            ],
+            "terms": [
+            ],
+            "title": "Freeing the iPod Nano 5G",
+            "topic": "Security",
+            "url": "https://viktorkrapivin.com/blog/nano5g-priv-prvd",
+            "why": "A rare, detailed look at turning a known parser bug into a persistent, untethered boot chain by abusing a boot-policy flag."
+        },
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "Covered by The Hacker News; PoCs for PostgreSQL, MySQL, ClickHouse and Oracle published this week",
+            "practice": [
+                "In a test PostgreSQL or MySQL instance you own, list which default privileges an ordinary new role receives and which of them let it create session-local objects.",
+                "Read the PostgreSQL advisory and the MySQL advisory for these CVEs and note the affected versions and fixes.",
+                "Study how a query planner picks an index for an aggregate, using the public PostgreSQL documentation, to see where a shortcut could skip a step.",
+                "Write a short threat model for a database in your own lab that separates data access from engine attack surface.",
+                "Read the ClickHouse fix pull request and describe in prose how a size check prevents integer wrap."
+            ],
+            "questions": [
+                {
+                    "answer": "The role limits access to data objects, but any allowed statement still reaches native engine code, where a memory bug can give OS-level execution.",
+                    "question": "Why is a least-privilege role not enough protection?"
+                },
+                {
+                    "answer": "An index-based shortcut for aggregates skipped the final function that converts the output type, so a raw value was treated as the wrong type.",
+                    "question": "What went wrong in the PostgreSQL planner path?"
+                },
+                {
+                    "answer": "The length check existed only as a debug assertion that is compiled out of release builds.",
+                    "question": "What made the MySQL bug exploitable in production?"
+                },
+                {
+                    "answer": "It needs no account. A reachable HTTP endpoint and two chained bugs reach the engine before any SQL role is checked.",
+                    "question": "What is special about the Oracle chain?"
+                },
+                {
+                    "answer": "Apply vendor patches, remove default temporary-table privileges and broad temp rights, and restrict client-controlled server settings.",
+                    "question": "Which mitigations does the author give?"
+                }
+            ],
+            "source": "depthfirst.com (Zheng Yu), via The Hacker News",
+            "summary": "The research argues that SQL privileges are a weak boundary against someone who already has database access. They only restrict logical objects. The real boundary is the memory safety of the C and C++ engine code that any permitted statement can reach, such as planners, aggregate evaluators, prepared-statement resolvers and wire parsers. A narrowly scoped account can therefore become code execution as the database's OS service user.\n\nThe post walks through four engines. In PostgreSQL (CVE-2026-116331) a planner shortcut for user-defined aggregates answers via an index and skips the final function that converts the result type. The engine then misreads the raw value as another type. Default temporary-schema privileges give ordinary roles the objects needed to reach it. In MySQL (CVE-2026-101786) a windowed BIT_OR counter array is sized at prepare time, but a longer value can be bound at execution. The only check was a debug assertion absent from release builds. In ClickHouse, an integer overflow in the RowBinary string reader wraps a size calculation, and the protective setting can be turned off by an unprivileged HTTP caller. Oracle is a pre-login chain through a GraphQL interface and a Text bug.\n\nThe author's advice is to patch, revoke default temporary-table rights where they aren't needed, and restrict client-changeable safety settings. Role design cannot fix pre-login exposure.",
+            "tags": [
+                "databases",
+                "memory-corruption",
+                "privilege-boundary"
+            ],
+            "takeaways": [
+                "A short SHOW GRANTS output does not mean a small attack surface.",
+                "SQL authorization restricts objects, not what engine code can be made to do.",
+                "Planner optimizations that skip steps, such as a final conversion function, can cause type confusion.",
+                "Sizes fixed at prepare time but values bound at execute time are a classic mismatch.",
+                "A check that exists only as a debug assertion vanishes in release builds.",
+                "Session-local features like temporary tables give attackers reliable building blocks for exploitation.",
+                "Client-settable settings that disable safety limits should be locked down.",
+                "Pre-login attack paths bypass role design entirely; only patching and network exposure control help."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-119",
+                    "kind": "weakness",
+                    "name": "Buffer Overflow",
+                    "text": "The product performs operations on a memory buffer, but it reads from or writes to a memory location outside the buffer's intended boundary.",
+                    "url": "https://cwe.mitre.org/data/definitions/119.html"
+                },
+                {
+                    "id": "CWE-843",
+                    "kind": "weakness",
+                    "name": "Type Confusion",
+                    "text": "The product allocates or initializes a resource such as a pointer, object, or variable using one type, but it later accesses that resource using a type that is incompatible with the original type.",
+                    "url": "https://cwe.mitre.org/data/definitions/843.html"
+                }
+            ],
+            "title": "Narrow Grants, Wide Engines",
+            "topic": "Security",
+            "url": "https://depthfirst.com/research/narrow-grants-wide-engines",
+            "why": "It reframes database least-privilege as a memory-safety problem and shows the same pattern across four engines."
+        },
+        {
+            "category": "Web",
+            "level": "Middle",
+            "popularity": "CISA KEV addition (CVE-2026-115731); covered by The Hacker News",
+            "practice": [
+                "In a lab you control, review your own configuration-management CA policy and identify whether any enrollment is auto-approved.",
+                "Read about insecure deserialization in Ruby and summarize in prose why trusting a class name from input is dangerous.",
+                "Review the OpenVox GHSA advisories and trace each fix to the lesson it illustrates.",
+                "Write test cases in prose for a hostname matcher, listing inputs with extra leading labels, and describe the expected result.",
+                "Map the trust relationships between your lab config server and clients, and list what a stolen CA key would allow."
+            ],
+            "questions": [
+                {
+                    "answer": "The deserializer trusts attacker-supplied type information and ends up evaluating attacker-controlled method bodies, giving command execution on the server.",
+                    "question": "What makes the report endpoint bug dangerous?"
+                },
+                {
+                    "answer": "A client certificate signed by the CA, which autosign configurations often hand out easily.",
+                    "question": "What does the attacker need for CVE-2026-115731?"
+                },
+                {
+                    "answer": "The matcher compares reversed labels only up to the shorter list's length, so extra leading labels are ignored and the name matches the target.",
+                    "question": "How does the hostname bug work?"
+                },
+                {
+                    "answer": "It can alter catalogs, trigger root tasks on hosts, expose secrets in catalogs and leak CA signing keys.",
+                    "question": "Why is a Puppet server compromise so severe?"
+                },
+                {
+                    "answer": "Restrict autosign and give the catalog a different owner from the service user.",
+                    "question": "What hardening reduces impact?"
+                }
+            ],
+            "source": "neodyme.io (Neodyme AG)",
+            "summary": "While preparing a red team engagement, Neodyme found two critical flaws in Puppet. The first (CVE-2026-115731) is in the Puppet Server report endpoint. It accepts serialized event objects, and the deserializer trusts type information from the input. An attacker with a valid agent certificate can make the server build a Ruby class from attacker-supplied method bodies and evaluate it, which gives command execution as the puppet user. Autosign setups, common with Satellite or Ansible provisioning, make such certificates easy to get.\n\nThe second (CVE-2026-115732) is in a Clojure authorization package. Hostname matching splits names into labels, reverses them and compares only up to the shorter list's length. So a certificate for an extra leading label still matches the allowed name. With wildcard autosign, an attacker can enroll such a name and act as the target host. That exposes its catalog, which in their test held database credentials and admin tokens, and lets them spoof facts.\n\nImpact depends on configuration. A compromised server could tamper with catalogs, run root tasks on managed hosts through PXP, or steal CA signing keys. Fixes shipped on 2026-11-03. The authors say AI helped find the bugs only with strict steering from experienced researchers.",
+            "tags": [
+                "deserialization",
+                "config-management",
+                "authz"
+            ],
+            "takeaways": [
+                "Type information from untrusted input must never decide which code is built or evaluated.",
+                "Comparisons that truncate to the shorter input create name-matching bypasses.",
+                "Autosign convenience turns agent certificates into low-barrier credentials.",
+                "A config-management server is a high-value target because it reaches the whole fleet.",
+                "Stolen CA signing keys allow impersonation of any host.",
+                "Giving the catalog a different owner than the service user limits damage.",
+                "Target data-ingestion paths and parsers first when hunting for bugs.",
+                "AI-assisted bug hunting mostly repeated known surface without expert direction."
+            ],
+            "terms": [
+            ],
+            "title": "Two critical Puppet vulnerabilities (Puppet RCE)",
+            "topic": "Security",
+            "url": "https://neodyme.io/en/blog/puppet_rce/",
+            "why": "A clear example of two small logic and deserialization flaws that compound into fleet-wide risk, now exploited in the wild."
+        },
+        {
+            "category": "Web",
+            "level": "Middle",
+            "popularity": "VulnCheck blog, 2026-11-16; about 124,000 exposed instances reported",
+            "practice": [
+                "In a practice web app you own, check how password-reset links are built and whether they depend on the Host header.",
+                "Read OWASP's guidance on password reset and list the properties a recovery token should have.",
+                "Review an intentionally vulnerable lab with a reset flow and describe in prose where a token could leak through logs, mail scanners or referrers.",
+                "Audit your own lab's auth code for early returns that skip later checks.",
+                "Write a short checklist for exposing an admin API only to trusted networks."
+            ],
+            "questions": [
+                {
+                    "answer": "The server puts the attacker-chosen host into the emailed link. When the link is opened, the code goes to the attacker's server.",
+                    "question": "How does Host-header reset poisoning leak a recovery code?"
+                },
+                {
+                    "answer": "The recovery-code branch returns before the configured key is checked.",
+                    "question": "Why can a dummy API key work in the second bug?"
+                },
+                {
+                    "answer": "It uses inputs like the hostname, which can be read from the TLS certificate on the same port.",
+                    "question": "Why is the signature weak?"
+                },
+                {
+                    "answer": "The reset-link bug, since the endpoint is on the public user panel across all exposed instances. The API bug needs port 2304 exposed.",
+                    "question": "Which bug has the larger reach and why?"
+                },
+                {
+                    "answer": "Links use the configured hostname, codes are single-use, and the API no longer accepts recovery codes.",
+                    "question": "What did the fix change?"
+                }
+            ],
+            "source": "vulncheck.com",
+            "summary": "VulnCheck analyzed two Control Web Panel bugs (CVE-2026-124020 and CVE-2026-124021) that both abuse the password-recovery code stored in the panel's database. Each can end in a shell as a hosting account, though not root. Version 1.30.6 fixes both.\n\nThe first is reset-link poisoning. The public reset endpoint builds the emailed link from the unauthenticated Host header, so a link can point at an attacker's server. When the owner or a link-following mail scanner opens it, the live code leaks. The attacker then resets the password and uses panel features to schedule a job as the account. The second is API misuse. An optional admin API on port 2304 accepts a live recovery code as authorization. It also relies on a daily signature built from guessable inputs, such as a hostname visible in the TLS certificate. A dummy API key passes because the recovery-code branch returns first.\n\nThe first bug reaches the whole public user panel. The second applies only where the API port was deliberately exposed. The fix builds links from configured hostnames, makes codes single-use, and removes recovery codes from API authorization.",
+            "tags": [
+                "password-reset",
+                "host-header",
+                "hosting-panel"
+            ],
+            "takeaways": [
+                "Never build security-sensitive URLs from the request Host header.",
+                "A secret is only as narrow as the code paths that accept it; a recovery code accepted by an API became a master credential.",
+                "Mail scanners that follow links can leak one-time tokens.",
+                "Signatures made from attacker-readable values give no protection.",
+                "An early return in an auth routine can skip later checks, such as the API key check.",
+                "Make one-time codes truly single-use and consume them on success.",
+                "Keep administrative APIs off the public internet even when authenticated.",
+                "Default firewall rules can limit exposure of one bug but not the other."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-59",
+                    "kind": "weakness",
+                    "name": "Link Following",
+                    "text": "The product attempts to access a file based on the filename, but it does not properly prevent that filename from identifying a link or shortcut that resolves to an unintended resource.",
+                    "url": "https://cwe.mitre.org/data/definitions/59.html"
+                }
+            ],
+            "title": "One Recovery Code, Two Shells in Control Web Panel",
+            "topic": "Security",
+            "url": "https://vulncheck.com/blog/control-web-panel-recovery-code-rce",
+            "why": "A compact, readable case of how reuse of a single secret across two code paths breaks a whole product."
+        },
+        {
+            "category": "Reverse",
+            "level": "Junior",
+            "popularity": "Lobsters · 9 points",
+            "practice": [
+                "Install jadx and decompile an open-source or intentionally vulnerable Android practice app you own, then list the network URLs it contains.",
+                "Find the cryptography calls in that app and describe in prose what each parameter is used for.",
+                "Read about AES-GCM and explain what nonce reuse would break.",
+                "Complete an Android reversing challenge on a CTF platform and note how you located the key.",
+                "Write a short note on how a developer could have protected such data better, and why client-side secrets are limited."
+            ],
+            "questions": [
+                {
+                    "answer": "By SHA-256 hashing the ciphertext length minus 28 combined with a secret string.",
+                    "question": "How was the AES key derived?"
+                },
+                {
+                    "answer": "By searching for 32-byte arrays and combining two of them with XOR.",
+                    "question": "How did the author find the secret string?"
+                },
+                {
+                    "answer": "The AES-GCM nonce and the authentication tag.",
+                    "question": "What do the first 12 and last 16 bytes of the data represent?"
+                },
+                {
+                    "answer": "Check for public, unencrypted sources, such as URLs in the app, before investing in deep analysis.",
+                    "question": "What was the main lesson?"
+                },
+                {
+                    "answer": "The app must contain everything needed to rebuild it, so anyone with the APK can recover it.",
+                    "question": "Why is a hardcoded split secret weak?"
+                }
+            ],
+            "source": "wuemeli.com",
+            "summary": "The author wanted to use the Hitster music card game's companion app without a streaming subscription. Each card's QR code holds a region and a card ID, and the app maps these to songs. The goal was to extract that mapping from the Android app.\n\nThey decompiled the APK with jadx and found a Base64 resource holding a database. The decryption routine decodes it and uses the first 12 bytes as an AES-GCM nonce and the last 16 as the tag. The key comes from hashing the ciphertext length together with a secret string. Two 32-byte arrays elsewhere in the code, combined by XOR, produced that secret. A small Rust tool then decrypted about 31,000 lines of card-to-track data.\n\nThe twist is that the app also contained a plain URL to the publisher's public asset directory, which held the same data unencrypted. About 18 hours went into the encrypted path that was not needed.",
+            "tags": [
+                "android",
+                "jadx",
+                "apk"
+            ],
+            "takeaways": [
+                "Decompile the APK and search for crypto routines and resources first.",
+                "AES-GCM splits input into nonce, ciphertext and tag, which you can see in the code layout.",
+                "Keys derived from hardcoded values split across arrays can be recovered from the app itself.",
+                "Look for plain URLs and public endpoints in the app before attacking encrypted blobs.",
+                "Searching for fixed-size byte arrays is a quick way to find embedded key material.",
+                "Obfuscated class names still reveal logic through control flow.",
+                "Asking a community for help can save hours.",
+                "Time spent on a hard path can be wasted if an easier one exists."
+            ],
+            "terms": [
+                {
+                    "id": "CAPEC-188",
+                    "kind": "pattern",
+                    "name": "Reverse Engineering",
+                    "text": "An adversary discovers the structure, function, and composition of an object, resource, or system by using a variety of analysis techniques to effectively determine how the analyzed entity was constructed or operates. The goal of reverse engineering is often to duplicate the function, or a part of the function, of an object in order to duplicate or \"back engineer\" some aspect of its functioning.",
+                    "url": "https://capec.mitre.org/data/definitions/188.html"
+                }
+            ],
+            "title": "Reverse Engineering a Board Game",
+            "topic": "Security",
+            "url": "https://wuemeli.com/blog/reversing-hitster-game/",
+            "why": "A friendly, honest walkthrough of a real APK reverse that also teaches when not to over-engineer your analysis."
+        }
+    ]
+}
