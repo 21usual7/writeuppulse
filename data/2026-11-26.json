@@ -1,0 +1,312 @@
+{
+    "date": "2026-11-26",
+    "generatedAt": "2026-11-26T08:35:06",
+    "items": [
+        {
+            "category": "Web",
+            "level": "Senior",
+            "popularity": "Lobsters · 76 points",
+            "practice": [
+                "Read the post's timeline and write your own one-page incident timeline template from it, with detection, containment, rotation and notification stages.",
+                "In a language of your choice, read the documentation of its serialization formats and list which ones are safe only for trusted input.",
+                "Review a test app you own and list every parser that runs before authentication, noting what content types each accepts.",
+                "Trace in your own test project how an error handler formats request data, and note where untrusted objects get inspected or logged.",
+                "Draw the multi-library call chain from the post on paper and mark the one check in each library that would have broken it."
+            ],
+            "questions": [
+                {
+                    "answer": "It ran before routing and authentication, so any unauthenticated request with the right content type reached a decoder that was only safe for trusted payloads.",
+                    "question": "Why was the request body decoder the critical entry point?"
+                },
+                {
+                    "answer": "Maps with a struct marker were not checked, so the attacker could craft structs that later steered code in other modules.",
+                    "question": "Why did blocking functions and new atoms not stop the attack?"
+                },
+                {
+                    "answer": "They inspected the crafted request data, which let the attacker choose which module's code was invoked.",
+                    "question": "How did error handling and logging help the attacker?"
+                },
+                {
+                    "answer": "A database-connection stream applied a module, function and arguments tuple supplied through a logging option.",
+                    "question": "What made the final step into command execution possible?"
+                },
+                {
+                    "answer": "Database reads are not logged, so reads of emails, hashes and 2FA secrets leave no trace.",
+                    "question": "Why could Hex not fully rule out data exposure?"
+                }
+            ],
+            "source": "hex.pm blog (Peter Ullrich, Jonatan Männchen, Eric Meadows-Jönsson)",
+            "summary": "On November 23, 2026 an unauthenticated attacker ran operating-system commands on six Hex.pm web servers through 69 requests. The entry point was a custom body parser that decoded Erlang-term payloads before routing and authentication. That decoder was only meant for trusted input. It blocked functions and new atoms but did not reject maps carrying a struct marker, so an attacker could build arbitrary Elixir structs. A check that would have caught this was removed in 2016.\n\nThe chain went through several libraries. Plug treated the crafted struct as a call target and raised an error that carried it. Error reporting and log formatting then inspected the request data, which let the attacker choose which module's code ran. An Ecto query type enumerated a field without checking its type and dispatched into a database-connection stream. That stream applied an attacker-supplied module, function and arguments tuple from a logging option, which gave command execution. A similar bug class was found in the Ash framework's pagination.\n\nThe team patched within about 20 minutes, replaced all servers, deactivated the cloud key and rotated nearly every credential. They found no evidence of package tampering. Because database reads are not logged, they could not rule out that emails, password hashes, API key hashes and 2FA secrets were read. The post gives a full UTC timeline, regulator notifications and user actions, plus hardening planned in plug_crypto, plug, ecto and db_connection.",
+            "tags": [
+                "Elixir",
+                "deserialization",
+                "incident-response"
+            ],
+            "takeaways": [
+                "A decoder that is safe only for trusted data must never sit in front of authentication.",
+                "Small gaps in several libraries can chain into code execution even when no single library looks fatal.",
+                "Error reporting and logging that inspect untrusted objects can become an execution path.",
+                "Blocking functions and atoms in a deserializer is not enough if structs or maps can still select behavior.",
+                "A removed safety check from years ago can come back as the root cause.",
+                "Missing logs, such as unlogged database reads, limit how firmly you can say data was not accessed.",
+                "Fast containment worked: block rule, patched build everywhere and key deactivation within minutes, then wider rotation.",
+                "A good incident post gives an exact timeline, the root cause, what is unknown and concrete user actions."
+            ],
+            "terms": [
+            ],
+            "title": "Security incident on Hex.pm",
+            "topic": "Security",
+            "url": "https://hex.pm/blog/security-incident-on-hexpm",
+            "why": "It is a rare, fully documented unauthenticated gadget chain across several libraries, with a candid timeline and unknowns."
+        },
+        {
+            "category": "Blue Team",
+            "level": "Middle",
+            "popularity": "Hacker News · 1320 points",
+            "practice": [
+                "List the controls you would put on developer accounts in a test organization you own: strong authentication, token scopes, branch protection and review rules.",
+                "Write a hunting plan, in prose, for spotting unexpected pushes to backend services using your own repository audit logs.",
+                "Map which secrets your own CI/CD setup holds and rank them by blast radius if the pipeline were compromised.",
+                "Compare this post with another vendor incident report and score both on timeline, root cause, scope and user guidance.",
+                "Estimate the guessing odds of a six-digit code against ten alphanumeric characters under a stated attempt limit."
+            ],
+            "questions": [
+                {
+                    "answer": "A compromised corporate GitHub account belonging to an employee.",
+                    "question": "What was the attacker's initial foothold?"
+                },
+                {
+                    "answer": "The attacker pushed malicious code to backend services, which then downloaded administrative data about customers.",
+                    "question": "How did source-control access lead to customer data?"
+                },
+                {
+                    "answer": "Vault contents, the keys protecting them, recovery keys and the apps and browser extensions.",
+                    "question": "What was reported as not affected?"
+                },
+                {
+                    "answer": "Tokens in those emails were exposed, so codes grew from six digits to ten alphanumeric characters as a precaution.",
+                    "question": "Why were recovery and invitation email codes changed?"
+                },
+                {
+                    "answer": "How the employee's GitHub account was compromised in the first place.",
+                    "question": "What does the post leave unanswered?"
+                }
+            ],
+            "source": "1Password blog",
+            "summary": "1Password began investigating intrusion signs on November 19, 2026 and published an update on November 25. The attacker first compromised an employee's corporate GitHub account. With it they reached source code, pushed malicious code to backend services that then downloaded administrative data about customers, copied private repositories and gained access to the CI/CD system, which holds infrastructure secrets.\n\nThe company says vault contents, the keys protecting them, recovery keys and its apps were not affected. Exposed data was account metadata for a subset of customers: names, sign-in emails, IDs, timestamps, public keys, SRP parameters and tokens in some invitation, provisioning and recovery emails. It reports no evidence of account takeover using those tokens.\n\nResponse steps were disabling the account, revoking the token, restoring clean service versions, rotating credentials and bringing in outside experts. It also lengthened the codes in invitation and recovery emails from six digits to ten alphanumeric characters and added detections for this attack type. The post does not describe how the GitHub account was compromised, so root cause remains unstated.",
+            "tags": [
+                "incident-response",
+                "GitHub",
+                "CI/CD"
+            ],
+            "takeaways": [
+                "One compromised developer account can reach source, deployment and secrets.",
+                "Pushing code to a backend service turned a source-control foothold into data access.",
+                "CI/CD systems hold infrastructure secrets and are high-value targets.",
+                "Zero-knowledge design limited the damage: vaults stayed encrypted with keys only customers hold.",
+                "Tokens inside invitation and recovery emails count as sensitive data.",
+                "Lengthening short codes to ten alphanumeric characters is a cheap precaution against guessing.",
+                "The post does not say how the account was compromised, so treat initial access as unknown.",
+                "Phishing risk rises after metadata exposure, so users are told to enter secrets only in official apps."
+            ],
+            "terms": [
+                {
+                    "id": "T1566",
+                    "kind": "technique",
+                    "name": "Phishing",
+                    "text": "Adversaries may send phishing messages to gain access to victim systems. All forms of phishing are electronically delivered social engineering. Phishing can be targeted, known as spearphishing. In spearphishing, a specific individual, company, or industry will be targeted by the adversary. More generally, adversaries can conduct non-targeted phishing, such as in mass malware spam campaigns.",
+                    "url": "https://attack.mitre.org/techniques/T1566"
+                }
+            ],
+            "title": "Update on a security incident involving 1Password's backend systems",
+            "topic": "Security",
+            "url": "https://1password.com/blog/update-on-nov-2026-security-incident",
+            "why": "It shows how a single developer account can open source, CI/CD and customer metadata, and how encryption design limited the damage."
+        },
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "Covered by BleepingComputer and The Register; trending on security feeds (CVE-2026-99288)",
+            "practice": [
+                "Read the Linux kernel documentation on how TCP request sockets and SYN cookies work and write a short flow of a handshake.",
+                "Study the concept of ABA problems in lock-free data structures and explain one example in your own words.",
+                "On a virtual machine you own, inspect how many receive queues and RPS settings your network interface uses and note which ones would meet the trigger condition.",
+                "Read the upstream fix description and explain in prose why checking the hashed state closes the window.",
+                "Compare how two distributions handled this fix and note their release timing from public trackers."
+            ],
+            "questions": [
+                {
+                    "answer": "A lockless lookup finds a request socket, but another path frees it and the memory is reused for a new request at the same address before the lookup takes its reference.",
+                    "question": "What is the core race?"
+                },
+                {
+                    "answer": "The new object has the same tuple, so the check passes even though it is a different object with no listener.",
+                    "question": "Why does the tuple recheck not help?"
+                },
+                {
+                    "answer": "Only a plain listening socket, plus concurrent receive processing such as multiple receive queues or RPS.",
+                    "question": "What does the attacker need on the target?"
+                },
+                {
+                    "answer": "A remote kernel panic, and a harder use-after-free path with no general code execution shown.",
+                    "question": "What is the demonstrated impact?"
+                },
+                {
+                    "answer": "Disabling SYN cookies reduces flood protection, and using one receive queue with RPS and RFS off can reduce network performance.",
+                    "question": "Name two mitigations and their cost."
+                }
+            ],
+            "source": "Hyunwoo Kim (V4bel), GitHub advisory",
+            "summary": "NoisyTCP is a pre-authentication flaw in the Linux kernel TCP stack, CVE-2026-99288, introduced in 2015 and fixed in November 2026. It is a race between two receive paths handling the same request socket. A lockless lookup finds a request socket and checks its tuple. Before it takes a reference, another receive context frees that object, and the memory is reused at the same address for a new SYN-cookie request with the same tuple. The stale lookup takes a reference on the new object and passes the recheck, but the new request has no listener attached, so a NULL listener is dereferenced.\n\nTriggering needs concurrent receive processing, for example two or more receive queues or RPS. The author uses the difference in receive hash between IPv4 fragments and regular packets to spread work across CPUs. A plain listening socket is enough. Reported times ranged from seconds on virtual machines to about 14 hours on a quiet 8-queue bare-metal server. The main impact is a remote kernel panic. A second path can lead to use-after-free but is hard, and general code execution is not demonstrated.\n\nMitigations are the patch, disabling SYN cookies per network namespace at the cost of flood protection, or serializing receive to one queue with RPS and RFS off. Separately, an oss-security thread that day criticized Ubuntu for lacking a fix nine days after publication.",
+            "tags": [
+                "Linux kernel",
+                "TCP",
+                "race condition"
+            ],
+            "takeaways": [
+                "The bug is an ABA-style reuse race: freed memory returns at the same address with the same tuple.",
+                "A tuple recheck cannot prove an object is still the one you first found.",
+                "Lockless lookups need a reference-then-revalidate step that confirms the object is still live.",
+                "Reachability needs only a normal listening socket, with no unusual configuration.",
+                "Concurrency across CPUs is a precondition, so queue and RPS settings change exposure.",
+                "A narrow race window can still be reliable in practice: seconds on VMs, hours on idle bare metal.",
+                "In containers a kernel crash takes down the host.",
+                "Mitigations trade off: disabling SYN cookies weakens flood protection."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-416",
+                    "kind": "weakness",
+                    "name": "Use After Free",
+                    "text": "The product reuses or references memory after it has been freed. At some point afterward, the memory may be allocated again and saved in another pointer, while the original pointer references a location somewhere within the new allocation. Any operations using the original pointer are no longer valid because the memory \"belongs\" to the code that operates on the new pointer.",
+                    "url": "https://cwe.mitre.org/data/definitions/416.html"
+                }
+            ],
+            "title": "NoisyTCP",
+            "topic": "Security",
+            "url": "https://raw.githubusercontent.com/V4bel/NoisyTCP/main/README.md",
+            "why": "A clear, well-scoped explanation of an 11-year-old kernel race, with honest limits on impact and practical mitigations."
+        },
+        {
+            "category": "Reverse",
+            "level": "Middle",
+            "popularity": "Hacker News · 331 points",
+            "practice": [
+                "Learn how automatic gain control and limiters work by reading an introductory DSP text and summarize the attack and release idea.",
+                "Using audio files you own, listen to a before and after of any loudness normalization tool and note what changes.",
+                "Read the project's README and list each recovered parameter, then guess which are fixed and which are user settings.",
+                "Plan, in prose, a validation experiment comparing a reimplementation with the original using test tones you generate.",
+                "Practice documenting a binary's behavior from public docs: pick a small open-source audio effect and describe its algorithm stages."
+            ],
+            "questions": [
+                {
+                    "answer": "A broadband automatic gain control, not a spectral equalizer.",
+                    "question": "What kind of effect is Windows Loudness Equalization, according to the findings?"
+                },
+                {
+                    "answer": "The look-ahead lets it ramp gain down before a peak reaches the output.",
+                    "question": "Why does the limiter delay its output?"
+                },
+                {
+                    "answer": "Windows applies volume before the limiter while PipeWire applies it later, so the port measures peaks after volume.",
+                    "question": "Why does the port differ in where it measures peaks?"
+                },
+                {
+                    "answer": "Gain drops immediately when the target is lower and rises slowly with a configurable release time.",
+                    "question": "How do attack and release behave?"
+                },
+                {
+                    "answer": "No quantitative validation or side-by-side measurements against Windows output.",
+                    "question": "What is missing from the evidence?"
+                }
+            ],
+            "source": "xoxorwr, GitHub (pw-loudness-eq)",
+            "summary": "The project reverse-engineers Windows' Loudness Equalization effect from WMALFXGFXDSP.dll and ports the limiter from CAudioLimiter in AudioEng.dll to a PipeWire plugin. The README documents the recovered algorithms but does not name the analysis tools, so the method of recovery is not described.\n\nLoudness equalization turns out to be a broadband automatic gain control rather than a spectral equalizer. Audio is cut into power-of-two frames near 10 ms with 50% overlap, windowed and transformed to power spectra. Power is summed into 25 bands across channels and weighted above per-band thresholds to give a loudness value raised to the 0.25 power. A target gain is derived with a cap near +20 dB. Gain falls instantly but rises slowly, with a release setting where the Windows default corresponds to about a 4.6 second time constant.\n\nThe limiter delays output by a look-ahead window, ramps gain down so peaks fit, shares one gain across channels and recovers exponentially. Windows applies software volume before the limiter while PipeWire applies it after, so the port measures post-volume peaks. There is no quantitative validation against Windows, only test targets and an offline WAV tool. JACK clients, streams above 8 channels and some Flatpak apps are not processed.",
+            "tags": [
+                "DSP",
+                "Windows",
+                "PipeWire"
+            ],
+            "takeaways": [
+                "Loudness equalization here is broadband gain control, not a frequency-shaping equalizer.",
+                "Gain reacts instantly downward and slowly upward, which avoids pumping.",
+                "Perceived loudness is estimated from weighted band power with a compressive exponent.",
+                "A look-ahead delay lets a limiter reduce gain before a peak arrives.",
+                "Ordering matters: where volume is applied relative to the limiter changes the result.",
+                "An offline tool for processing files makes a reimplementation testable without live audio.",
+                "The README claims faithfulness but reports no measured comparison with Windows.",
+                "Documented limits, such as unsupported clients, set honest expectations."
+            ],
+            "terms": [
+                {
+                    "id": "CAPEC-188",
+                    "kind": "pattern",
+                    "name": "Reverse Engineering",
+                    "text": "An adversary discovers the structure, function, and composition of an object, resource, or system by using a variety of analysis techniques to effectively determine how the analyzed entity was constructed or operates. The goal of reverse engineering is often to duplicate the function, or a part of the function, of an object in order to duplicate or \"back engineer\" some aspect of its functioning.",
+                    "url": "https://capec.mitre.org/data/definitions/188.html"
+                }
+            ],
+            "title": "Windows Loudness Equalization, reverse-engineered and ported to PipeWire",
+            "topic": "Security",
+            "url": "https://github.com/xoxorwr/pw-loudness-eq",
+            "why": "It turns an opaque Windows audio effect into a readable algorithm description, a good model of behavior-focused reverse engineering."
+        },
+        {
+            "category": "Other",
+            "level": "Junior",
+            "popularity": "Hacker News · 170 points",
+            "practice": [
+                "In a terminal on your own machine, read your terminal's documentation and list which graphics, clipboard and notification features it supports.",
+                "Read the public specification of the Kitty graphics protocol and describe its message structure in prose.",
+                "Compare two terminal emulators you have installed on how they handle clipboard and image features.",
+                "Sketch a fallback chain for a text app that wants notifications on terminals with different support.",
+                "Consider the security of terminal clipboard writes and list risks of letting remote programs write to your clipboard."
+            ],
+            "questions": [
+                {
+                    "answer": "Through terminal graphics protocols, mainly Kitty's, with Sixel and iTerm2 as fallbacks.",
+                    "question": "How does the system draw graphics over SSH?"
+                },
+                {
+                    "answer": "Terminals support different features, so the system picks the best protocol and falls back when something is missing.",
+                    "question": "Why query terminal capabilities at session start?"
+                },
+                {
+                    "answer": "By sending only changed grid cells, dropping alpha where possible, streaming text as text and caching repeated UI parts.",
+                    "question": "How is bandwidth reduced?"
+                },
+                {
+                    "answer": "Applications report exactly what changed and terminal text stays selectable and copyable.",
+                    "question": "What advantages over VNC are claimed?"
+                },
+                {
+                    "answer": "Unreliable Android terminals, no good audio path and weaker client-side state than web apps.",
+                    "question": "What are the stated limits?"
+                }
+            ],
+            "source": "zydra.sh",
+            "summary": "The article describes zydra.sh, a microVM desktop that renders over a plain SSH session with no sign-up. It shows how far modern terminal escape sequences go: the Kitty graphics protocol, with Sixel and iTerm2 fallbacks, draws images and animations. Notifications step down from OSC 99 to 777 to 9 as client support shrinks. Clipboard sharing uses OSC 52, with Kitty's extension for images. Mouse tracking and synchronized output give precise input and tear-free frames.\n\nTo save bandwidth the screen is split into a grid and only changed cells are sent, alpha is dropped where unneeded, text is streamed as text and repeated UI parts are cached on the client. At boot it queries terminal capabilities and falls back to ASCII when features are missing.\n\nThe author argues SSH beats VNC because applications report exactly what changed and text stays selectable, and beats web apps for universal access, key authentication, agent forwarding and sshfs. Limits are unreliable Android terminals, no audio path, and weaker client-side state than the web. It is a product page, so claims are the author's and unmeasured.",
+            "tags": [
+                "terminal",
+                "protocols",
+                "SSH"
+            ],
+            "takeaways": [
+                "Terminals support images, clipboard, notifications and mouse input through escape sequences.",
+                "Graphics protocols differ in support, so clients must be queried for capabilities.",
+                "Fallback chains keep an app usable on weaker terminals at lower fidelity.",
+                "Sending only changed cells cuts bandwidth for remote rendering.",
+                "Synchronized output prevents tearing and flicker.",
+                "SSH brings key authentication, agent forwarding and file mounting for free.",
+                "Audio and rich client-side state remain weak spots compared with the web.",
+                "Treat the performance claims as unverified, since the page is also a product description."
+            ],
+            "terms": [
+            ],
+            "title": "SSH is a GUI framework",
+            "topic": "Other",
+            "url": "https://zydra.sh/articles/ssh-is-a-gui-framework/",
+            "why": "It is an approachable tour of what terminal protocols can do, and a good first step into how remote UIs are built."
+        }
+    ]
+}
