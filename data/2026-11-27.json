@@ -1,0 +1,340 @@
+{
+    "date": "2026-11-27",
+    "generatedAt": "2026-11-27T08:20:02",
+    "items": [
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "Widely covered by Phoronix, Qualys, Mend, Picus and Security Affairs; I did not see an HN or Reddit score",
+            "practice": [
+                "Inventory the JVM versions and CPU types in a lab you own. Work out which combinations would take the vulnerable code path and which would not.",
+                "Read the OpenJDK advisory and the upstream fix description. Write a short note explaining in your own words why the length calculation went wrong.",
+                "Study how JIT intrinsics replace library methods. Read the HotSpot documentation on intrinsics and list which standard APIs have them.",
+                "In your own test environment, confirm how to check which JVM flags are active on a running process. Describe how you would verify that a mitigation took effect.",
+                "Write a short threat model for a Java service you control. List every path where attacker-controlled Base64 enters and what log lines would show abuse."
+            ],
+            "questions": [
+                {
+                    "answer": "It is in a hand-written x86-64 vector routine (an intrinsic) behind the Base64 decoder. Such code is not subject to the memory-safety checks of ordinary Java, so an arithmetic error becomes real memory corruption.",
+                    "question": "What kind of code contains the Java4Shell bug, and why does that matter?"
+                },
+                {
+                    "answer": "The vulnerable path runs only on x86-64 CPUs with AVX-512 VBMI. ARM64 and older x86 CPUs use different code and are not affected.",
+                    "question": "Why are some servers affected and others not?"
+                },
+                {
+                    "answer": "Input that ends with padding characters makes the routine miscalculate the output length. That produces a mask that writes past the end of the output buffer.",
+                    "question": "What triggers the overflow?"
+                },
+                {
+                    "answer": "Disable the Base64 intrinsic in the JVM, or lower the vector instruction level. The second option is only safe on x86-64 hosts, because ARM JVMs may refuse to start.",
+                    "question": "What are the two interim mitigations if you cannot patch?"
+                },
+                {
+                    "answer": "The decoder is reachable by unauthenticated input in common features, and a heap overflow or leak in a widely used runtime can lead to code execution or Heartbleed-style disclosure.",
+                    "question": "Why is the CVSS score so high for an overflow of a few dozen bytes?"
+                }
+            ],
+            "source": "Calif (calif.io)",
+            "summary": "Calif researchers used an AI coding agent to audit the OpenJDK JVM, focusing on JIT intrinsics, APIs and cryptography. In about an hour it found a heap out-of-bounds write in the hand-written x86-64 vector routine that implements the Base64 decoder. When the input ends in padding characters, the routine miscalculates the output length. The resulting write mask lets the routine write up to about 62 bytes past the end of the output buffer. Java rejects the bad input afterwards, but the neighbouring heap memory is already corrupted.\n\nThe flaw is rated CVSS 4.0 9.2. The vulnerable path runs only on x86-64 CPUs with AVX-512 VBMI (recent Intel Xeon and AMD Zen 4 or newer). ARM64 is not affected. Ordinary features such as authentication headers and file uploads can reach the decoder, so the bug can leak heap contents or be pushed toward remote code execution. Calif says it demonstrated code execution in several popular Java applications under default settings.\n\nThe post also notes that the bug had been reported publicly months earlier and had a proposed fix. Oracle and OpenJDK shipped fixed builds on November 17, 2026. The interim mitigations are to disable the Base64 intrinsic or to limit the JVM to a lower vector instruction level.",
+            "tags": [
+                "memory-corruption",
+                "JVM",
+                "AI-assisted-audit"
+            ],
+            "takeaways": [
+                "Performance-oriented hand-written vector code in a memory-safe runtime bypasses the language's safety guarantees.",
+                "A length miscalculation on padding input produced a bounded overflow of up to about 62 bytes.",
+                "The bug is hardware-dependent, so two identical Java versions can differ in exposure depending on the CPU.",
+                "Input validation that rejects bad data after the write has already happened does not protect memory.",
+                "Everyday features like auth headers and uploads are enough to reach a decoder, so exploitability comes from reachability, not exotic input.",
+                "AI agents can find real bugs quickly in JIT intrinsics, an area humans seldom audit.",
+                "A bug that was publicly reported and root-caused months earlier still went unfixed until a high-profile disclosure.",
+                "Interim mitigations turned off the specific intrinsic or the CPU feature, which is a useful pattern when patching lags."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-122",
+                    "kind": "weakness",
+                    "name": "Heap-based Buffer Overflow",
+                    "text": "The product writes past the end of a buffer that was allocated on the heap.",
+                    "url": "https://cwe.mitre.org/data/definitions/122.html"
+                },
+                {
+                    "id": "CWE-787",
+                    "kind": "weakness",
+                    "name": "Out-of-bounds Write",
+                    "text": "The product writes data past the end, or before the beginning, of the intended buffer.",
+                    "url": "https://cwe.mitre.org/data/definitions/787.html"
+                }
+            ],
+            "title": "Java4Shell: CVE-2026-114938",
+            "topic": "Security",
+            "url": "https://calif.io/java4shell",
+            "why": "A critical heap overflow in a core JVM intrinsic, found by an AI agent in about an hour, with clear lessons on hand-written vector code."
+        },
+        {
+            "category": "Web",
+            "level": "Senior",
+            "popularity": "Linked in RE:HACK's November 2026 newsletter; I did not see an HN score",
+            "practice": [
+                "Read the PHP source documentation on how request memory is allocated and freed. Draw a diagram of what happens to request-scoped data when a fatal error occurs.",
+                "In your own test PHP install, review which settings control memory limit, post size and session upload progress. Write down what each does and the risk of changing it.",
+                "Take the write-up's timeline and list what a defender could have monitored, such as repeated out-of-memory fatals in logs.",
+                "Compare the write-up with the older PHP memory-limit bugs it cites. Summarize what stayed the same across 20 years.",
+                "Write a short checklist for reviewing any C code that updates counters and allocates in the same function, and note where failure ordering matters."
+            ],
+            "questions": [
+                {
+                    "answer": "Counters are incremented before the new bucket's key is allocated. If that allocation causes a fatal error, cleanup treats the incomplete bucket as valid.",
+                    "question": "What is the core flaw in the hash-table bug?"
+                },
+                {
+                    "answer": "On mod_php the worker is reused, so stale state survives into the next request. PHP-FPM ends a worker when startup fails, so the attack needed a fatal that occurs after successful startup.",
+                    "question": "Why does mod_php give a different exploitation route from PHP-FPM?"
+                },
+                {
+                    "answer": "By exceeding the memory limit with requests built from many empty nested upload parts, while staying under the body-size limit.",
+                    "question": "How can an attacker force the fatal error?"
+                },
+                {
+                    "answer": "The flaws are in the PHP runtime itself, so any app running on an affected PHP version and server model was exposed.",
+                    "question": "Why were many applications affected without app bugs?"
+                },
+                {
+                    "answer": "The team studied past PHP memory-limit bugs and used AI-assisted analysis guided toward old code, then generalized the first bug's pattern to find the second.",
+                    "question": "What was the research method?"
+                }
+            ],
+            "source": "Calif, with OpenAI and Wiz (calif.io)",
+            "summary": "Calif, OpenAI and Wiz describe two PHP memory-management bugs (CVE-2026-109618 and CVE-2026-109619) that give unauthenticated code execution in default setups. The first is a hash-table bookkeeping flaw in which counters are incremented before the new bucket's key is allocated. If that allocation hits a fatal error, teardown treats the half-built bucket as live. This path leads to code execution on Apache mod_php. The second path abuses stale request state left after a fatal error during startup or unserialization, and reaches code execution on PHP-FPM through the session upload-progress feature.\n\nThe exploitation idea relies on forcing a fatal at a chosen moment, by exhausting the memory limit with many nested upload parts while staying under body-size limits. Because the attacker picks which allocation fails, the failure lands where the interpreter state is inconsistent. A follow-up request then consumes the stale state. PHP-FPM kills a worker when startup fails, so that route needed a fatal after a successful startup, which led to the unserialize-based chain.\n\nThe authors say they found the bugs by guiding AI-assisted analysis with the history of old PHP memory-limit bugs, rather than letting it chase new code. The team reported them in August and patched releases shipped on October 21, 2026. Confirmed pre-auth impact covered WordPress, Drupal, Joomla, MediaWiki, Roundcube, Magento, phpMyAdmin, Nextcloud and others.",
+            "tags": [
+                "PHP",
+                "memory-corruption",
+                "RCE"
+            ],
+            "takeaways": [
+                "Out-of-order state updates (counters bumped before allocation) are a classic source of corruption when a failure interrupts the sequence.",
+                "Fatal errors that skip cleanup leave stale pointers, and a reused worker process carries them into the next request.",
+                "Attackers who can choose which allocation fails get precise control over the inconsistent state.",
+                "Memory limits are an attack surface: making a fatal error happen on demand is itself a primitive.",
+                "Different PHP server models (mod_php vs PHP-FPM) need different exploit routes because of how they handle failed workers.",
+                "Historical bug reports are a good map for finding variants, and AI works better when it is pointed at old code.",
+                "The bugs affected many well-known apps with no application-specific flaw needed.",
+                "Temporary mitigations are config changes, but they trade one risk for another, so patching is the real fix."
+            ],
+            "terms": [
+            ],
+            "title": "PHP2Shell: A Tale of Two PHP Remote Vulnerabilities",
+            "topic": "Security",
+            "url": "https://calif.io/php2shell/",
+            "why": "Two PHP runtime bugs gave pre-auth RCE across WordPress, Drupal, Joomla and more, and the post explains the failure-ordering root causes in depth."
+        },
+        {
+            "category": "Web",
+            "level": "Junior",
+            "popularity": "Widely covered by Cybernews, The New Stack and eSecurityPlanet; a listing on zeli.app. I did not see an HN score",
+            "practice": [
+                "In an intentionally vulnerable lab app you run yourself, inspect a signed session cookie and write down what it reveals, and why signing differs from encryption.",
+                "Read the documentation for your favourite web framework's session handling. Note what is stored client-side and what the signing key protects.",
+                "Audit one of your own projects for any secret that is used for more than one purpose, and list how you would split them.",
+                "Read your language's documentation on unsafe deserialization formats and list safer alternatives for data crossing a trust boundary.",
+                "Practice on a CTF platform's deserialization or session-forgery challenges, then write a one-paragraph summary of the root cause."
+            ],
+            "questions": [
+                {
+                    "answer": "It was larger than expected for its purpose. Decoding it showed a serialized object with the OAuth client ID and secret in plaintext.",
+                    "question": "What made the session cookie suspicious?"
+                },
+                {
+                    "answer": "The developers used the OAuth client secret as the Flask signing key, so the readable secret let anyone sign their own sessions.",
+                    "question": "Why did the leaked secret allow forging sessions?"
+                },
+                {
+                    "answer": "The callback deserialized the session's flow object with pickle, which can execute actions on load, so a forged session could carry a malicious object.",
+                    "question": "Why did forged sessions lead to code execution?"
+                },
+                {
+                    "answer": "By making the server pause for chosen durations and checking that response times matched, with control tests for missing and tampered cookies.",
+                    "question": "How did the researcher demonstrate impact safely?"
+                },
+                {
+                    "answer": "Rotate secrets and invalidate sessions, use a separate random session key per deployment, keep sensitive flow state on the server, and replace pickle with a validated data-only format.",
+                    "question": "What are the four recommended fixes?"
+                }
+            ],
+            "source": "Simon Koeck (simonkoeck.com)",
+            "summary": "While mapping the OAuth sign-in flow shared by Google's developer documentation sites, the researcher noticed an unusually large Flask session cookie. Flask cookies are signed but not encrypted, so the contents are readable. Decoded, the cookie held a serialized flow object that included Google's OAuth client ID and client secret in plaintext.\n\nThe developers had also used that client secret as the key that signs session cookies. This meant anyone could read the signing key from their own cookie and forge valid sessions. The OAuth callback then deserialized the stored flow object with Python's pickle, which can execute actions on load. A forged session carrying a crafted object therefore gave unauthenticated code execution. The same key worked across several other Google developer domains, such as Firebase and Android.\n\nTo prove impact without touching production, the author only made the server pause for a chosen number of seconds and matched the response times, with control tests for unsigned and tampered cookies. Google deployed a hotfix within about a day, and the reward was $90,000. The write-up recommends rotating secrets, separating signing keys from credentials, keeping flow state on the server and replacing pickle at client boundaries.",
+            "tags": [
+                "deserialization",
+                "secrets",
+                "bug-bounty"
+            ],
+            "takeaways": [
+                "Signed does not mean private: anything in a client-held cookie is readable.",
+                "One secret should have one purpose; reusing an OAuth secret as a signing key linked two systems.",
+                "Storing the key inside the object it protects defeats the protection.",
+                "Unsafe deserialization is only as safe as the signature in front of it, which fails when the key leaks.",
+                "A cookie that is unusually large for what it should hold is a good prompt for inspection.",
+                "A timing-based proof can show severe impact without running commands on production.",
+                "Fixes should include rotation, session invalidation, server-side state and a data-only format.",
+                "The bug was reported to Google's VRP, got a fast hotfix, and paid a large bounty."
+            ],
+            "terms": [
+            ],
+            "title": "A leaked Google OAuth secret let me run code on Google's servers",
+            "topic": "Security",
+            "url": "https://simonkoeck.com/writeups/google-devsite-flask-session-pickle-rce",
+            "why": "A beginner-friendly chain of three simple mistakes (readable cookie, reused secret, pickle) that earned a $90,000 bounty."
+        },
+        {
+            "category": "Blue Team",
+            "level": "Middle",
+            "popularity": "Heavily covered by BleepingComputer, SecurityWeek, Rapid7, Dark Reading and others; I did not see an HN score",
+            "practice": [
+                "Take the detection list and design, in your own SIEM or log lab, how you would alert on the same types of events for any management agent.",
+                "Make an inventory of internet-exposed admin or legacy interfaces in your own environment and rank which should be closed first.",
+                "Write a short incident-response checklist for a compromised management server: isolate, rotate credentials, review endpoints, rebuild.",
+                "Read about XXE and OGNL injection in the OWASP documentation and explain in prose why each is dangerous on an enterprise server.",
+                "Practise threat hunting for suspicious children of a trusted agent process using sample process logs you generate in a test VM."
+            ],
+            "questions": [
+                {
+                    "answer": "It has privileged agents on many endpoints, so one server compromise can reach all managed Windows systems, often as SYSTEM.",
+                    "question": "What makes an RMM platform like N-central such a high-risk target?"
+                },
+                {
+                    "answer": "The non-default Legacy API. The server chain and Agent2Shell reportedly required it to be enabled and internet-exposed.",
+                    "question": "Which configuration setting mattered most for exposure?"
+                },
+                {
+                    "answer": "Agents and probes that are not upgraded can still be impersonated, so they need the HF3 level as well.",
+                    "question": "Why was patching only the server not enough?"
+                },
+                {
+                    "answer": "Encoded PowerShell running as SYSTEM and spawned by the N-able agent, and unexpected probe binaries or config written to the Windows Software Probe directory.",
+                    "question": "Name two host-side indicators defenders should check on endpoints."
+                },
+                {
+                    "answer": "One finding allowed tampering with audit logs and session records, so records from unpatched servers may have been altered.",
+                    "question": "Why does the post warn against trusting some audit records?"
+                }
+            ],
+            "source": "Huntress",
+            "summary": "An independent researcher published 33 critical flaws in N-able's N-central remote management server on GitHub, chained into four exploit paths called Able2Shell. Three of them give remote code execution and one gives root. The bug classes include XXE, OGNL injection, path traversal, missing authentication on SOAP and API calls, predictable appliance passcodes, syslog injection and insecure IPC. N-able took its hosted service offline on November 9. Further exploit sets (4EverAble2Shell and Agent2Shell) followed and targeted the first hotfix, including paths from the server to managed Windows endpoints.\n\nHuntress, which keeps updating the post, tracks the vendor timeline: hotfix HF2 on November 10, guidance to disable the non-default Legacy API on November 12, indicators of compromise on November 13, and HF3 on November 16, which removed the Legacy API option. It lists 17 CVEs fixed in HF3, three of them critical. A patched server alone does not close agent and probe impersonation.\n\nThe post is mostly practical for defenders. It lists suspicious requests to specific server endpoints, unexpected files and symlinks on the server, encoded PowerShell run as SYSTEM from the agent, and probe binary changes on Windows. It also advises rotating stored credentials, enforcing MFA, not trusting audit records from unpatched servers, and not relying on IP allowlisting alone.",
+            "tags": [
+                "RMM",
+                "incident-response",
+                "detection"
+            ],
+            "takeaways": [
+                "Remote management servers are high-value targets because compromise reaches every managed endpoint.",
+                "Many of the exploited bugs were old classes such as XXE, path traversal and missing authorization checks.",
+                "The most dangerous paths depended on a non-default legacy API exposed to the internet, so exposure review matters.",
+                "Patching the server does not fix agent and probe impersonation; clients must be updated too.",
+                "Public proof-of-concept code for hotfix-fixed bugs appeared within hours of the fix.",
+                "Detection can use specific web requests, odd file symlinks and unexpected child processes of the management agent.",
+                "Audit logs on a possibly compromised server cannot be trusted as evidence.",
+                "After exposure, rotate credentials stored in the platform and require MFA."
+            ],
+            "terms": [
+                {
+                    "id": "CWE-22",
+                    "kind": "weakness",
+                    "name": "Path traversal",
+                    "text": "The product uses external input to construct a pathname that is intended to identify a file or directory that is located underneath a restricted parent directory, but the product does not properly neutralize special elements within the pathname that can cause the pathname to resolve to a location that is outside of the restricted directory.",
+                    "url": "https://cwe.mitre.org/data/definitions/22.html"
+                },
+                {
+                    "id": "CWE-611",
+                    "kind": "weakness",
+                    "name": "XXE",
+                    "text": "The product processes an XML document that can contain XML entities with URIs that resolve to documents outside of the intended sphere of control, causing the product to embed incorrect documents into its output.",
+                    "url": "https://cwe.mitre.org/data/definitions/611.html"
+                },
+                {
+                    "id": "CWE-862",
+                    "kind": "weakness",
+                    "name": "Missing Authorization",
+                    "text": "The product does not perform an authorization check when an actor attempts to access a resource or perform an action.",
+                    "url": "https://cwe.mitre.org/data/definitions/862.html"
+                },
+                {
+                    "id": "T1021.007",
+                    "kind": "technique",
+                    "name": "Cloud Services",
+                    "text": "Adversaries may log into accessible cloud services within a compromised environment using Valid Accounts that are synchronized with or federated to on-premises user identities. The adversary may then perform management actions or access cloud-hosted resources as the logged-on user.",
+                    "url": "https://attack.mitre.org/techniques/T1021/007"
+                }
+            ],
+            "title": "N-able Disables Cloud Services Following Disclosure of \"Able2Shell\" Exploit Chains",
+            "topic": "Security",
+            "url": "https://www.huntress.com/blog/n-able-disables-cloud-services-following-disclosure-of-able2shell-exploit-chains",
+            "why": "A living incident post with a vendor timeline, concrete detection ideas and post-patch advice for a management platform with 33 public flaws."
+        },
+        {
+            "category": "Reverse",
+            "level": "Middle",
+            "popularity": "Lobste.rs · 18 points",
+            "practice": [
+                "Pick a simple file format you can legally obtain, read its spec, and write down its structure as a diagram of headers, indexes and data blocks.",
+                "Study a basic LZ77 description and work by hand through decoding a short example with literals and back-references.",
+                "Read about variable-length codes and write a short note on how one off-by-one in the prefix length could shift all later values.",
+                "Look at a hash function used in a file format and explain in prose why signedness of a lookup table could change results for some inputs.",
+                "Review the parser of an open-source file reader and list every place where a length or offset from the file is checked before use."
+            ],
+            "questions": [
+                {
+                    "answer": "As a small embedded file system, with a directory pointing to named internal entries such as the topic data, fonts and context table, and with B+ tree indexes.",
+                    "question": "How is a WinHelp file organised internally?"
+                },
+                {
+                    "answer": "They count decompressed bytes and each block reserves a fixed slot larger than the typical decompressed size, so readers must skip unused space.",
+                    "question": "Why do topic addresses require special handling?"
+                },
+                {
+                    "answer": "It always read at least one remainder bit, but when the step is one there are none, so every phrase after the first was misaligned.",
+                    "question": "What went wrong with the phrase-length decoder?"
+                },
+                {
+                    "answer": "They store a hash of the context name, which is looked up in the context table rather than a direct position.",
+                    "question": "How do links find their targets?"
+                },
+                {
+                    "answer": "Legacy files may be malformed or hostile, and a parser that trusts the offsets and lengths in the file can read or write out of bounds.",
+                    "question": "Why does bounds checking matter for a reader like this?"
+                }
+            ],
+            "source": "quin.fyi",
+            "summary": "The author built libhlp, a pure-Rust reader for Microsoft's undocumented WinHelp (.hlp) format, so an accessibility-focused reader could open old help files. The work relied on a community format description and inspection of real files. The format is an embedded file system with pipe-prefixed internal entries for system settings, topic text, fonts, a context table and phrase tables. The indexes are B+ trees that share one page layout. Topic text is split into fixed blocks that may be LZ77-compressed, and addresses count decompressed bytes, so readers must skip unused space.\n\nThe post explains the compression layers. A flag byte controls eight items that are literals or back-references. A second layer swaps phrase codes for entries from a phrase table, with an additional scheme from the Windows 95 compiler. Two subtle bugs are described: a length decoder that always read a remainder bit even when the step size left none, which misaligned every later phrase, and a signed-value error in link hashing that still works for most names and is hard to notice.\n\nThe post also covers how links store a hash of the target name instead of a position, how fonts carry all formatting, code page guessing for text encoding, and how WinHelp 3.0 differs structurally. The result is a bounds-checked reader published on crates.io that handles versions 3.0 through the Windows 95 compiler.",
+            "tags": [
+                "file-format",
+                "reverse-engineering",
+                "compression"
+            ],
+            "takeaways": [
+                "An undocumented format can be learned from a community spec plus careful study of real sample files.",
+                "Many old formats are small file systems with directories, indexes and compressed blocks.",
+                "LZ77 style schemes use flag bytes to mark literals versus back-references, and overlapping copies create runs.",
+                "Off-by-one decoding errors in variable-length codes can shift every later item, so one bug breaks the entire output.",
+                "Signed versus unsigned handling can hide bugs that only show up for rare inputs, such as certain characters.",
+                "Links stored as hashes need an exact reproduction of the hash function, including case folding.",
+                "Formatting stored as font indices means a reader must infer meaning, such as telling link underlines from real underlines.",
+                "A defensive parser should do bounds checking throughout when handling untrusted legacy files."
+            ],
+            "terms": [
+                {
+                    "id": "CAPEC-188",
+                    "kind": "pattern",
+                    "name": "Reverse Engineering",
+                    "text": "An adversary discovers the structure, function, and composition of an object, resource, or system by using a variety of analysis techniques to effectively determine how the analyzed entity was constructed or operates. The goal of reverse engineering is often to duplicate the function, or a part of the function, of an object in order to duplicate or \"back engineer\" some aspect of its functioning.",
+                    "url": "https://capec.mitre.org/data/definitions/188.html"
+                }
+            ],
+            "title": "How WinHelp files work",
+            "topic": "Security",
+            "url": "https://quin.fyi/posts/how-winhelp-files-work.html",
+            "why": "A clear tour of reverse engineering an undocumented binary format, including two subtle decoder bugs that are easy to learn from."
+        }
+    ]
+}
