@@ -1,0 +1,304 @@
+{
+    "date": "2026-11-28",
+    "generatedAt": "2026-11-28T08:54:17",
+    "items": [
+        {
+            "category": "Web",
+            "level": "Junior",
+            "popularity": "Hacker News · 488 points, 257 comments",
+            "practice": [
+                "In a test shop you own, list every third-party script on the checkout page and write down who can change each one and why it is there.",
+                "Draft a content security policy for a sample payment page and reason about which directives would block each stage of the described chain, then verify in your own test site's browser developer tools.",
+                "Read the CSP specification sections on connect-src and note which browser features it does and does not cover.",
+                "Using your own browser, observe what WebRTC connections a demo page opens and think through how you would alert on unexpected ones.",
+                "Write a short threat model for a retailer with tag manager, consent banner, and CDN, marking the trust boundaries each represents."
+            ],
+            "questions": [
+                {
+                    "answer": "The skimmer needs two ordinary HTTP requests to a lookalike domain to start the WebRTC session. Blocking those requests prevents the channel from ever forming.",
+                    "question": "Why can a connect-src rule stop this skimmer even though it uses WebRTC?"
+                },
+                {
+                    "answer": "A modified ad-attribution pixel, an edited cookie-banner configuration, and a tampered file on a retailer's own CDN.",
+                    "question": "Which three delivery routes did the loader use?"
+                },
+                {
+                    "answer": "The script collected and exfiltrated fields as they were typed, before the store validated the payment.",
+                    "question": "Why did declined orders still lose card data?"
+                },
+                {
+                    "answer": "The script activates only on small or touch-screen devices, and in one case only on the checkout path.",
+                    "question": "Why would testing only on a desktop miss it?"
+                },
+                {
+                    "answer": "Auditing and controlling every third-party tag on payment pages, isolating card fields in a separate frame, testing checkout on mobile, and monitoring WebRTC connections.",
+                    "question": "What defences does the article recommend besides CSP?"
+                }
+            ],
+            "source": "InfoHawk News",
+            "summary": "InfoHawk found a card-skimming script on five retail sites (Lascana, Samsonite, American Tourister, Revolve, FWRD) in the week before Black Friday. The loader arrived by three routes: a modified ad-attribution pixel, an edited cookie-banner configuration, and a tampered file on a retailer's own CDN. That spread points to one actor abusing third-party content.\n\nThe skimmer fetched its main script from an attacker-controlled cloud storage bucket and ran only on small or touch-screen devices, and in one variant only on the checkout path. It made two ordinary HTTP requests to a lookalike domain to set up a WebRTC connection through a major CDN's relay service. It then received its payload in chunks over the data channel, checked a hash, executed it, and sent stolen data back over the same channel. Data was taken before payment validation, so declined orders still leaked cards. Live exfiltration was seen on one site, and all five removed the script after notification.\n\nThe key defensive point is that a strict connect-src policy blocks the two setup requests, so the WebRTC stage never starts. The authors also recommend auditing every third-party tag on payment pages and isolating card fields in a separate frame.",
+            "tags": [
+                "skimmer",
+                "supply-chain",
+                "CSP"
+            ],
+            "takeaways": [
+                "Third-party scripts (pixels, consent banners, CDN files) are a supply-chain path into checkout pages even when the retailer's own code is untouched.",
+                "Once a WebRTC data channel is up, the Content Security Policy connect-src directive no longer restricts what flows through it.",
+                "The only blockable step is the initial pair of HTTP requests, so a strict allow-list on payment pages stops the chain early.",
+                "Mobile-only and checkout-only triggers mean desktop testing and homepage scans can miss the skimmer.",
+                "Relaying through a large CDN's infrastructure makes malicious traffic look like legitimate WebRTC.",
+                "Capturing fields before payment validation means a declined or cancelled order is still a leaked card.",
+                "Vendor-hosted files can change at any time without the retailer's review, so ownership and change control of each tag matter.",
+                "Isolating card entry in a payment frame keeps third-party tags away from sensitive inputs."
+            ],
+            "terms": [
+                {
+                    "id": "T1195",
+                    "kind": "technique",
+                    "name": "Supply Chain Compromise",
+                    "text": "Adversaries may manipulate products or product delivery mechanisms prior to receipt by a final consumer for the purpose of data or system compromise.",
+                    "url": "https://attack.mitre.org/techniques/T1195"
+                }
+            ],
+            "title": "Credit card skimming scripts using WebRTC found on popular shopping sites",
+            "topic": "Security",
+            "url": "https://www.infohawk.com/news/2026-11-27-black-friday-webrtc-skimmer",
+            "why": "A clear, current example of how a supply-chain compromise bypasses a common web defence, with concrete mitigations."
+        },
+        {
+            "category": "Pwn",
+            "level": "Senior",
+            "popularity": "Lobsters · 86 points; Hacker News coverage of the nginx advisory exceeded 1,500 points",
+            "practice": [
+                "Read the HTTP/2 specification's flow-control section and write down how window sizes should be bounded and why overflow must be rejected.",
+                "In an nginx instance you run in a lab, inventory which of the affected features (HTTP/2, HTTP/3, mirror, mail proxy) are enabled and map each to the matching mitigation.",
+                "Study integer overflow and signed/unsigned conversion bugs using an intentionally vulnerable training platform or CTF, focusing on length-to-size conversions.",
+                "Write a short monitoring plan for your own web tier covering process execution by worker users and unusual connection shapes.",
+                "Compare your distribution's package changelog against upstream release notes to practise verifying backported fixes."
+            ],
+            "questions": [
+                {
+                    "answer": "Cancelling a stream with queued data returns credit to the connection send window without checking the protocol maximum, letting the window overflow and wrap in unsigned arithmetic.",
+                    "question": "What is the root cause of the main HTTP/2 bug?"
+                },
+                {
+                    "answer": "It can be chained with any nginx bug to go from worker-level code execution to root, even in a container.",
+                    "question": "Why does the kernel bug matter to nginx users?"
+                },
+                {
+                    "answer": "Distribution backports can fix the bug while keeping the upstream version number, so the package advisory must be checked.",
+                    "question": "Why is checking the nginx version string insufficient?"
+                },
+                {
+                    "answer": "No. The running executable is only replaced by a restart or supported live binary upgrade.",
+                    "question": "Is a configuration reload enough after patching?"
+                },
+                {
+                    "answer": "Long-lived HTTP/2 connections with heavy inbound and little outbound data, process execution by worker users, and abnormal worker exits or core dumps.",
+                    "question": "What detection signals do the authors suggest?"
+                }
+            ],
+            "source": "xint.io (Xint research team)",
+            "summary": "Xint disclosed six bugs: five in nginx that each give code execution as the worker user, and one Linux kernel SCTP bug that turns a worker compromise into root. The headline bug, affecting every official release from 1.9.5 with HTTP/2 enabled, is an integer overflow in send-window accounting. Cancelling a stream with queued data returns credit to the connection window without checking the protocol maximum, so a client can push the window past its limit. Unsigned arithmetic then wraps, and a negative length becomes a huge copy size and a heap out-of-bounds write.\n\nThe other four nginx bugs are use-after-frees: in the DNS resolver with mirrored subrequests, in HTTP/2 and HTTP/3 connection reuse and draining, and in the mail proxy auth lookup. The kernel bug lets a waiting send operation free an association that was moved to another socket, present since 2018. The authors describe at a high level how they obtained address leaks and a function-pointer overwrite, and say the chain worked on major clouds and from inside a container. They withhold final reproduction steps.\n\nThe post gives per-bug mitigations, a timeline from discovery on October 11 to patch on November 18, and detection ideas such as lopsided long-lived HTTP/2 connections and unexpected process execution by worker users.",
+            "tags": [
+                "nginx",
+                "HTTP/2",
+                "kernel-LPE"
+            ],
+            "takeaways": [
+                "A single missing bounds check on a window counter can turn into a heap write when later arithmetic is unsigned.",
+                "Cleanup paths that return credit or resources are as security-relevant as the main path.",
+                "Several use-after-frees came from connection reuse and draining logic freeing objects still in use elsewhere.",
+                "Version strings are unreliable for exposure checks because distributions backport fixes without changing them.",
+                "Reloading nginx does not replace the running binary; a restart or supported binary upgrade is needed.",
+                "Disabling the affected protocol feature is a stopgap, not a fix, and may break clients like gRPC.",
+                "Chaining an application bug with a kernel local privilege escalation turns worker access into host or container-escape access.",
+                "Attacks like this may leave little in access logs, so process-execution and connection-shape monitoring matter."
+            ],
+            "terms": [
+                {
+                    "id": "CAPEC-233",
+                    "kind": "pattern",
+                    "name": "Privilege Escalation",
+                    "text": "An adversary exploits a weakness enabling them to elevate their privilege and perform an action that they are not supposed to be authorized to perform.",
+                    "url": "https://capec.mitre.org/data/definitions/233.html"
+                },
+                {
+                    "id": "CWE-787",
+                    "kind": "weakness",
+                    "name": "Out-of-bounds Write",
+                    "text": "The product writes data past the end, or before the beginning, of the intended buffer.",
+                    "url": "https://cwe.mitre.org/data/definitions/787.html"
+                }
+            ],
+            "title": "NGINX2Root",
+            "topic": "Security",
+            "url": "https://xint.io/blog/nginx2root-remote-code-execution",
+            "why": "A rigorous multi-bug writeup on a ubiquitous server, with root-cause detail, honest mitigation limits, and a chain to root."
+        },
+        {
+            "category": "Other",
+            "level": "Junior",
+            "popularity": "Widely covered (BleepingComputer, SecurityWeek, CSO); no single score seen",
+            "practice": [
+                "Read the OpenSSH and musl release notes for this issue and trace in prose how each behaviour contributes.",
+                "In a throwaway lab VM you own, audit your SSH configuration for password authentication, PAM use, and locked-account handling.",
+                "Review how shadow password fields represent locked accounts and which markers exist.",
+                "Practise reading a vendor advisory and mapping its preconditions to your own fleet inventory.",
+                "Find a CTF or training room on authentication logic bugs and describe the root cause of each in your own words."
+            ],
+            "questions": [
+                {
+                    "answer": "The musl hashing function returns a star as an error for overlong passwords, which equals the star stored for locked accounts, and OpenSSH's dummy hashing borrows another account's hash.",
+                    "question": "What two behaviours combine to cause SSHole?"
+                },
+                {
+                    "answer": "Mainly musl-based systems without PAM such as Alpine; glibc or PAM systems like Debian, Ubuntu, and RHEL are described as outside scope.",
+                    "question": "Which distributions are in scope?"
+                },
+                {
+                    "answer": "Disable password authentication after confirming key-based login works, while keeping an admin session open.",
+                    "question": "What is the interim mitigation?"
+                },
+                {
+                    "answer": "It is a logic flaw in how return values are compared, not an out-of-bounds or lifetime error.",
+                    "question": "Why is this not a memory corruption bug?"
+                }
+            ],
+            "source": "TryHackMe blog (Ayomide Joseph A.); discovered by Özgün Kültekin",
+            "summary": "SSHole is an OpenSSH authentication bypass rated 8.1, disclosed on November 5, 2026 with OpenSSH 10.6p2. It is not a memory bug but the combination of two ordinary behaviours. On musl-based systems, the password hashing function rejects passwords over 256 bytes and returns a star character as an error. Locked accounts also store a star in the shadow password field, so OpenSSH's comparison of the two values succeeds.\n\nThe second behaviour is a timing defence: for accounts without a usable hash, OpenSSH hashes the attempt against another local account's hash. When that borrowed hash is a SHA-256 or SHA-512 type, the faulty comparison is triggered. Exploitation needs musl, PAM disabled, password authentication on, a locked target account, and another account with a compatible hash. Alpine Linux is the main example; glibc and PAM systems such as Debian, Ubuntu, and RHEL are out of scope.\n\nThe fix is upgrading to the patched release or a distribution backport. Disabling password authentication is a temporary mitigation, and patching does not remove access an attacker already gained.",
+            "tags": [
+                "OpenSSH",
+                "authentication",
+                "musl"
+            ],
+            "takeaways": [
+                "Two individually reasonable behaviours can combine into an authentication bypass.",
+                "An error return value that looks like valid data is a classic confusion bug.",
+                "A timing-attack defence (dummy hashing against another account) created the path to the flaw.",
+                "Exposure depends on a specific stack: musl libc, no PAM, password login enabled, a locked account.",
+                "Locked accounts are only safe if every comparison path treats the lock marker as non-matching.",
+                "Key-only authentication removes this attack surface and is a valid stopgap.",
+                "Patching does not undo prior compromise, so review affected hosts."
+            ],
+            "terms": [
+                {
+                    "id": "CAPEC-115",
+                    "kind": "pattern",
+                    "name": "Authentication Bypass",
+                    "text": "An attacker gains access to application, service, or device with the privileges of an authorized or privileged user by evading or circumventing an authentication mechanism. The attacker is therefore able to access protected data without authentication ever having taken place.",
+                    "url": "https://capec.mitre.org/data/definitions/115.html"
+                }
+            ],
+            "title": "CVE-2026-123158 (\"SSHole\")",
+            "topic": "Other",
+            "url": "https://tryhackme.com/resources/blog/sshole",
+            "why": "A short, accessible case study in how error handling and timing defences can interact into a login bypass."
+        },
+        {
+            "category": "Other",
+            "level": "Senior",
+            "popularity": "Lobsters · 15 points",
+            "practice": [
+                "Read an introduction to separation logic and write a plain-language explanation of the frame rule.",
+                "Study the CHERI capability model documentation and describe what no-capture means.",
+                "Work through a beginner tutorial in a proof assistant such as Rocq on a small invariant, and note where a failed proof would reveal a flaw.",
+                "Review the two linked fixes in the public repository and describe each bug in your own words.",
+                "Sketch a threat model for a small RTOS component where a scheduler is untrusted."
+            ],
+            "questions": [
+                {
+                    "answer": "It transitions between compartments and threads, enforcing isolation, so everything else's security relies on it being correct.",
+                    "question": "What does the switcher do and why verify it?"
+                },
+                {
+                    "answer": "A logical relation over-approximates its behaviour as a universal contract, and the frame rule preserves the caller's resources.",
+                    "question": "How is unknown code handled in the proofs?"
+                },
+                {
+                    "answer": "A scheduler could reschedule an exited thread and the switcher restored an uncleared saved context, exposing local capabilities.",
+                    "question": "What was the exited-thread bug?"
+                },
+                {
+                    "answer": "The loader, which is not verified.",
+                    "question": "What remains in the trusted computing base?"
+                }
+            ],
+            "source": "cheriot.org (June Rousseau, Jean Pichon-Pharabod, Lars Birkedal)",
+            "summary": "The Aarhus Griotte team verified the CHERIoT switcher, the small trusted component that moves between compartments and threads, against a strong threat model where other compartments and even the scheduler may be malicious. They used separation logic in the Rocq prover on the Iris framework: known code is verified line by line, while unknown code is bounded by a logical relation acting as a universal contract. They built up from a simplified model to one with exceptions, concurrency, and the stack high watermark, then to the full ISA model.\n\nThe proofs found two real bugs. First, a caller could pass a restricted stack pointer and an object outside it, moving the high watermark below the stack base and letting the caller recover the callee's private data after a fault. Second, a malicious scheduler could reschedule an exited thread, whose stale saved context would be restored, exposing capabilities. Both surfaced when a proof stalled on an invariant that did not hold. Fixes stop callers changing the stack base and clear registers when a thread exits.\n\nWith fixes, the switcher is proven to give isolation and no-capture, assuming a correct initial state; the loader remains trusted and unverified.",
+            "tags": [
+                "formal-verification",
+                "CHERI",
+                "capabilities"
+            ],
+            "takeaways": [
+                "A stuck proof is a bug report: the unprovable invariant points at the flaw.",
+                "Staged modelling, simple first then adding features, keeps proofs tractable.",
+                "Treating unknown code as an over-approximating contract lets you verify a trusted core against hostile neighbours.",
+                "Hardware capability systems still depend on a small software switcher being correct.",
+                "Stale state in save areas is a recurring leak source across privilege boundaries.",
+                "Even a verified result has a trusted base; here the loader is excluded.",
+                "A malicious scheduler is a strong adversary model that exposed a bug ordinary review missed."
+            ],
+            "terms": [
+            ],
+            "title": "From formal verification to bug-finding in CHERIoT",
+            "topic": "Other",
+            "url": "https://cheriot.org/verification/2026/11/24/griotte-verification-effort.html",
+            "why": "Shows how formal methods surface real isolation bugs, with a clear account of method, findings, and limits."
+        },
+        {
+            "category": "LLM & Agents",
+            "level": "Middle",
+            "popularity": "Hacker News · 274 points, 88 comments",
+            "practice": [
+                "Pick a skill or plugin you use, read every instruction file, and list each outbound network call and remote script it triggers.",
+                "Write a review checklist for agent skills covering disclosure, pinning, credentials, and permission prompts.",
+                "In your own sandbox, observe what network traffic an agent plugin generates during a normal task.",
+                "Compare how package registries use hashes and lockfiles with how skills fetch remote scripts, and note the gaps.",
+                "Draft a short policy for your team on approving third-party agent skills."
+            ],
+            "questions": [
+                {
+                    "answer": "The user's one-sentence project idea, posted to a remote host under a telemetry label.",
+                    "question": "What data was sent without disclosure?"
+                },
+                {
+                    "answer": "The skill states that a combined command is what safety classifiers block, so the split is meant to avoid that check.",
+                    "question": "Why is splitting download and execution a concern?"
+                },
+                {
+                    "answer": "The remote operator can change the executed code at any time with no plugin release or marketplace review.",
+                    "question": "Why does the lack of pinning matter?"
+                },
+                {
+                    "answer": "Disclose and make telemetry optional, bundle or hash-pin scripts, and remove the classifier-avoidance instruction.",
+                    "question": "What fixes does the author propose?"
+                }
+            ],
+            "source": "GitHub issue by thirtysix (convex-backend-skill)",
+            "summary": "A reviewer audited three skills in a plugin listed in an official agent plugin marketplace. One skill posts the user's one-sentence project idea to a remote host, labelled as telemetry without telling the user. Another pipes scripts fetched from the same host straight into a shell. A third splits download and execution into separate steps, with a comment saying a single download-and-run command is what safety classifiers block.\n\nThe author reads the intent as smoothing onboarding, not malice, but argues that telling the agent to restructure commands to avoid classifiers removes a check users or administrators chose to keep. A commenter added that other scripts install unpinned dependencies, deploy backend changes with existing credentials, and that an opt-out flag does not stop deployment because it is checked too late. Neither remote payload is pinned or integrity-checked, so the endpoint operator can change what runs without a plugin release or review.\n\nSuggested fixes are disclosing and making the transmission optional, bundling or hash-pinning scripts, and removing the classifier-avoidance instruction. As of the page, the maintainers had not responded.",
+            "tags": [
+                "agent-skills",
+                "supply-chain",
+                "telemetry"
+            ],
+            "takeaways": [
+                "Agent skills are instructions plus scripts, and they deserve the same supply-chain review as code dependencies.",
+                "Unpinned remote scripts let the host operator change behaviour without any marketplace review.",
+                "Telemetry that includes user prompts or project ideas needs explicit disclosure and consent.",
+                "Instructions that reshape commands to avoid safety classifiers undermine user-chosen controls.",
+                "Opt-out flags must be checked before the action they are meant to prevent.",
+                "Reusing existing credentials for deployment widens the blast radius of a skill.",
+                "Marketplace listing is not a security review; read the skill files yourself."
+            ],
+            "terms": [
+            ],
+            "title": "Convex skills send the user's app idea to a remote server without telling them",
+            "topic": "AI / ML",
+            "url": "https://github.com/convex/convex-backend-skill/issues/64",
+            "why": "A concrete, current audit showing the supply-chain and consent risks of third-party agent skills."
+        }
+    ]
+}
